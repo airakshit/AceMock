@@ -1,8 +1,10 @@
 import { betterAuth } from "better-auth/minimal";
+import { lastLoginMethod } from "better-auth/plugins"
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { db } from "@/db";
 import { env } from "@/config/env/server";
+import { nextCookies } from "better-auth/next-js";
 
 export const auth = betterAuth({
     database: drizzleAdapter(db, {
@@ -29,4 +31,5 @@ export const auth = betterAuth({
     advanced: {
         cookiePrefix: "mock-ace",
     },
+    plugins: [nextCookies(), lastLoginMethod()]
 });
