@@ -13,6 +13,7 @@ npm install -D drizzle-kit
 
 For generating auth related database tables, we will use
 ```bash
-npx auth@latest generate
+npx auth@latest generate --config "src/lib/auth/auth.ts" --output "src/db/schemas/auth.ts"
 ```
 This will generate tables according to **Better Auth Service.**
+
