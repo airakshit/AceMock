@@ -1,5 +1,20 @@
 export const LastUsedIndicator = () => (
-	<span className="ml-auto absolute -right-3 px-2 py-1 text-[0.5rem] bg-blue-200 text-blue-900 dark:bg-blue-600 dark:text-blue-100 rounded-md font-medium pointer-events-none">
-		Last Used
-	</span>
+  <span
+    className="
+      absolute -right-2 -top-2
+      rounded-full
+      border border-background
+      bg-blue-100
+      px-2 py-0.5
+      text-[10px] font-medium leading-none
+      text-blue-700
+      shadow-sm
+      dark:bg-blue-900
+      dark:text-blue-200
+      pointer-events-none
+      whitespace-nowrap
+    "
+  >
+    Last used
+  </span>
 );

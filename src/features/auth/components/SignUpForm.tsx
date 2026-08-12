@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -28,7 +28,6 @@ interface SignUpFormProps {
 export function SignUpForm({
     onSuccess,
     callbackURL = "/dashboard",
-    params,
 }: SignUpFormProps) {
     const [loading, startTransition] = useTransition();
 
@@ -51,9 +50,6 @@ export function SignUpForm({
                 name: `${data.firstName} ${data.lastName}`,
                 callbackURL,
                 fetchOptions: {
-                    query: params
-                        ? Object.fromEntries(params.entries())
-                        : undefined,
                     onError: (ctx) => {
                         toast.error(ctx.error.message);
                     },
@@ -69,7 +65,7 @@ export function SignUpForm({
     return (
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-2">
             <FieldGroup>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Controller
                         name="firstName"
                         control={form.control}
@@ -135,7 +131,7 @@ export function SignUpForm({
                         </Field>
                     )}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Controller
                         name="password"
                         control={form.control}

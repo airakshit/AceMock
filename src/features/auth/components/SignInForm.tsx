@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -34,7 +33,6 @@ export function SignInForm({
     onSuccess,
     callbackURL = "/dashboard",
     showPasswordToggle = false,
-    params,
 }: SignInFormProps) {
     const [loading, startTransition] = useTransition();
     const [isMounted, setIsMounted] = useState(false);
@@ -59,12 +57,9 @@ export function SignInForm({
                     email: data.email,
                     password: data.password,
                     rememberMe: data.rememberMe,
-                    callbackURL,
+                    callbackURL: callbackURL,
                 },
                 {
-                    query: params
-                        ? Object.fromEntries(params.entries())
-                        : undefined,
                     onSuccess() {
                         toast.success("Successfully signed in");
                         onSuccess?.();
@@ -111,12 +106,12 @@ export function SignInForm({
                                 <FieldLabel htmlFor="sign-in-password">
                                     Password
                                 </FieldLabel>
-                                <Link
+                                {/* <Link
                                     href="/forgot-password"
                                     className="ml-auto inline-block text-sm underline text-foreground"
                                 >
                                     Forgot your password?
-                                </Link>
+                                </Link> */}
                             </div>
                             {showPasswordToggle ? (
                                 <PasswordInput
