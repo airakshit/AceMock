@@ -42,6 +42,8 @@ export function ContinueWithGoogle({
         } catch (error) {
             console.error("Google sign-in failed:", error);
             setIsLoading(false);
+        } finally {
+            setIsLoading(false)
         }
     };
 
