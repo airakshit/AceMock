@@ -43,7 +43,7 @@ export function ContinueWithGoogle({
             console.error("Google sign-in failed:", error);
             setIsLoading(false);
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
     };
 

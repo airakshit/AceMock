@@ -10,7 +10,6 @@ import {
     index,
 } from "drizzle-orm/pg-core";
 
-
 export const subjects = pgTable("subjects", {
     id: bigint("id", { mode: "number" })
         .primaryKey()
@@ -133,5 +132,3 @@ export const questions = pgTable(
         index("questions_difficulty_idx").on(table.difficulty),
     ],
 );
-
-

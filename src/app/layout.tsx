@@ -1,5 +1,5 @@
 import "./globals.css";
-
+import { Toaster } from "sonner";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 
@@ -44,6 +44,7 @@ export default function RootLayout({
                 className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}
             >
                 <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+                <Toaster position="top-right"/>
                 {children}
             </body>
         </html>

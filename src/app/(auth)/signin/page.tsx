@@ -49,10 +49,14 @@ function SignInPageContent() {
                 {/* Header section with badge */}
                 <div className="mx-auto flex flex-col items-center text-center px-4 mb-6 sm:mb-8">
                     <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
-                        Ace <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-rose-500 bg-clip-text text-transparent">IOE Entrance</span>
+                        Ace{" "}
+                        <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-rose-500 bg-clip-text text-transparent">
+                            IOE Entrance
+                        </span>
                     </h1>
                     <p className="mt-2.5 text-xs sm:text-sm text-muted-foreground max-w-sm sm:max-w-md leading-relaxed">
-                        Free high-quality mock tests & subject-wise practice for BE/B.Arch entrance exams.
+                        Free high-quality mock tests & subject-wise practice for
+                        BE/B.Arch entrance exams.
                     </p>
                 </div>
 
@@ -71,7 +75,7 @@ function SignInPageContent() {
                                         "absolute top-1 bottom-1 left-1 rounded-xl bg-card shadow-sm transition-all duration-300 ease-out",
                                         activeTab === "signin"
                                             ? "w-[calc(50%-4px)] translate-x-0"
-                                            : "w-[calc(50%-4px)] translate-x-[100%]"
+                                            : "w-[calc(50%-4px)] translate-x-[100%]",
                                     )}
                                 />
 
@@ -80,7 +84,7 @@ function SignInPageContent() {
                                         "relative z-10 flex-1 min-h-10 rounded-xl px-4 py-2 text-sm sm:text-base font-semibold transition-all duration-200 focus-visible:outline-hidden cursor-pointer flex items-center justify-center gap-2",
                                         activeTab === "signin"
                                             ? "text-foreground"
-                                            : "text-muted-foreground hover:text-foreground"
+                                            : "text-muted-foreground hover:text-foreground",
                                     )}
                                     value="signin"
                                 >
@@ -92,7 +96,7 @@ function SignInPageContent() {
                                         "relative z-10 flex-1 min-h-10 rounded-xl px-4 py-2 text-sm sm:text-base font-semibold transition-all duration-200 focus-visible:outline-hidden cursor-pointer flex items-center justify-center gap-2",
                                         activeTab === "signup"
                                             ? "text-foreground"
-                                            : "text-muted-foreground hover:text-foreground"
+                                            : "text-muted-foreground hover:text-foreground",
                                     )}
                                     value="signup"
                                 >
@@ -126,20 +130,50 @@ function SignInPageContent() {
                     </p>
                     <div className="mt-4 flex flex-wrap justify-center items-center gap-x-5 gap-y-2.5 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <svg
+                                className="w-3.5 h-3.5 text-emerald-500"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
                             </svg>
                             <span>Subject-wise & Full Mock Tests</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <svg
+                                className="w-3.5 h-3.5 text-emerald-500"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
                             </svg>
                             <span>Real Exam Timing & Layout</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <svg
+                                className="w-3.5 h-3.5 text-emerald-500"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
                             </svg>
                             <span>100% Free Forever</span>
                         </div>
@@ -152,14 +186,18 @@ function SignInPageContent() {
 
 export default function Page() {
     return (
-        <Suspense fallback={
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    <p className="text-xs text-muted-foreground font-medium">Loading auth portal...</p>
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        <p className="text-xs text-muted-foreground font-medium">
+                            Loading auth portal...
+                        </p>
+                    </div>
                 </div>
-            </div>
-        }>
+            }
+        >
             <SignInPageContent />
         </Suspense>
     );

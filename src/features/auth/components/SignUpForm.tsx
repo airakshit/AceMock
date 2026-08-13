@@ -51,6 +51,7 @@ export function SignUpForm({
                 callbackURL,
                 fetchOptions: {
                     onError: (ctx) => {
+                        console.log(`Error occured during auth. ${ctx.error.message}`)
                         toast.error(ctx.error.message);
                     },
                     onSuccess: async () => {
