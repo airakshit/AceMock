@@ -51,7 +51,7 @@ export function ContinueWithGoogle({
         <Button
             variant="outline"
             className={cn(
-                "relative w-full justify-center gap-3 px-4 py-3 text-sm font-medium",
+                "relative h-10 w-full justify-center gap-2.5 text-sm font-medium",
                 className,
             )}
             onClick={handleClick}

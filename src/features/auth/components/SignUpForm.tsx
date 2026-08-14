@@ -14,7 +14,9 @@ import {
     FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/shared/PasswordInput";
 import { authClient } from "@/lib/auth/auth-client";
+import { layout } from "@/lib/design-system";
 import { signUpSchema } from "../schemas";
 
 type SignUpFormValues = z.infer<typeof signUpSchema>;
@@ -22,7 +24,6 @@ type SignUpFormValues = z.infer<typeof signUpSchema>;
 interface SignUpFormProps {
     onSuccess?: () => void;
     callbackURL?: string;
-    params?: URLSearchParams;
 }
 
 export function SignUpForm({
@@ -34,28 +35,26 @@ export function SignUpForm({
     const form = useForm<SignUpFormValues>({
         resolver: zodResolver(signUpSchema),
         defaultValues: {
-            firstName: "",
-            lastName: "",
             email: "",
             password: "",
-            passwordConfirmation: "",
         },
     });
 
     const onSubmit = (data: SignUpFormValues) => {
         startTransition(async () => {
+            const name = data.email.split("@")[0] || "User";
+
             await authClient.signUp.email({
                 email: data.email,
                 password: data.password,
-                name: `${data.firstName} ${data.lastName}`,
+                name,
                 callbackURL,
                 fetchOptions: {
                     onError: (ctx) => {
-                        console.log(`Error occured during auth. ${ctx.error.message}`)
                         toast.error(ctx.error.message);
                     },
                     onSuccess: async () => {
-                        toast.success("Successfully signed up");
+                        toast.success("Account created successfully");
                         onSuccess?.();
                     },
                 },
@@ -64,65 +63,19 @@ export function SignUpForm({
     };
 
     return (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-2">
-            <FieldGroup>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Controller
-                        name="firstName"
-                        control={form.control}
-                        render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid}>
-                                <FieldLabel htmlFor="sign-up-first-name">
-                                    First name
-                                </FieldLabel>
-                                <Input
-                                    {...field}
-                                    id="sign-up-first-name"
-                                    placeholder="Max"
-                                    aria-invalid={fieldState.invalid}
-                                    autoComplete="given-name"
-                                />
-                                {fieldState.invalid && (
-                                    <FieldError errors={[fieldState.error]} />
-                                )}
-                            </Field>
-                        )}
-                    />
-                    <Controller
-                        name="lastName"
-                        control={form.control}
-                        render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid}>
-                                <FieldLabel htmlFor="sign-up-last-name">
-                                    Last name
-                                </FieldLabel>
-                                <Input
-                                    {...field}
-                                    id="sign-up-last-name"
-                                    placeholder="Robinson"
-                                    aria-invalid={fieldState.invalid}
-                                    autoComplete="family-name"
-                                />
-                                {fieldState.invalid && (
-                                    <FieldError errors={[fieldState.error]} />
-                                )}
-                            </Field>
-                        )}
-                    />
-                </div>
+        <form onSubmit={form.handleSubmit(onSubmit)} className={layout.fieldStack}>
+            <FieldGroup className={layout.fieldStack}>
                 <Controller
                     name="email"
                     control={form.control}
                     render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                            <FieldLabel htmlFor="sign-up-email">
-                                Email
-                            </FieldLabel>
+                            <FieldLabel htmlFor="sign-up-email">Email</FieldLabel>
                             <Input
                                 {...field}
                                 id="sign-up-email"
                                 type="email"
-                                placeholder="m@example.com"
+                                placeholder="you@example.com"
                                 aria-invalid={fieldState.invalid}
                                 autoComplete="email"
                             />
@@ -132,58 +85,34 @@ export function SignUpForm({
                         </Field>
                     )}
                 />
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Controller
-                        name="password"
-                        control={form.control}
-                        render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid}>
-                                <FieldLabel htmlFor="sign-up-password">
-                                    Password
-                                </FieldLabel>
-                                <Input
-                                    {...field}
-                                    id="sign-up-password"
-                                    type="password"
-                                    placeholder="Password"
-                                    aria-invalid={fieldState.invalid}
-                                    autoComplete="new-password"
-                                />
-                                {fieldState.invalid && (
-                                    <FieldError errors={[fieldState.error]} />
-                                )}
-                            </Field>
-                        )}
-                    />
-                    <Controller
-                        name="passwordConfirmation"
-                        control={form.control}
-                        render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid}>
-                                <FieldLabel htmlFor="sign-up-password-confirmation">
-                                    Confirm Password
-                                </FieldLabel>
-                                <Input
-                                    {...field}
-                                    id="sign-up-password-confirmation"
-                                    type="password"
-                                    placeholder="Confirm Password"
-                                    aria-invalid={fieldState.invalid}
-                                    autoComplete="new-password"
-                                />
-                                {fieldState.invalid && (
-                                    <FieldError errors={[fieldState.error]} />
-                                )}
-                            </Field>
-                        )}
-                    />
-                </div>
+                <Controller
+                    name="password"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                            <FieldLabel htmlFor="sign-up-password">
+                                Password
+                            </FieldLabel>
+                            <PasswordInput
+                                {...field}
+                                id="sign-up-password"
+                                placeholder="At least 8 characters"
+                                aria-invalid={fieldState.invalid}
+                                autoComplete="new-password"
+                            />
+                            {fieldState.invalid && (
+                                <FieldError errors={[fieldState.error]} />
+                            )}
+                        </Field>
+                    )}
+                />
             </FieldGroup>
-            <Button type="submit" className="w-full" disabled={loading}>
+
+            <Button type="submit" className="h-10 w-full" disabled={loading}>
                 {loading ? (
                     <Loader2 size={16} className="animate-spin" />
                 ) : (
-                    "Create an account"
+                    "Sign up"
                 )}
             </Button>
         </form>

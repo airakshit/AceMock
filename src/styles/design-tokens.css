@@ -1,0 +1,42 @@
+/*
+ * Ace Mock — extended design tokens
+ * Import from globals.css. Use these CSS variables in components
+ * for consistent spacing, sizing, and auth-specific layout.
+ */
+
+:root {
+    /* Layout */
+    --auth-card-max-width: 22rem;
+    --page-max-width-sm: 24rem;
+    --page-max-width-md: 32rem;
+    --page-max-width-lg: 48rem;
+
+    /* Spacing scale (auth & compact UIs) */
+    --space-auth-section: 1rem;
+    --space-auth-field: 0.75rem;
+    --space-page-x: 1rem;
+    --space-page-y: 1.5rem;
+
+    /* Typography scale */
+    --text-display: 1.5rem;
+    --text-title: 1.25rem;
+    --text-body: 0.875rem;
+    --text-caption: 0.75rem;
+
+    /* Brand accent (subtle, works in light & dark) */
+    --brand: oklch(0.55 0.18 264);
+    --brand-foreground: oklch(0.985 0 0);
+    --brand-muted: oklch(0.55 0.18 264 / 12%);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --brand: oklch(0.72 0.14 264);
+        --brand-muted: oklch(0.72 0.14 264 / 15%);
+    }
+}
+
+.dark {
+    --brand: oklch(0.72 0.14 264);
+    --brand-muted: oklch(0.72 0.14 264 / 15%);
+}

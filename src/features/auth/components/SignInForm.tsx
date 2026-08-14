@@ -7,7 +7,6 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
     Field,
     FieldError,
@@ -18,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/shared/PasswordInput";
 import { authClient } from "@/lib/auth/auth-client";
 import { LastUsedIndicator } from "@/components/shared/LastUsedIndicator";
+import { layout } from "@/lib/design-system";
 import { signInSchema } from "../schemas";
 
 type SignInFormValues = z.infer<typeof signInSchema>;
@@ -25,14 +25,11 @@ type SignInFormValues = z.infer<typeof signInSchema>;
 interface SignInFormProps {
     onSuccess?: () => void;
     callbackURL?: string;
-    showPasswordToggle?: boolean;
-    params?: URLSearchParams;
 }
 
 export function SignInForm({
     onSuccess,
     callbackURL = "/dashboard",
-    showPasswordToggle = false,
 }: SignInFormProps) {
     const [loading, startTransition] = useTransition();
     const [isMounted, setIsMounted] = useState(false);
@@ -46,7 +43,6 @@ export function SignInForm({
         defaultValues: {
             email: "",
             password: "",
-            rememberMe: false,
         },
     });
 
@@ -56,8 +52,7 @@ export function SignInForm({
                 {
                     email: data.email,
                     password: data.password,
-                    rememberMe: data.rememberMe,
-                    callbackURL: callbackURL,
+                    callbackURL,
                 },
                 {
                     onSuccess() {
@@ -73,21 +68,19 @@ export function SignInForm({
     };
 
     return (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-2">
-            <FieldGroup>
+        <form onSubmit={form.handleSubmit(onSubmit)} className={layout.fieldStack}>
+            <FieldGroup className={layout.fieldStack}>
                 <Controller
                     name="email"
                     control={form.control}
                     render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                            <FieldLabel htmlFor="sign-in-email">
-                                Email
-                            </FieldLabel>
+                            <FieldLabel htmlFor="sign-in-email">Email</FieldLabel>
                             <Input
                                 {...field}
                                 id="sign-in-email"
                                 type="email"
-                                placeholder="m@example.com"
+                                placeholder="you@example.com"
                                 aria-invalid={fieldState.invalid}
                                 autoComplete="email"
                             />
@@ -102,57 +95,19 @@ export function SignInForm({
                     control={form.control}
                     render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                            <div className="flex items-center">
-                                <FieldLabel htmlFor="sign-in-password">
-                                    Password
-                                </FieldLabel>
-                                {/* <Link
-                                    href="/forgot-password"
-                                    className="ml-auto inline-block text-sm underline text-foreground"
-                                >
-                                    Forgot your password?
-                                </Link> */}
-                            </div>
-                            {showPasswordToggle ? (
-                                <PasswordInput
-                                    {...field}
-                                    id="sign-in-password"
-                                    placeholder="Password"
-                                    aria-invalid={fieldState.invalid}
-                                    autoComplete="current-password"
-                                />
-                            ) : (
-                                <Input
-                                    {...field}
-                                    id="sign-in-password"
-                                    type="password"
-                                    placeholder="password"
-                                    aria-invalid={fieldState.invalid}
-                                    autoComplete="current-password"
-                                />
-                            )}
+                            <FieldLabel htmlFor="sign-in-password">
+                                Password
+                            </FieldLabel>
+                            <PasswordInput
+                                {...field}
+                                id="sign-in-password"
+                                placeholder="Enter your password"
+                                aria-invalid={fieldState.invalid}
+                                autoComplete="current-password"
+                            />
                             {fieldState.invalid && (
                                 <FieldError errors={[fieldState.error]} />
                             )}
-                        </Field>
-                    )}
-                />
-                <Controller
-                    name="rememberMe"
-                    control={form.control}
-                    render={({ field }) => (
-                        <Field orientation="horizontal">
-                            <Checkbox
-                                id="sign-in-remember"
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                            />
-                            <FieldLabel
-                                htmlFor="sign-in-remember"
-                                className="font-normal"
-                            >
-                                Remember me
-                            </FieldLabel>
                         </Field>
                     )}
                 />
@@ -160,13 +115,13 @@ export function SignInForm({
 
             <Button
                 type="submit"
-                className="w-full relative"
+                className="relative h-10 w-full"
                 disabled={loading}
             >
                 {loading ? (
                     <Loader2 size={16} className="animate-spin" />
                 ) : (
-                    "Login"
+                    "Log in"
                 )}
                 {isMounted && authClient.isLastUsedLoginMethod("email") && (
                     <LastUsedIndicator />
