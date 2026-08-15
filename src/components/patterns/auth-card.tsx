@@ -31,7 +31,9 @@ interface AuthHeaderProps {
 export function AuthHeader({ title, description, className }: AuthHeaderProps) {
     return (
         <header className={cn("space-y-1.5 text-center", className)}>
-            <h1 className={typography.display}>{title}</h1>
+            <h1 data-page-title className={typography.display}>
+                {title}
+            </h1>
             {description ? (
                 <p className={typography.sectionSubtitle}>{description}</p>
             ) : null}

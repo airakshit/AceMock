@@ -3,10 +3,10 @@
  */
 export const typography = {
     display:
-        "font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-[length:var(--text-display)]",
+        "font-cursive text-3xl font-semibold leading-none tracking-normal text-foreground sm:text-4xl",
     pageTitle:
-        "font-heading text-lg font-semibold tracking-tight text-foreground md:text-xl",
-    pageSubtitle: "text-sm leading-relaxed text-muted-foreground",
+        "font-cursive text-2xl font-normal leading-none tracking-wide text-foreground md:text-3xl",
+    pageSubtitle: "font-sans text-sm leading-relaxed text-muted-foreground",
     sectionTitle:
         "font-heading text-base font-semibold tracking-tight text-foreground md:text-[length:var(--text-title)]",
     sectionSubtitle: "text-sm leading-relaxed text-muted-foreground",

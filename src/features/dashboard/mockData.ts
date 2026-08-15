@@ -3,7 +3,7 @@ import type { DashboardData } from "./types";
 /** Empty history — shows the onboarding message in metrics section. */
 export const dashboardMockData: DashboardData = {
     metrics: {
-        hasAttemptedTests: false,
+        hasAttemptedTests: true,
         metrics: [],
     },
     popularMockTests: [

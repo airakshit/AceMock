@@ -1,9 +1,9 @@
 import { MetricsSection } from "@/features/dashboard/components/MetricsSection";
 import { PopularMockTestsSection } from "@/features/dashboard/components/PopularMockTestsSection";
-import { dashboardMockData } from "@/features/dashboard/mockData";
+import { dashboardMockDataWithHistory } from "@/features/dashboard/mockData";
 
 export function DashboardView() {
-    const data = dashboardMockData;
+    const data = dashboardMockDataWithHistory;
 
     return (
         <div className="space-y-8">

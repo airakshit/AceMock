@@ -19,7 +19,10 @@ export function AppHeader({ title, description }: AppHeaderProps) {
                 className="mr-1 h-4 md:hidden"
             />
             <div className="min-w-0 space-y-0.5">
-                <h1 className={cn(typography.pageTitle, "truncate")}>
+                <h1
+                    data-page-title
+                    className={cn(typography.pageTitle, "truncate")}
+                >
                     {title}
                 </h1>
                 {description ? (
