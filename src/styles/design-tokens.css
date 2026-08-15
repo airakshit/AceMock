@@ -18,22 +18,19 @@
     --space-page-y: 1.5rem;
 
     /* Typography scale */
-    --text-display: 1.5rem;
-    --text-title: 1.25rem;
-    --text-body: 0.875rem;
-    --text-caption: 0.75rem;
+    --text-display: 1.75rem;
+    --text-title: 1.125rem;
+    --text-body: 0.9375rem;
+    --text-caption: 0.8125rem;
+    --leading-body: 1.6;
+    --leading-heading: 1.25;
+    --tracking-body: -0.011em;
+    --tracking-heading: -0.025em;
 
     /* Brand accent (subtle, works in light & dark) */
     --brand: oklch(0.55 0.18 264);
     --brand-foreground: oklch(0.985 0 0);
     --brand-muted: oklch(0.55 0.18 264 / 12%);
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        --brand: oklch(0.72 0.14 264);
-        --brand-muted: oklch(0.72 0.14 264 / 15%);
-    }
 }
 
 .dark {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { layout } from "@/lib/design-system";
+import { typography } from "@/lib/design-system";
 
 interface AuthCardProps {
     children: React.ReactNode;
@@ -29,12 +30,10 @@ interface AuthHeaderProps {
 
 export function AuthHeader({ title, description, className }: AuthHeaderProps) {
     return (
-        <header className={cn("space-y-1 text-center", className)}>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                {title}
-            </h1>
+        <header className={cn("space-y-1.5 text-center", className)}>
+            <h1 className={typography.display}>{title}</h1>
             {description ? (
-                <p className="text-sm text-muted-foreground">{description}</p>
+                <p className={typography.sectionSubtitle}>{description}</p>
             ) : null}
         </header>
     );
@@ -54,12 +53,9 @@ export function AuthSwitchLink({
     className,
 }: AuthSwitchLinkProps) {
     return (
-        <p className={cn("text-center text-sm text-muted-foreground", className)}>
+        <p className={cn(typography.bodyMuted, "text-center", className)}>
             {prompt}{" "}
-            <Link
-                href={href}
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
+            <Link href={href} className={typography.link}>
                 {linkText}
             </Link>
         </p>

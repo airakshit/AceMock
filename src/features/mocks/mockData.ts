@@ -1,0 +1,62 @@
+import type { MockTestsData } from "./types";
+
+export const mocksMockData: MockTestsData = {
+    tests: [
+        {
+            id: "mock-1",
+            title: "IOE Full Mock Test 2025 — Set A",
+            durationMinutes: 180,
+            totalQuestions: 140,
+            totalMarks: 140,
+            subject: "Full Mock",
+            difficulty: "Hard",
+            description: "Complete exam simulation with official timing.",
+        },
+        {
+            id: "mock-2",
+            title: "Physics — Mechanics Mastery",
+            durationMinutes: 60,
+            totalQuestions: 45,
+            totalMarks: 45,
+            subject: "Physics",
+            difficulty: "Medium",
+            description: "Covers kinematics, dynamics, and work-energy.",
+        },
+        {
+            id: "mock-3",
+            title: "Chemistry — Physical Chemistry Set",
+            durationMinutes: 55,
+            totalQuestions: 40,
+            totalMarks: 40,
+            subject: "Chemistry",
+            difficulty: "Medium",
+        },
+        {
+            id: "mock-4",
+            title: "Mathematics — Algebra & Trigonometry",
+            durationMinutes: 50,
+            totalQuestions: 35,
+            totalMarks: 35,
+            subject: "Mathematics",
+            difficulty: "Hard",
+        },
+        {
+            id: "mock-5",
+            title: "English — Reading Comprehension",
+            durationMinutes: 30,
+            totalQuestions: 30,
+            totalMarks: 30,
+            subject: "English",
+            difficulty: "Easy",
+        },
+        {
+            id: "mock-6",
+            title: "IOE Full Mock Test 2024 — Set B",
+            durationMinutes: 180,
+            totalQuestions: 140,
+            totalMarks: 140,
+            subject: "Full Mock",
+            difficulty: "Hard",
+        },
+    ],
+};

@@ -2,33 +2,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
-
-const themeInitScript = `
-(function () {
-  try {
-    var theme = localStorage.getItem("theme-preference");
-    var root = document.documentElement;
-    function setTheme(value) {
-      var useDark = value === "dark" || (value !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      root.classList.toggle("dark", useDark);
-    }
-
-    if (theme === "light" || theme === "dark" || theme === "system") {
-      setTheme(theme);
-    } else {
-      setTheme("system");
-    }
-
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-      if (!localStorage.getItem("theme-preference") || localStorage.getItem("theme-preference") === "system") {
-        setTheme("system");
-      }
-    });
-  } catch (error) {
-    /* ignore */
-  }
-})();
-`;
+import { themeInitScript } from "@/lib/theme";
 
 export default function RootLayout({
     children,
