@@ -1,7 +1,7 @@
-import { CustomView } from "@/features/custom/components/CustomView";
-import { AppHeader } from "@/features/shell/components/AppHeader";
+import { DocumentView } from "@/features/documents/components/DocumentView";
+import { AppHeader } from "@/components/layouts/components/AppHeader";
 
-export default function CustomPage() {
+export default function DocumentPage() {
     return (
         <>
             <AppHeader
@@ -9,7 +9,7 @@ export default function CustomPage() {
                 description="Build tests tailored to your study plan."
             />
             <div className="flex-1 overflow-auto p-4 md:p-6">
-                <CustomView />
+                <DocumentView />
             </div>
         </>
     );

@@ -4,7 +4,6 @@ import { Lobster } from "next/font/google";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 
-import { themeInitScript } from "@/lib/theme";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const caveat = Lobster({
@@ -28,7 +27,6 @@ export default function RootLayout({
                 <link rel="icon" href="/favicon/favicon.ico" sizes="any" />
             </head>
             <body className="font-sans antialiased">
-                {/* <script dangerouslySetInnerHTML={{ __html: themeInitScript }} /> */}
                 <Toaster position="top-right" />
                 <TooltipProvider>{children}</TooltipProvider>
             </body>

@@ -1,5 +1,5 @@
 import { MocksView } from "@/features/mocks/components/MocksView";
-import { AppHeader } from "@/features/shell/components/AppHeader";
+import { AppHeader } from "@/components/layouts/components/AppHeader";
 
 export default function MocksPage() {
     return (

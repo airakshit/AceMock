@@ -3,12 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
-import { customMockData } from "@/features/custom/mockData";
+import { customMockData } from "@/features/documents/mockData";
 import { DocumentForm } from "./DocumentForm";
 import { MoreInformation } from "@/components/shared/MoreInformation";
 import { MORE_INFORMATION_NEW_DOCUMENT } from "../constants";
 
-export function CustomView() {
+export function DocumentView() {
     const { recentDrafts } = customMockData;
 
     return (

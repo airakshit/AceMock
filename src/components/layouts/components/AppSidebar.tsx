@@ -15,8 +15,8 @@ import {
     SidebarMenuItem,
     SidebarRail,
 } from "@/components/ui/sidebar";
-import { APP_NAME, APP_NAV_ITEMS } from "@/features/shell/constants";
-import { SidebarThemeToggle } from "@/features/shell/components/SidebarThemeToggle";
+import { APP_NAME, APP_NAV_ITEMS } from "@/components/layouts/constants";
+import { SidebarThemeToggle } from "@/components/layouts/components/SidebarThemeToggle";
 
 export function AppSidebar() {
     const pathname = usePathname();

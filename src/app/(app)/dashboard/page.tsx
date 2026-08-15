@@ -1,5 +1,5 @@
 import { DashboardView } from "@/features/dashboard/components/DashboardView";
-import { AppHeader } from "@/features/shell/components/AppHeader";
+import { AppHeader } from "@/components/layouts/components/AppHeader";
 
 export default function DashboardPage() {
     return (

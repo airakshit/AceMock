@@ -1,4 +1,8 @@
-import { ClipboardList, LayoutDashboard, SlidersHorizontal } from "lucide-react";
+import {
+    ClipboardList,
+    LayoutDashboard,
+    SlidersHorizontal,
+} from "lucide-react";
 
 import type { NavItem } from "./types";
 
@@ -14,8 +18,8 @@ export const APP_NAV_ITEMS: NavItem[] = [
         icon: ClipboardList,
     },
     {
-        title: "Custom",
-        href: "/custom",
+        title: "Documents",
+        href: "/documents",
         icon: SlidersHorizontal,
     },
 ];
