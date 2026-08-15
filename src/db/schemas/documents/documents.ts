@@ -12,9 +12,10 @@ export const documentStatusEnum = pgEnum("document_status", [
 
 export const documents = pgTable("documents", {
     id: uuid("id").primaryKey(),
-    userId: uuid("id")
+    userId: uuid("user_id")
         .notNull()
-        .references(() => user.id, { onDelete: "set null" }),
+        .references(() => user.id, { onDelete: "cascade" }),
+
     title: text("title").notNull(),
     description: text("description"),
     status: documentStatusEnum("status").notNull().default("draft"),

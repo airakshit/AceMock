@@ -3,7 +3,7 @@ import { user } from "../auth";
 
 export const mockTests = pgTable("mock-tests", {
     id: uuid("id").primaryKey(),
-    userId: uuid("id").references(() => user.id, { onDelete: "set null" }),
+    userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }),
 
     title: text("title").notNull(),
     duration_seconds: integer("duration_seconds").notNull(),

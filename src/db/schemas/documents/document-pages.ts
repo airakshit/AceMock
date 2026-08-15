@@ -5,7 +5,7 @@ import {
     integer,
     text,
     jsonb,
-    uniqueIndex,
+
     timestamp,
 } from "drizzle-orm/pg-core";
 import { documentFiles } from "./document-files";
