@@ -10,7 +10,9 @@ export const documentStatusEnum = pgEnum("document_status", [
     "deleted",
 ]);
 
-export const documents = pgTable("documents", {
+export const documentsTable = "documents";
+
+export const documents = pgTable(documentsTable, {
     id: uuid("id").primaryKey(),
     userId: uuid("user_id")
         .notNull()

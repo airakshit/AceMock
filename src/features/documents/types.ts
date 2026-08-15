@@ -1,22 +1,28 @@
-export interface CustomTestOption {
-    id: string;
-    label: string;
-    description: string;
-    value: string | number | boolean;
+import {
+    documentFileTypeEnum,
+    documentStatusEnum,
+    documentFileStatusEnum,
+    documentPageStatusEnum,
+} from "@/db/schemas";
+
+export type DocumentStatusEnum = (typeof documentStatusEnum.enumValues)[number];
+export type DocumentFileTypeEnum =
+    (typeof documentFileTypeEnum.enumValues)[number];
+export type DocumentFileStatusEnum =
+    (typeof documentFileStatusEnum.enumValues)[number];
+export type DocumentPageStatusEnum =
+    (typeof documentPageStatusEnum.enumValues)[number];
+    
+
+interface FilePayload {
+    name: string;
+    size: number;
+    type: string;
 }
 
-export interface CustomTestDraft {
-    id: string;
+export interface CreateNewDocumentPayload {
     title: string;
-    subject: string;
-    questionCount: number;
-    durationMinutes: number;
-    difficulty: "Easy" | "Medium" | "Hard";
-    topics: string[];
-}
-
-export interface CustomTestsData {
-    subjects: string[];
-    topicsBySubject: Record<string, string[]>;
-    recentDrafts: CustomTestDraft[];
+    description?: string;
+    pdfs: FilePayload[];
+    images: FilePayload[];
 }
