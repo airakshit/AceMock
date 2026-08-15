@@ -1,5 +1,8 @@
 import { relations } from "drizzle-orm";
-import { subjects, topics, passages, questions } from "./features";
+import { subjects } from "./subjects";
+import { passages } from "./passages";
+import { topics } from "./topics";
+import { questions } from "./questions";
 
 export const subjectsRelations = relations(subjects, ({ many }) => ({
     topics: many(topics),

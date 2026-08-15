@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { env } from "@/config/env/server";
 import { nextCookies } from "better-auth/next-js";
 import { account, session, user, verification } from "@/db/schemas/auth";
+import { v7 as uuidv7 } from "uuid";
 
 export const auth = betterAuth({
     database: drizzleAdapter(db, {
@@ -37,6 +38,9 @@ export const auth = betterAuth({
 
     advanced: {
         cookiePrefix: "mock-ace",
+        database: {
+            generateId: () => uuidv7(),
+        },
     },
     plugins: [nextCookies(), lastLoginMethod()],
 });
