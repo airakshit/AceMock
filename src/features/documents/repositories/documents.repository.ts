@@ -6,9 +6,11 @@ import { DbExecutor } from "../../shared/types";
 export class DocumentsRepository {
     async create(
         db: DbExecutor,
-        userId: string,
-        title: string,
-        description?: string,
+        data: {
+            userId: string;
+            title: string;
+            description?: string;
+        },
     ) {
         const documentId = generateUUIDv7();
 
@@ -16,19 +18,16 @@ export class DocumentsRepository {
             .insert(documents)
             .values({
                 id: documentId,
-                userId,
-                title,
-                description,
+                userId: data.userId,
+                title: data.title,
+                description: data.description,
             })
             .returning();
 
         return document;
     }
 
-    async findById(
-        db: DbExecutor,
-        documentId: string,
-    ) {
+    async findById(db: DbExecutor, documentId: string) {
         const [document] = await db
             .select()
             .from(documents)
@@ -38,29 +37,19 @@ export class DocumentsRepository {
         return document;
     }
 
-    async findByIdForUser(
-        db: DbExecutor,
-        documentId: string,
-        userId: string,
-    ) {
+    async findByIdForUser(db: DbExecutor, documentId: string, userId: string) {
         const [document] = await db
             .select()
             .from(documents)
             .where(
-                and(
-                    eq(documents.id, documentId),
-                    eq(documents.userId, userId),
-                ),
+                and(eq(documents.id, documentId), eq(documents.userId, userId)),
             )
             .limit(1);
 
         return document;
     }
 
-    async findByUser(
-        db: DbExecutor,
-        userId: string,
-    ) {
+    async findByUser(db: DbExecutor, userId: string) {
         return db
             .select()
             .from(documents)
@@ -84,28 +73,18 @@ export class DocumentsRepository {
                 updatedAt: new Date(),
             })
             .where(
-                and(
-                    eq(documents.id, documentId),
-                    eq(documents.userId, userId),
-                ),
+                and(eq(documents.id, documentId), eq(documents.userId, userId)),
             )
             .returning();
 
         return document;
     }
 
-    async delete(
-        db: DbExecutor,
-        documentId: string,
-        userId: string,
-    ) {
+    async delete(db: DbExecutor, documentId: string, userId: string) {
         const [document] = await db
             .delete(documents)
             .where(
-                and(
-                    eq(documents.id, documentId),
-                    eq(documents.userId, userId),
-                ),
+                and(eq(documents.id, documentId), eq(documents.userId, userId)),
             )
             .returning();
 

@@ -12,7 +12,19 @@ export type DocumentFileStatusEnum =
     (typeof documentFileStatusEnum.enumValues)[number];
 export type DocumentPageStatusEnum =
     (typeof documentPageStatusEnum.enumValues)[number];
-    
+
+export enum FileContentTypeEnum {
+    PHYSICS = "physics",
+    CHEMISTRY = "chemistry",
+    MATHS = "maths",
+    ENGLISH = "english",
+    MOCK_TEST = "mock-tests",
+    STUDY_NOTES = "study-notes",
+}
+
+interface UserIdInterface {
+    userId: string;
+}
 
 interface FilePayload {
     name: string;
@@ -20,7 +32,7 @@ interface FilePayload {
     type: string;
 }
 
-export interface CreateNewDocumentPayload {
+export interface CreateNewDocumentPayload extends UserIdInterface {
     title: string;
     description?: string;
     pdfs: FilePayload[];

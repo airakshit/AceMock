@@ -3,6 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
 
 export class DocumentQueries {
+    
     async getDocumentWithFiles(
         db: DbExecutor,
         documentId: string,

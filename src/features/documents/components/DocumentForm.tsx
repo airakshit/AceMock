@@ -1,10 +1,10 @@
 "use client";
 
-import { FileText, Image as ImageIcon } from "lucide-react";
+import { FileText, Image as ImageIcon, Plus, X } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
-
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -24,21 +24,24 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { layout } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
+import { MiniHorizontalList } from "@/components/shared/MiniHorizontalList";
+import { contentTypeItems } from "../constants";
 
 import { documentFormSchema, type DocumentFormData } from "../schemas";
+import { FileDropzone } from "./FileDropzone";
 
 interface DocumentFormProps {
     onSuccess?: () => void;
 }
 
-import { FileDropzone } from "./FileDropzone";
-
 export function DocumentForm({ onSuccess }: DocumentFormProps) {
+    const [showDescription, setShowDescription] = useState(false);
     const form = useForm<DocumentFormData>({
         resolver: zodResolver(documentFormSchema),
         defaultValues: {
             title: "",
             description: "",
+            contentType: undefined,
             pdfs: [],
             images: [],
         },
@@ -48,6 +51,11 @@ export function DocumentForm({ onSuccess }: DocumentFormProps) {
         console.log("Document Submitted:", data);
         toast.success("Document created successfully.");
         onSuccess?.();
+    };
+
+    const handleRemoveDescription = () => {
+        form.setValue("description", "");
+        setShowDescription(false);
     };
 
     return (
@@ -65,6 +73,32 @@ export function DocumentForm({ onSuccess }: DocumentFormProps) {
                     className={cn(layout.fieldStack, "space-y-6")}
                 >
                     <FieldGroup className={layout.fieldStack}>
+                        {/* Content Type */}
+                        <Controller
+                            name="contentType"
+                            control={form.control}
+                            render={({ field, fieldState }) => (
+                                <Field
+                                    data-invalid={fieldState.invalid}
+                                    className="min-w-0"
+                                >
+                                    <FieldLabel>Content Type</FieldLabel>
+
+                                    <MiniHorizontalList
+                                        items={contentTypeItems}
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                    />
+
+                                    {fieldState.invalid && (
+                                        <FieldError
+                                            errors={[fieldState.error]}
+                                        />
+                                    )}
+                                </Field>
+                            )}
+                        />
+
                         {/* Title */}
                         <Controller
                             name="title"
@@ -95,34 +129,63 @@ export function DocumentForm({ onSuccess }: DocumentFormProps) {
                         />
 
                         {/* Description */}
-                        <Controller
-                            name="description"
-                            control={form.control}
-                            render={({ field, fieldState }) => (
-                                <Field
-                                    data-invalid={fieldState.invalid}
-                                    className="min-w-0"
-                                >
-                                    <FieldLabel htmlFor="description">
-                                        Description
-                                    </FieldLabel>
+                        {showDescription ? (
+                            <Controller
+                                name="description"
+                                control={form.control}
+                                render={({ field, fieldState }) => (
+                                    <Field
+                                        data-invalid={fieldState.invalid}
+                                        className="min-w-0"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <FieldLabel htmlFor="description">
+                                                Description
+                                            </FieldLabel>
 
-                                    <Textarea
-                                        {...field}
-                                        id="description"
-                                        placeholder="Describe what this document contains..."
-                                        rows={4}
-                                        aria-invalid={fieldState.invalid}
-                                    />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={
+                                                    handleRemoveDescription
+                                                }
+                                                className="h-8 shrink-0 px-2 text-muted-foreground"
+                                            >
+                                                <X className="size-4" />
+                                                <span className="hidden sm:inline">
+                                                    Remove
+                                                </span>
+                                            </Button>
+                                        </div>
 
-                                    {fieldState.invalid && (
-                                        <FieldError
-                                            errors={[fieldState.error]}
+                                        <Textarea
+                                            {...field}
+                                            id="description"
+                                            placeholder="Describe what this document contains..."
+                                            rows={4}
+                                            aria-invalid={fieldState.invalid}
                                         />
-                                    )}
-                                </Field>
-                            )}
-                        />
+
+                                        {fieldState.invalid && (
+                                            <FieldError
+                                                errors={[fieldState.error]}
+                                            />
+                                        )}
+                                    </Field>
+                                )}
+                            />
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowDescription(true)}
+                                className="w-full border-dashed sm:w-fit"
+                            >
+                                <Plus className="size-4" />
+                                Add description
+                            </Button>
+                        )}
 
                         <div className="grid gap-6 md:grid-cols-2">
                             {/* PDFs */}

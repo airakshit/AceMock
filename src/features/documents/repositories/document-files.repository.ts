@@ -1,12 +1,8 @@
-
 import { documentFiles } from "@/db/schemas";
 import { and, desc, eq } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
-import {
-    DocumentFileStatusEnum,
-    DocumentFileTypeEnum,
-} from "../types";
+import { DocumentFileStatusEnum, DocumentFileTypeEnum } from "../types";
 
 export class DocumentFilesRepository {
     async create(
@@ -38,10 +34,36 @@ export class DocumentFilesRepository {
         return file;
     }
 
-    async findById(
+    async createMany(
         db: DbExecutor,
-        fileId: string,
+        documentId: string,
+        files: Array<{
+            originalFilename: string;
+            mimeType: string;
+            fileType: DocumentFileTypeEnum;
+            fileSize: number;
+            storagePath: string;
+        }>,
     ) {
+        const values = files.map((file) => ({
+            id: generateUUIDv7(),
+            documentId,
+            originalFilename: file.originalFilename,
+            mimeType: file.mimeType,
+            fileType: file.fileType,
+            fileSize: file.fileSize,
+            storagePath: file.storagePath,
+        }));
+
+        const createdFiles = await db
+            .insert(documentFiles)
+            .values(values)
+            .returning();
+
+        return createdFiles;
+    }
+
+    async findById(db: DbExecutor, fileId: string) {
         const [file] = await db
             .select()
             .from(documentFiles)
@@ -70,16 +92,11 @@ export class DocumentFilesRepository {
         return file;
     }
 
-    async findByDocument(
-        db: DbExecutor,
-        documentId: string,
-    ) {
+    async findByDocument(db: DbExecutor, documentId: string) {
         return db
             .select()
             .from(documentFiles)
-            .where(
-                eq(documentFiles.documentId, documentId),
-            )
+            .where(eq(documentFiles.documentId, documentId))
             .orderBy(desc(documentFiles.createdAt));
     }
 
@@ -113,11 +130,7 @@ export class DocumentFilesRepository {
         return file;
     }
 
-    async delete(
-        db: DbExecutor,
-        fileId: string,
-        documentId: string,
-    ) {
+    async delete(db: DbExecutor, fileId: string, documentId: string) {
         const [file] = await db
             .delete(documentFiles)
             .where(
@@ -132,5 +145,4 @@ export class DocumentFilesRepository {
     }
 }
 
-export const documentFilesRepository =
-    new DocumentFilesRepository();
+export const documentFilesRepository = new DocumentFilesRepository();
