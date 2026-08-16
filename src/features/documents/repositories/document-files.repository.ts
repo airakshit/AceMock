@@ -13,7 +13,7 @@ export class DocumentFilesRepository {
             mimeType: string;
             fileType: DocumentFileTypeEnum;
             fileSize: number;
-            storagePath: string;
+            storageUrl: string;
         },
     ) {
         const fileId = generateUUIDv7();
@@ -27,7 +27,7 @@ export class DocumentFilesRepository {
                 mimeType: data.mimeType,
                 fileType: data.fileType,
                 fileSize: data.fileSize,
-                storagePath: data.storagePath,
+                storageUrl: data.storageUrl,
             })
             .returning();
 
@@ -42,7 +42,7 @@ export class DocumentFilesRepository {
             mimeType: string;
             fileType: DocumentFileTypeEnum;
             fileSize: number;
-            storagePath: string;
+            storageUrl: string;
         }>,
     ) {
         const values = files.map((file) => ({
@@ -52,7 +52,7 @@ export class DocumentFilesRepository {
             mimeType: file.mimeType,
             fileType: file.fileType,
             fileSize: file.fileSize,
-            storagePath: file.storagePath,
+            storageUrl: file.storageUrl,
         }));
 
         const createdFiles = await db
@@ -109,7 +109,7 @@ export class DocumentFilesRepository {
             mimeType?: string;
             fileType?: DocumentFileTypeEnum;
             fileSize?: number;
-            storagePath?: string;
+            storageUrl?: string;
             status?: DocumentFileStatusEnum;
         },
     ) {

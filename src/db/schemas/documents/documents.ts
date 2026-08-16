@@ -10,6 +10,15 @@ export const documentStatusEnum = pgEnum("document_status", [
     "deleted",
 ]);
 
+export const documentContentTypeEnum = pgEnum("document_status", [
+    "physics",
+    "maths",
+    "chemistry",
+    "english",
+    "mock-test",
+    "sudy-notes",
+]);
+
 export const documentsTable = "documents";
 
 export const documents = pgTable(documentsTable, {
@@ -20,6 +29,7 @@ export const documents = pgTable(documentsTable, {
 
     title: text("title").notNull(),
     description: text("description"),
+    contentType: documentContentTypeEnum("content_type").notNull(),
     status: documentStatusEnum("status").notNull().default("draft"),
 
     createdAt: timestamp("created_at", {

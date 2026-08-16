@@ -21,7 +21,6 @@ export const documentFileStatusEnum = pgEnum("document_file_status", [
 
 export const documentFiles = pgTable("document_files", {
     id: uuid("id").primaryKey(),
-
     documentId: uuid("document_id")
         .notNull()
         .references(() => documents.id, {
@@ -29,32 +28,18 @@ export const documentFiles = pgTable("document_files", {
         }),
 
     originalFilename: text("original_filename").notNull(),
-
     mimeType: text("mime_type").notNull(),
-
     fileType: documentFileTypeEnum("file_type").notNull(),
-
     fileSize: bigint("file_size", {
         mode: "number",
     }).notNull(),
-
-    /**
-     * Path inside Supabase Storage.
-     *
-     * Example:
-     *
-     * users/{userId}/documents/{documentId}/files/{fileId}/original.pdf
-     */
-    storagePath: text("storage_path").notNull().unique(),
-
     status: documentFileStatusEnum("status").notNull().default("uploading"),
-
+    storageUrl: text("storage_url").notNull(),
     createdAt: timestamp("created_at", {
         withTimezone: true,
     })
         .notNull()
         .defaultNow(),
-
     updatedAt: timestamp("updated_at", {
         withTimezone: true,
     })

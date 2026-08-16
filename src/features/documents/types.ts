@@ -3,6 +3,9 @@ import {
     documentStatusEnum,
     documentFileStatusEnum,
     documentPageStatusEnum,
+    documentContentTypeEnum,
+    documents,
+    documentFiles,
 } from "@/db/schemas";
 
 export type DocumentStatusEnum = (typeof documentStatusEnum.enumValues)[number];
@@ -13,14 +16,8 @@ export type DocumentFileStatusEnum =
 export type DocumentPageStatusEnum =
     (typeof documentPageStatusEnum.enumValues)[number];
 
-export enum FileContentTypeEnum {
-    PHYSICS = "physics",
-    CHEMISTRY = "chemistry",
-    MATHS = "maths",
-    ENGLISH = "english",
-    MOCK_TEST = "mock-tests",
-    STUDY_NOTES = "study-notes",
-}
+export type DocumentContentTypeEnum =
+    (typeof documentContentTypeEnum.enumValues)[number];
 
 interface UserIdInterface {
     userId: string;
@@ -32,9 +29,14 @@ interface FilePayload {
     type: string;
 }
 
-export interface CreateNewDocumentPayload extends UserIdInterface {
+export interface CreateNewDocumentActionPayload {
     title: string;
     description?: string;
+    contentType: DocumentContentTypeEnum;
     pdfs: FilePayload[];
     images: FilePayload[];
+}
+export interface CreateNewDocumentActionResponse {
+    document: typeof documents.$inferSelect;
+    files: Array<typeof documentFiles.$inferSelect>;
 }

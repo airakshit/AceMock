@@ -60,12 +60,12 @@ export function DocumentForm({ onSuccess }: DocumentFormProps) {
 
     return (
         <Card>
-            <CardHeader>
+            {/* <CardHeader>
                 <CardTitle>New document</CardTitle>
                 <CardDescription>
                     Add a title, description, and any source files.
                 </CardDescription>
-            </CardHeader>
+            </CardHeader> */}
 
             <CardContent>
                 <form

@@ -1,17 +1,20 @@
 import { db } from "@/db";
-import { CreateNewDocumentPayload } from "./types";
+import { CreateNewDocumentActionPayload } from "./types";
 import { documentsRepository } from "./repositories/documents.repository";
 import { documentFilesRepository } from "./repositories/document-files.repository";
-import { DocumentFileTypeEnum } from "./types";
 import { documentFileTypeEnum } from "@/db/schemas";
 
 class DocumentsService {
-    async createNewDocumentTransaction(payload: CreateNewDocumentPayload) {
-        await db.transaction(async (tx) => {
+    async createNewDocument(
+        userId: string,
+        payload: CreateNewDocumentActionPayload,
+    ) {
+        const result = await db.transaction(async (tx) => {
             const newDoc = await documentsRepository.create(tx, {
-                userId: payload.userId,
+                userId: userId,
                 title: payload.title,
                 description: payload.description,
+                contentType: payload.contentType,
             });
 
             const files = await documentFilesRepository.createMany(
@@ -24,7 +27,7 @@ class DocumentsService {
                             mimeType: value.type,
                             fileType: documentFileTypeEnum.enumValues[0],
                             fileSize: value.size,
-                            storagePath: "",
+                            storageUrl: "",
                         };
                     }),
                     ...payload.images.map((value, _) => {
@@ -33,11 +36,20 @@ class DocumentsService {
                             mimeType: value.type,
                             fileType: documentFileTypeEnum.enumValues[1],
                             fileSize: value.size,
-                            storagePath: "",
+                            storageUrl: "",
                         };
                     }),
                 ],
             );
+
+            return {
+                document: newDoc,
+                files: files,
+            };
         });
+
+        return result;
     }
 }
+
+export const documentsService = new DocumentsService();

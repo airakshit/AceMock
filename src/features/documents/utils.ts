@@ -1,14 +1,6 @@
 import { DocumentFormData } from "./schemas";
 import { CreateNewDocumentPayload } from "./types";
 
-export function buildStorageUrl(
-    documentId: string,
-    documentFileId: string,
-    fileName: string,
-): string {
-    return `documents/${documentId}/files/${documentFileId}/${fileName}`;
-}
-
 export function documentFormDataToCreateNewDocumentPayload(
     data: DocumentFormData,
 ): CreateNewDocumentPayload {
