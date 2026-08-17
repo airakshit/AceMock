@@ -1,11 +1,12 @@
 import { DocumentFormData } from "./schemas";
-import { CreateNewDocumentPayload } from "./types";
+import { CreateNewDocumentActionPayload } from "./types";
 
 export function documentFormDataToCreateNewDocumentPayload(
     data: DocumentFormData,
-): CreateNewDocumentPayload {
+): CreateNewDocumentActionPayload {
     return {
         title: data.title,
+        contentType: data.contentType,
         description: data.description,
         pdfs: data.pdfs.map((value, _) => {
             return {

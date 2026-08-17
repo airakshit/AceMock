@@ -29,12 +29,19 @@ import { contentTypeItems } from "../constants";
 
 import { documentFormSchema, type DocumentFormData } from "../schemas";
 import { FileDropzone } from "./FileDropzone";
+import {
+    CreateNewDocumentActionPayload,
+    CreateNewDocumentActionResponse,
+} from "../types";
+import { documentFormDataToCreateNewDocumentPayload } from "../utils";
 
 interface DocumentFormProps {
-    onSuccess?: () => void;
+    onSumbitAction: (
+        data: CreateNewDocumentActionPayload,
+    ) => Promise<CreateNewDocumentActionResponse>;
 }
 
-export function DocumentForm({ onSuccess }: DocumentFormProps) {
+export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
     const [showDescription, setShowDescription] = useState(false);
     const form = useForm<DocumentFormData>({
         resolver: zodResolver(documentFormSchema),
@@ -47,10 +54,12 @@ export function DocumentForm({ onSuccess }: DocumentFormProps) {
         },
     });
 
-    const onSubmit = (data: DocumentFormData) => {
+    const onSubmit = async (data: DocumentFormData) => {
         console.log("Document Submitted:", data);
-        toast.success("Document created successfully.");
-        onSuccess?.();
+        const payload: CreateNewDocumentActionPayload =
+            documentFormDataToCreateNewDocumentPayload(data);
+
+        await onSumbitAction(payload);
     };
 
     const handleRemoveDescription = () => {

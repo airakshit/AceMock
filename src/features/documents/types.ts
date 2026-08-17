@@ -8,15 +8,17 @@ import {
     documentFiles,
 } from "@/db/schemas";
 
-export type DocumentStatusEnum = (typeof documentStatusEnum.enumValues)[number];
-export type DocumentFileTypeEnum =
-    (typeof documentFileTypeEnum.enumValues)[number];
-export type DocumentFileStatusEnum =
+export type DocumentStatus = (typeof documentStatusEnum.enumValues)[number];
+
+export type DocumentFileType = (typeof documentFileTypeEnum.enumValues)[number];
+
+export type DocumentFileStatus =
     (typeof documentFileStatusEnum.enumValues)[number];
-export type DocumentPageStatusEnum =
+
+export type DocumentPageStatus =
     (typeof documentPageStatusEnum.enumValues)[number];
 
-export type DocumentContentTypeEnum =
+export type DocumentContentType =
     (typeof documentContentTypeEnum.enumValues)[number];
 
 interface UserIdInterface {
@@ -32,7 +34,7 @@ interface FilePayload {
 export interface CreateNewDocumentActionPayload {
     title: string;
     description?: string;
-    contentType: DocumentContentTypeEnum;
+    contentType: DocumentContentType;
     pdfs: FilePayload[];
     images: FilePayload[];
 }

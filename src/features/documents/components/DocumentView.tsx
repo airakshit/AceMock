@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { DocumentForm } from "./DocumentForm";
 import { MoreInformation } from "@/components/shared/MoreInformation";
 import { MORE_INFORMATION_NEW_DOCUMENT } from "../constants";
+import { createNewDocumentAction } from "@/features/documents/actions";
+
 
 export function DocumentView() {
     return (
@@ -19,7 +21,7 @@ export function DocumentView() {
                     />
                 </div>
 
-                <DocumentForm />
+                <DocumentForm onSumbitAction={createNewDocumentAction} />
             </section>
 
             <section className="space-y-4">

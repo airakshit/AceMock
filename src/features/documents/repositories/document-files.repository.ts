@@ -2,7 +2,7 @@ import { documentFiles } from "@/db/schemas";
 import { and, desc, eq } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
-import { DocumentFileStatusEnum, DocumentFileTypeEnum } from "../types";
+import { DocumentFileStatus, DocumentFileType } from "../types";
 
 export class DocumentFilesRepository {
     async create(
@@ -11,7 +11,7 @@ export class DocumentFilesRepository {
         data: {
             originalFilename: string;
             mimeType: string;
-            fileType: DocumentFileTypeEnum;
+            fileType: DocumentFileType;
             fileSize: number;
             storageUrl: string;
         },
@@ -40,7 +40,7 @@ export class DocumentFilesRepository {
         files: Array<{
             originalFilename: string;
             mimeType: string;
-            fileType: DocumentFileTypeEnum;
+            fileType: DocumentFileType;
             fileSize: number;
             storageUrl: string;
         }>,
@@ -107,10 +107,10 @@ export class DocumentFilesRepository {
         data: {
             originalFilename?: string;
             mimeType?: string;
-            fileType?: DocumentFileTypeEnum;
+            fileType?: DocumentFileType;
             fileSize?: number;
             storageUrl?: string;
-            status?: DocumentFileStatusEnum;
+            status?: DocumentFileStatus;
         },
     ) {
         const [file] = await db

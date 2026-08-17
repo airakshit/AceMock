@@ -10,13 +10,13 @@ export const documentStatusEnum = pgEnum("document_status", [
     "deleted",
 ]);
 
-export const documentContentTypeEnum = pgEnum("document_status", [
+export const documentContentTypeEnum = pgEnum("document_content_type", [
     "physics",
     "maths",
     "chemistry",
     "english",
     "mock-test",
-    "sudy-notes",
+    "study-notes",
 ]);
 
 export const documentsTable = "documents";
