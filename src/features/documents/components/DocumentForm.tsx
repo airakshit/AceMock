@@ -34,11 +34,12 @@ import {
     CreateNewDocumentActionResponse,
 } from "../types";
 import { documentFormDataToCreateNewDocumentPayload } from "../utils";
+import { ServerActionResult } from "@/features/shared/actions/types";
 
 interface DocumentFormProps {
     onSumbitAction: (
         data: CreateNewDocumentActionPayload,
-    ) => Promise<CreateNewDocumentActionResponse>;
+    ) => Promise<ServerActionResult<CreateNewDocumentActionResponse>>;
 }
 
 export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
@@ -59,7 +60,12 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
         const payload: CreateNewDocumentActionPayload =
             documentFormDataToCreateNewDocumentPayload(data);
 
-        await onSumbitAction(payload);
+        const result = await onSumbitAction(payload);
+        if (result.success) {
+            toast.success(result.message);
+        } else {
+            toast.error(result.error.message);
+        }
     };
 
     const handleRemoveDescription = () => {

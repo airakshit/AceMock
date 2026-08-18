@@ -42,5 +42,5 @@ export const auth = betterAuth({
             generateId: () => uuidv7(),
         },
     },
-    plugins: [nextCookies(), lastLoginMethod()],
+    plugins: [lastLoginMethod(), nextCookies()],
 });

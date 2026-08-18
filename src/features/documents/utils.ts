@@ -8,14 +8,14 @@ export function documentFormDataToCreateNewDocumentPayload(
         title: data.title,
         contentType: data.contentType,
         description: data.description,
-        pdfs: data.pdfs.map((value, _) => {
+        pdfs: data.pdfs.map((value) => {
             return {
                 name: value.name,
                 size: value.size,
                 type: value.type,
             };
         }),
-        images: data.images.map((value, _) => {
+        images: data.images.map((value) => {
             return {
                 name: value.name,
                 size: value.size,

@@ -7,20 +7,20 @@ import { DocumentContentType } from "../types";
 export class DocumentsRepository {
     async create(
         db: DbExecutor,
+        userId: string,
         data: {
-            userId: string;
+            documentId: string;
             title: string;
             contentType: DocumentContentType;
             description?: string;
         },
     ) {
-        const documentId = generateUUIDv7();
 
         const [document] = await db
             .insert(documents)
             .values({
-                id: documentId,
-                userId: data.userId,
+                id: data.documentId,
+                userId: userId,
                 title: data.title,
                 description: data.description,
                 contentType: data.contentType,

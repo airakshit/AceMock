@@ -15,6 +15,9 @@ const serverEnvSchema = z.object({
 
     GOOGLE_CLIENT_ID: z.string().min(1),
     GOOGLE_CLIENT_SECRET: z.string().min(1),
+
+    NEXT_PUBLIC_SUPABASE_URL: z.url().min(1),
+    SUPABASE_SECRET_KEY: z.string(),
 });
 
 export const env = serverEnvSchema.parse(process.env);

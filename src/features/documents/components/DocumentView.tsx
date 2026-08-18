@@ -1,11 +1,9 @@
-
 import { typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import { DocumentForm } from "./DocumentForm";
 import { MoreInformation } from "@/components/shared/MoreInformation";
 import { MORE_INFORMATION_NEW_DOCUMENT } from "../constants";
-import { createNewDocumentAction } from "@/features/documents/actions";
-
+import { createNewDocumentAction } from "../actions/create-document";
 
 export function DocumentView() {
     return (

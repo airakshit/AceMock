@@ -6,6 +6,7 @@ interface UserIdInterface {
 }
 
 interface FilePayload {
+    clientFileId: string;
     name: string;
     size: number;
     type: string;

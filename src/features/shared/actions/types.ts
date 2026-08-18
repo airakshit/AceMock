@@ -9,6 +9,6 @@ export type ServerActionResult<T = void> =
           error: {
               code: string;
               message: string;
-              field?: string;  // For validation errors.
+              //   field?: string;
           };
       };
