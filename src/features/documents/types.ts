@@ -18,4 +18,3 @@ export type DocumentPageStatus =
 
 export type DocumentContentType =
     (typeof documentContentTypeEnum.enumValues)[number];
-

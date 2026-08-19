@@ -18,6 +18,7 @@ const serverEnvSchema = z.object({
 
     NEXT_PUBLIC_SUPABASE_URL: z.url().min(1),
     SUPABASE_SECRET_KEY: z.string(),
+    SUPABASE_STORAGE_BUCKET_NAME: z.string(),
 });
 
 export const env = serverEnvSchema.parse(process.env);

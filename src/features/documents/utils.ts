@@ -1,5 +1,6 @@
 import { DocumentFormData } from "./schemas";
-import { CreateNewDocumentActionPayload } from "./types";
+import { CreateNewDocumentActionPayload } from "./actions/types";
+import { generateUUIDv7 } from "../shared/utils";
 
 export function documentFormDataToCreateNewDocumentPayload(
     data: DocumentFormData,
@@ -10,6 +11,7 @@ export function documentFormDataToCreateNewDocumentPayload(
         description: data.description,
         pdfs: data.pdfs.map((value) => {
             return {
+                clientFileId: generateUUIDv7(),
                 name: value.name,
                 size: value.size,
                 type: value.type,
@@ -17,6 +19,7 @@ export function documentFormDataToCreateNewDocumentPayload(
         }),
         images: data.images.map((value) => {
             return {
+                clientFileId: generateUUIDv7(),
                 name: value.name,
                 size: value.size,
                 type: value.type,

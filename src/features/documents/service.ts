@@ -5,7 +5,7 @@ import { documentFilesRepository } from "./repositories/document-files.repositor
 import { documentFileTypeEnum } from "@/db/schemas";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { supabaseStorageClient } from "./storage-service";
 
 class DocumentsService {
     async createNewDocument(
@@ -67,11 +67,25 @@ class DocumentsService {
             };
         });
 
-        // Now, Continuing from step 6: Creating Signed urls.
-        // const supabase = createSupabaseServerClient()
-        // await supabase.storage.from("ace-mock").createSignedUploadUrl()
+        const signedUrls = await supabaseStorageClient.getUploadSignedUrls([
+            ...pdfs.map((value) => {
+                return {
+                    clientFileId: value.clientFileId,
+                    storagePath: value.storageUrl,
+                };
+            }),
+            ...images.map((value) => {
+                return {
+                    clientFileId: value.clientFileId,
+                    storagePath: value.storageUrl,
+                };
+            }),
+        ]);
 
-        return result;
+        return {
+            documentId: documentId,
+            files: signedUrls,
+        };
     }
 }
 

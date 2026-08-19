@@ -32,9 +32,10 @@ import { FileDropzone } from "./FileDropzone";
 import {
     CreateNewDocumentActionPayload,
     CreateNewDocumentActionResponse,
-} from "../types";
+} from "../actions/types";
 import { documentFormDataToCreateNewDocumentPayload } from "../utils";
 import { ServerActionResult } from "@/features/shared/actions/types";
+import { log } from "console";
 
 interface DocumentFormProps {
     onSumbitAction: (
@@ -59,8 +60,9 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
         console.log("Document Submitted:", data);
         const payload: CreateNewDocumentActionPayload =
             documentFormDataToCreateNewDocumentPayload(data);
-
+        console.log("The payload is : ", payload);
         const result = await onSumbitAction(payload);
+        console.log("The result is : ", result);
         if (result.success) {
             toast.success(result.message);
         } else {

@@ -1,5 +1,5 @@
+import { SignedUrlResponseObject } from "../storage-service";
 import { DocumentContentType } from "../types";
-import { documents, documentFiles } from "@/db/schemas";
 
 interface UserIdInterface {
     userId: string;
@@ -20,6 +20,6 @@ export interface CreateNewDocumentActionPayload {
     images: FilePayload[];
 }
 export interface CreateNewDocumentActionResponse {
-    document: typeof documents.$inferSelect;
-    files: Array<typeof documentFiles.$inferSelect>;
+    documentId: string;
+    files: SignedUrlResponseObject[]
 }

@@ -26,8 +26,6 @@ export async function createNewDocumentAction(
             data: data,
             message: "Document Created Succcessfully. Uploading..",
         };
-
-        
     } catch (error) {
         return handleActionError(error);
     }
