@@ -32,7 +32,7 @@ class SupabaseStorageClient {
         token: string;
     }> {
         const response = await this._supabaseClient.storage
-            .from(env.SUPABASE_STORAGE_BUCKET_NAME)
+            .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
             .createSignedUploadUrl(storagePath, { upsert: true });
 
         if (response.error) {

@@ -1,19 +1,24 @@
 "use client";
 
-import { FileText, Image as ImageIcon, Plus, X } from "lucide-react";
+import {
+    CheckCircle2,
+    CircleAlert,
+    FileText,
+    Image as ImageIcon,
+    Loader2,
+    Pause,
+    Play,
+    Plus,
+    RotateCcw,
+    Trash2,
+    X,
+} from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Field,
     FieldError,
@@ -22,20 +27,21 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { layout } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import { MiniHorizontalList } from "@/components/shared/MiniHorizontalList";
 import { contentTypeItems } from "../constants";
 
-import { documentFormSchema, type DocumentFormData } from "../schemas";
+import { documentFormSchema, type DocumentFormData, type DocumentFileItem } from "../schemas";
 import { FileDropzone } from "./FileDropzone";
 import {
     CreateNewDocumentActionPayload,
     CreateNewDocumentActionResponse,
 } from "../actions/types";
-import { documentFormDataToCreateNewDocumentPayload } from "../utils";
 import { ServerActionResult } from "@/features/shared/actions/types";
-import { log } from "console";
+import { useDocumentUploader } from "../uploads/use-document-uploader";
 
 interface DocumentFormProps {
     onSumbitAction: (
@@ -45,6 +51,25 @@ interface DocumentFormProps {
 
 export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
     const [showDescription, setShowDescription] = useState(false);
+    const [isCreatingDoc, setIsCreatingDoc] = useState(false);
+    const [isUploadingStarted, setIsUploadingStarted] = useState(false);
+
+    const {
+        uploadStates,
+        totalProgress,
+        addFiles,
+        removeFile,
+        pauseFile,
+        resumeFile,
+        retryFile,
+        pauseAll,
+        resumeAll,
+        retryAll,
+        clear,
+        setCredentials,
+        upload,
+    } = useDocumentUploader();
+
     const form = useForm<DocumentFormData>({
         resolver: zodResolver(documentFormSchema),
         defaultValues: {
@@ -56,17 +81,55 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
         },
     });
 
+    const pdfsValue = form.watch("pdfs");
+    const imagesValue = form.watch("images");
+    const totalFilesCount = pdfsValue.length + imagesValue.length;
+
     const onSubmit = async (data: DocumentFormData) => {
-        console.log("Document Submitted:", data);
-        const payload: CreateNewDocumentActionPayload =
-            documentFormDataToCreateNewDocumentPayload(data);
-        console.log("The payload is : ", payload);
-        const result = await onSumbitAction(payload);
-        console.log("The result is : ", result);
-        if (result.success) {
-            toast.success(result.message);
-        } else {
-            toast.error(result.error.message);
+        const allItems = [...data.pdfs, ...data.images];
+        if (allItems.length === 0) {
+            toast.error("Please add at least one PDF or image file.");
+            return;
+        }
+
+        const pdfPayloads = data.pdfs.map((item) => ({
+            clientFileId: item.clientFileId,
+            name: item.file.name,
+            size: item.file.size,
+            type: item.file.type || "application/pdf",
+        }));
+
+        const imagePayloads = data.images.map((item) => ({
+            clientFileId: item.clientFileId,
+            name: item.file.name,
+            size: item.file.size,
+            type: item.file.type || "image/jpeg",
+        }));
+
+        const payload: CreateNewDocumentActionPayload = {
+            title: data.title,
+            contentType: data.contentType,
+            description: data.description,
+            pdfs: pdfPayloads,
+            images: imagePayloads,
+        };
+
+        setIsCreatingDoc(true);
+        try {
+            const result = await onSumbitAction(payload);
+            if (result.success) {
+                toast.success("Document session created! Starting resumable upload...");
+                setCredentials(result.data.files);
+                setIsUploadingStarted(true);
+                await upload();
+            } else {
+                toast.error(result.error.message);
+            }
+        } catch (error) {
+            toast.error("Failed to create document upload session.");
+            console.error(error);
+        } finally {
+            setIsCreatingDoc(false);
         }
     };
 
@@ -75,16 +138,119 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
         setShowDescription(false);
     };
 
-    return (
-        <Card>
-            {/* <CardHeader>
-                <CardTitle>New document</CardTitle>
-                <CardDescription>
-                    Add a title, description, and any source files.
-                </CardDescription>
-            </CardHeader> */}
+    const handleReset = () => {
+        clear();
+        form.reset({
+            title: "",
+            description: "",
+            contentType: undefined,
+            pdfs: [],
+            images: [],
+        });
+        setShowDescription(false);
+        setIsUploadingStarted(false);
+    };
 
-            <CardContent>
+    const handleFilesAdded = (addedItems: DocumentFileItem[]) => {
+        addFiles(addedItems);
+    };
+
+    const handleFileRemoved = (clientFileId: string) => {
+        removeFile(clientFileId);
+    };
+
+    const isAllComplete =
+        isUploadingStarted && totalProgress === 100;
+
+    return (
+        <Card className="w-full shadow-sm">
+            <CardHeader className="border-b pb-4">
+                <CardTitle className="text-lg font-bold flex items-center justify-between">
+                    <span>Create Document & Upload Files</span>
+                    {isUploadingStarted && (
+                        <Badge
+                            variant={isAllComplete ? "outline" : "default"}
+                            className={cn(
+                                "text-xs font-mono",
+                                isAllComplete && "border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40",
+                            )}
+                        >
+                            {isAllComplete ? (
+                                <span className="flex items-center gap-1">
+                                    <CheckCircle2 className="size-3" />
+                                    All Uploads Complete
+                                </span>
+                            ) : (
+                                <span>Batch Upload: {totalProgress}%</span>
+                            )}
+                        </Badge>
+                    )}
+                </CardTitle>
+
+                {isUploadingStarted && (
+                    <div className="space-y-2 pt-2">
+                        <Progress value={totalProgress} className="h-2 w-full" />
+
+                        <div className="flex items-center justify-between gap-2 pt-1 text-xs">
+                            <span className="text-muted-foreground">
+                                Uploading batch ({totalFilesCount} {totalFilesCount === 1 ? "file" : "files"})
+                            </span>
+
+                            <div className="flex items-center gap-1.5">
+                                {!isAllComplete && (
+                                    <>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-[11px] gap-1 px-2"
+                                            onClick={pauseAll}
+                                        >
+                                            <Pause className="size-3" />
+                                            Pause All
+                                        </Button>
+
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-[11px] gap-1 px-2"
+                                            onClick={resumeAll}
+                                        >
+                                            <Play className="size-3" />
+                                            Resume All
+                                        </Button>
+
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-[11px] gap-1 px-2"
+                                            onClick={retryAll}
+                                        >
+                                            <RotateCcw className="size-3" />
+                                            Retry All
+                                        </Button>
+                                    </>
+                                )}
+
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-[11px] gap-1 px-2 text-destructive hover:text-destructive"
+                                    onClick={handleReset}
+                                >
+                                    <Trash2 className="size-3" />
+                                    Reset
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </CardHeader>
+
+            <CardContent className="pt-6">
                 <form
                     onSubmit={form.handleSubmit(onSubmit)}
                     className={cn(layout.fieldStack, "space-y-6")}
@@ -132,8 +298,9 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                     <Input
                                         {...field}
                                         id="title"
-                                        placeholder="e.g. Physics Mechanics"
+                                        placeholder="e.g. Physics Mechanics Chapter 1"
                                         aria-invalid={fieldState.invalid}
+                                        disabled={isCreatingDoc || isUploadingStarted}
                                     />
 
                                     {fieldState.invalid && (
@@ -164,13 +331,12 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={
-                                                    handleRemoveDescription
-                                                }
-                                                className="h-8 shrink-0 px-2 text-muted-foreground"
+                                                onClick={handleRemoveDescription}
+                                                disabled={isCreatingDoc || isUploadingStarted}
+                                                className="h-7 shrink-0 px-2 text-muted-foreground hover:text-foreground"
                                             >
-                                                <X className="size-4" />
-                                                <span className="hidden sm:inline">
+                                                <X className="size-3.5" />
+                                                <span className="hidden sm:inline text-xs">
                                                     Remove
                                                 </span>
                                             </Button>
@@ -180,8 +346,9 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                             {...field}
                                             id="description"
                                             placeholder="Describe what this document contains..."
-                                            rows={4}
+                                            rows={3}
                                             aria-invalid={fieldState.invalid}
+                                            disabled={isCreatingDoc || isUploadingStarted}
                                         />
 
                                         {fieldState.invalid && (
@@ -197,14 +364,16 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                 type="button"
                                 variant="outline"
                                 onClick={() => setShowDescription(true)}
-                                className="w-full border-dashed sm:w-fit"
+                                disabled={isCreatingDoc || isUploadingStarted}
+                                className="w-full border-dashed sm:w-fit text-xs h-8"
                             >
-                                <Plus className="size-4" />
+                                <Plus className="size-3.5" />
                                 Add description
                             </Button>
                         )}
 
-                        <div className="grid gap-6 md:grid-cols-2">
+                        {/* File Dropzones with live upload progress */}
+                        <div className="grid gap-6 md:grid-cols-2 pt-2">
                             {/* PDFs */}
                             <Controller
                                 name="pdfs"
@@ -222,11 +391,18 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                             id="pdfs"
                                             label="PDF files"
                                             title="Upload PDF files"
-                                            description="Select one or more PDF files"
+                                            description="Select one or more PDF files (max 50 MB each)"
                                             accept="application/pdf"
                                             icon={FileText}
                                             value={field.value}
                                             onChange={field.onChange}
+                                            onFilesAdded={handleFilesAdded}
+                                            onFileRemoved={handleFileRemoved}
+                                            uploadStates={uploadStates}
+                                            onPauseFile={pauseFile}
+                                            onResumeFile={resumeFile}
+                                            onRetryFile={retryFile}
+                                            disabled={isCreatingDoc || isUploadingStarted}
                                             invalid={fieldState.invalid}
                                         />
 
@@ -256,11 +432,18 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                             id="images"
                                             label="Images"
                                             title="Upload images"
-                                            description="Images will be processed in the selected order"
+                                            description="Images will be uploaded in selected order"
                                             accept="image/*"
                                             icon={ImageIcon}
                                             value={field.value}
                                             onChange={field.onChange}
+                                            onFilesAdded={handleFilesAdded}
+                                            onFileRemoved={handleFileRemoved}
+                                            uploadStates={uploadStates}
+                                            onPauseFile={pauseFile}
+                                            onResumeFile={resumeFile}
+                                            onRetryFile={retryFile}
+                                            disabled={isCreatingDoc || isUploadingStarted}
                                             invalid={fieldState.invalid}
                                             numbered
                                         />
@@ -276,13 +459,39 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                         </div>
                     </FieldGroup>
 
-                    <Button type="submit" className="h-10 w-full">
-                        Create Document
-                    </Button>
+                    {!isUploadingStarted ? (
+                        <Button
+                            type="submit"
+                            className="h-11 w-full text-sm font-semibold shadow-sm"
+                            disabled={isCreatingDoc || totalFilesCount === 0}
+                        >
+                            {isCreatingDoc ? (
+                                <>
+                                    <Loader2 className="mr-2 size-4 animate-spin" />
+                                    Creating Document & Generating Signed URLs...
+                                </>
+                            ) : (
+                                `Submit & Upload ${totalFilesCount} ${totalFilesCount === 1 ? "File" : "Files"}`
+                            )}
+                        </Button>
+                    ) : (
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            className="h-10 w-full"
+                            onClick={handleReset}
+                        >
+                            {isAllComplete ? "Start New Document Upload" : "Clear & Start Over"}
+                        </Button>
+                    )}
                 </form>
             </CardContent>
 
-            <CardFooter>Please Upload Only Related Documents.</CardFooter>
+            <CardFooter className="border-t pt-4 text-xs text-muted-foreground flex justify-between">
+                <span>Direct TUS Resumable Upload to Supabase Storage</span>
+                <span>Max 50MB per file</span>
+            </CardFooter>
         </Card>
     );
 }
+

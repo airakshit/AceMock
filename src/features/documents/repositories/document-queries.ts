@@ -34,7 +34,11 @@ export class DocumentQueries {
                 page: documentPages,
             })
             .from(documents)
-            .leftJoin(documentPages, eq(documentPages.documentId, documents.id))
+            .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
+            .leftJoin(
+                documentPages,
+                eq(documentPages.documentFileId, documentFiles.id),
+            )
             .where(
                 and(eq(documents.id, documentId), eq(documents.userId, userId)),
             )
