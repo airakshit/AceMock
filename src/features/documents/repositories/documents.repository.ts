@@ -2,7 +2,7 @@ import { documents } from "@/db/schemas";
 import { and, desc, eq } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
-import { DocumentContentType } from "../types";
+import { DocumentContentType, DocumentStatus } from "../types";
 
 export class DocumentsRepository {
     async create(
@@ -15,7 +15,6 @@ export class DocumentsRepository {
             description?: string;
         },
     ) {
-
         const [document] = await db
             .insert(documents)
             .values({
@@ -68,6 +67,7 @@ export class DocumentsRepository {
             title?: string;
             description?: string;
             contentType?: DocumentContentType;
+            status?: DocumentStatus;
         },
     ) {
         const [document] = await db

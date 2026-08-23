@@ -1,5 +1,5 @@
 import { documentFiles } from "@/db/schemas";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
 import { DocumentFileStatus, DocumentFileType } from "../types";
@@ -38,6 +38,7 @@ export class DocumentFilesRepository {
         db: DbExecutor,
         documentId: string,
         files: Array<{
+            serverFileId: string;
             originalFilename: string;
             mimeType: string;
             fileType: DocumentFileType;
@@ -46,7 +47,7 @@ export class DocumentFilesRepository {
         }>,
     ) {
         const values = files.map((file) => ({
-            id: generateUUIDv7(),
+            id: file.serverFileId,
             documentId,
             originalFilename: file.originalFilename,
             mimeType: file.mimeType,
@@ -142,6 +143,29 @@ export class DocumentFilesRepository {
             .returning();
 
         return file;
+    }
+
+    async updateStatusForFiles(
+        db: DbExecutor,
+        documentId: string,
+        fileIds: string[],
+        status: DocumentFileStatus,
+    ) {
+        if (fileIds.length === 0) return [];
+
+        return db
+            .update(documentFiles)
+            .set({
+                status,
+                updatedAt: new Date(),
+            })
+            .where(
+                and(
+                    eq(documentFiles.documentId, documentId),
+                    inArray(documentFiles.id, fileIds),
+                ),
+            )
+            .returning();
     }
 }
 

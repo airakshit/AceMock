@@ -23,3 +23,13 @@ export interface CreateNewDocumentActionResponse {
     documentId: string;
     files: SignedUrlResponseObject[]
 }
+
+export interface FinalizeDocumentUploadActionPayload {
+    documentId: string;
+    fileIds: string[]
+}
+
+export interface FinalizeDocumentUploadActionResponse {
+    fileIds: string[];
+}
+export type FinalizeDocumentUplaodActionResponse = FinalizeDocumentUploadActionResponse;

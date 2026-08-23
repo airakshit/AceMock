@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { env } from "@/config/env/server";
 
 export interface SignedUrlResponseObject {
+    serverFileId: string;
     clientFileId: string;
     storagePath: string;
     token: string;
@@ -23,9 +24,13 @@ class SupabaseStorageClient {
     }
 
     private async _createUploadSignedUrl(
-        clientFileId: string,
-        storagePath: string,
+        data: {
+            serverFileId: string;
+            clientFileId: string;
+            storagePath: string;
+        }
     ): Promise<{
+        serverFileId: string;
         clientFileId: string;
         signedUrl: string;
         path: string;
@@ -33,24 +38,23 @@ class SupabaseStorageClient {
     }> {
         const response = await this._supabaseClient.storage
             .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
-            .createSignedUploadUrl(storagePath, { upsert: true });
+            .createSignedUploadUrl(data.storagePath, { upsert: true });
 
         if (response.error) {
             console.log(
-                `Error for path: ${storagePath}: [MESSAGE]: ${response.error.message}, [STATUS]: ${response.error.status}, [CAUSE]: ${response.error.cause}`,
+                `Error for path: ${data.storagePath}: [MESSAGE]: ${response.error.message}, [STATUS]: ${response.error.status}, [CAUSE]: ${response.error.cause}`,
             );
             throw response.error;
         }
-        return { clientFileId: clientFileId, ...response.data };
+        return { serverFileId: data.serverFileId, clientFileId: data.clientFileId, ...response.data };
     }
 
     async getUploadSignedUrls(
-        data: Array<{ clientFileId: string; storagePath: string }>,
+        data: Array<{ clientFileId: string; storagePath: string; serverFileId: string; }>,
     ): Promise<SignedUrlResponseObject[]> {
         const functions = data.map((value) => {
             return this._createUploadSignedUrl(
-                value.clientFileId,
-                value.storagePath,
+                { serverFileId: value.serverFileId, clientFileId: value.clientFileId, storagePath: value.storagePath }
             );
         });
 
@@ -64,6 +68,7 @@ class SupabaseStorageClient {
 
                 for (const element of batchResult) {
                     signedUrls.push({
+                        serverFileId: element.serverFileId,
                         clientFileId: element.clientFileId,
                         signedUrl: element.signedUrl,
                         storagePath: element.path,

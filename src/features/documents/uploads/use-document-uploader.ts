@@ -217,6 +217,7 @@ export function useDocumentUploader() {
 
                 uppy.setFileMeta(file.id, {
                     clientFileId: cred.clientFileId,
+                    serverFileId: cred.serverFileId,
                     bucketName: env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME,
                     objectName: cred.storagePath,
                     contentType: file.type || "application/octet-stream",
