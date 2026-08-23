@@ -1,5 +1,5 @@
-import { documents } from "@/db/schemas";
-import { and, desc, eq } from "drizzle-orm";
+import { documents, documentFiles } from "@/db/schemas";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
 import { DocumentContentType, DocumentStatus } from "../types";
@@ -57,6 +57,35 @@ export class DocumentsRepository {
             .from(documents)
             .where(eq(documents.userId, userId))
             .orderBy(desc(documents.createdAt));
+    }
+
+    async findByUserWithFiles(db: DbExecutor, userId: string) {
+        const userDocs = await db
+            .select()
+            .from(documents)
+            .where(eq(documents.userId, userId))
+            .orderBy(desc(documents.createdAt));
+
+        if (userDocs.length === 0) return [];
+
+        const docIds = userDocs.map((d) => d.id);
+        const files = await db
+            .select()
+            .from(documentFiles)
+            .where(inArray(documentFiles.documentId, docIds))
+            .orderBy(desc(documentFiles.createdAt));
+
+        const filesMap = new Map<string, typeof files>();
+        for (const file of files) {
+            const existing = filesMap.get(file.documentId) || [];
+            existing.push(file);
+            filesMap.set(file.documentId, existing);
+        }
+
+        return userDocs.map((doc) => ({
+            ...doc,
+            files: filesMap.get(doc.id) || [],
+        }));
     }
 
     async update(

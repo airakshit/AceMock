@@ -1,5 +1,5 @@
 import { SignedUrlResponseObject } from "../storage-service";
-import { DocumentContentType } from "../types";
+import { DocumentContentType, DocumentStatus, DocumentFileStatus, DocumentFileType } from "../types";
 
 interface UserIdInterface {
     userId: string;
@@ -33,3 +33,30 @@ export interface FinalizeDocumentUploadActionResponse {
     fileIds: string[];
 }
 export type FinalizeDocumentUplaodActionResponse = FinalizeDocumentUploadActionResponse;
+
+export interface DocumentFileDTO {
+    id: string;
+    documentId: string;
+    originalFilename: string;
+    mimeType: string;
+    fileType: DocumentFileType;
+    fileSize: number;
+    status: DocumentFileStatus;
+    storageUrl: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface DocumentItemDTO {
+    id: string;
+    userId: string;
+    title: string;
+    description: string | null;
+    contentType: DocumentContentType;
+    status: DocumentStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    files: DocumentFileDTO[];
+}
+
+export type GetUserDocumentsActionResponse = DocumentItemDTO[];

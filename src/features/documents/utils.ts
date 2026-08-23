@@ -6,3 +6,13 @@ export function formatBytes(bytes: number) {
     return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
+export function formatDate(date: Date | string | number) {
+    const d = new Date(date);
+    return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    }).format(d);
+}
+
+

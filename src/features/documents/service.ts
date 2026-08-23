@@ -133,6 +133,10 @@ class DocumentsService {
             fileIds: updatedFiles.map((f) => f.id),
         };
     }
+
+    async getUserDocuments(userId: string) {
+        return documentsRepository.findByUserWithFiles(db, userId);
+    }
 }
 
 export const documentsService = new DocumentsService();

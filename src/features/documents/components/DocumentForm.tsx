@@ -19,6 +19,7 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -64,6 +65,7 @@ export function DocumentForm({
     onSumbitAction,
     onFinalizeAction = finalizeDocumentUploadAction,
 }: DocumentFormProps) {
+    const router = useRouter();
     const [showDescription, setShowDescription] = useState(false);
     const [isCreatingDoc, setIsCreatingDoc] = useState(false);
     const [isUploadingStarted, setIsUploadingStarted] = useState(false);
@@ -154,6 +156,7 @@ export function DocumentForm({
 
                     if (finalizeResult.success) {
                         toast.success("Upload completed successfully!");
+                        router.refresh();
                     } else {
                         toast.error(finalizeResult.error.message);
                     }
