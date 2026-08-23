@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import type { DocumentFileItem } from "../schemas";
 import type { FileProgressState } from "../uploads/upload.types";
 import { formatBytes } from "../utils";
+import { MobileFilePicker } from "./MobileFilePicker";
 
 interface FileDropzoneProps {
     id: string;
@@ -205,7 +206,7 @@ export function FileDropzone({
                         variant="outline"
                         size="sm"
                         disabled={disabled}
-                        className="mt-1 shadow-2xs"
+                        className="mt-1 shadow-2xs sm:flex"
                         onClick={(event) => {
                             event.stopPropagation();
                             openPicker();
@@ -214,6 +215,19 @@ export function FileDropzone({
                         <Upload className="mr-2 size-3.5" />
                         Browse {label.toLowerCase()}
                     </Button>
+
+                    {/* Touch-optimized mobile camera/photos/documents picker (only visible on mobile screens) */}
+                    <div
+                        className="w-full pt-2 block sm:hidden"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <MobileFilePicker
+                            accept={accept}
+                            multiple={multiple}
+                            disabled={disabled}
+                            onFilesSelected={(files) => processRawFiles(files)}
+                        />
+                    </div>
                 </div>
 
                 {hiddenInput}

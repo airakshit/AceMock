@@ -2,6 +2,8 @@
 
 import {
     CheckCircle2,
+    ChevronDown,
+    ChevronUp,
     CircleAlert,
     FileText,
     Image as ImageIcon,
@@ -18,7 +20,12 @@ import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
     Field,
     FieldError,
@@ -156,16 +163,38 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
         removeFile(clientFileId);
     };
 
+    const [isOpen, setIsOpen] = useState(true);
+
     const isAllComplete =
         isUploadingStarted && totalProgress === 100;
 
     return (
-        <Card className="w-full shadow-sm">
-            <CardHeader className="border-b pb-4">
-                <CardTitle className="text-lg font-bold flex items-center justify-between">
-                    <span>Create Document</span>
-                    {isUploadingStarted && (
-                        <div className="flex items-center gap-1.5">
+        <Collapsible
+            open={isOpen}
+            onOpenChange={setIsOpen}
+            className="w-full rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden"
+        >
+            {/* Trigger — the single top row of the box */}
+            <CollapsibleTrigger className={cn(
+                "w-full flex items-center justify-between gap-3 p-4 sm:p-6 text-left cursor-pointer select-none transition-colors hover:bg-muted/40 focus:outline-none",
+                isOpen && "border-b"
+            )}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base sm:text-lg font-bold truncate">Create Document</span>
+
+                    {!isOpen && totalFilesCount > 0 && (
+                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                            {totalFilesCount} {totalFilesCount === 1 ? "file" : "files"}
+                        </span>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                    {isUploadingStarted && isOpen && (
+                        <div
+                            className="flex items-center gap-1.5"
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             {!isAllComplete && (
                                 <>
                                     <Button
@@ -176,7 +205,7 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                         onClick={pauseAll}
                                     >
                                         <Pause className="size-3" />
-                                        Pause All
+                                        <span className="hidden sm:inline">Pause All</span>
                                     </Button>
 
                                     <Button
@@ -187,7 +216,7 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                         onClick={resumeAll}
                                     >
                                         <Play className="size-3" />
-                                        Resume All
+                                        <span className="hidden sm:inline">Resume All</span>
                                     </Button>
 
                                     <Button
@@ -198,7 +227,7 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                         onClick={retryAll}
                                     >
                                         <RotateCcw className="size-3" />
-                                        Retry All
+                                        <span className="hidden sm:inline">Retry All</span>
                                     </Button>
                                 </>
                             )}
@@ -211,264 +240,274 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                                 onClick={handleReset}
                             >
                                 <Trash2 className="size-3" />
-                                Reset
+                                <span className="hidden sm:inline">Reset</span>
                             </Button>
                         </div>
                     )}
-                </CardTitle>
-            </CardHeader>
 
-            <CardContent className="pt-6">
-                <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className={cn(layout.fieldStack, "space-y-6")}
-                >
-                    <FieldGroup className={layout.fieldStack}>
-                        {/* Content Type */}
-                        <Controller
-                            name="contentType"
-                            control={form.control}
-                            render={({ field, fieldState }) => (
-                                <Field
-                                    data-invalid={fieldState.invalid}
-                                    className="min-w-0"
-                                >
-                                    <FieldLabel>Content Type</FieldLabel>
+                    <div className="flex size-8 items-center justify-center text-muted-foreground">
+                        {isOpen ? (
+                            <ChevronUp className="size-5" />
+                        ) : (
+                            <ChevronDown className="size-5" />
+                        )}
+                    </div>
+                </div>
+            </CollapsibleTrigger>
 
-                                    <MiniHorizontalList
-                                        items={contentTypeItems}
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                    />
+            <CollapsibleContent>
+                <div className="p-4 sm:p-6 pt-6">
+                        <form
+                            onSubmit={form.handleSubmit(onSubmit)}
+                            className={cn(layout.fieldStack, "space-y-6")}
+                        >
+                            <FieldGroup className={layout.fieldStack}>
+                                {/* Content Type */}
+                                <Controller
+                                    name="contentType"
+                                    control={form.control}
+                                    render={({ field, fieldState }) => (
+                                        <Field
+                                            data-invalid={fieldState.invalid}
+                                            className="min-w-0"
+                                        >
+                                            <FieldLabel>Content Type</FieldLabel>
 
-                                    {fieldState.invalid && (
-                                        <FieldError
-                                            errors={[fieldState.error]}
-                                        />
+                                            <MiniHorizontalList
+                                                items={contentTypeItems}
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                            />
+
+                                            {fieldState.invalid && (
+                                                <FieldError
+                                                    errors={[fieldState.error]}
+                                                />
+                                            )}
+                                        </Field>
                                     )}
-                                </Field>
-                            )}
-                        />
+                                />
 
-                        {/* Title */}
-                        <Controller
-                            name="title"
-                            control={form.control}
-                            render={({ field, fieldState }) => (
-                                <Field
-                                    data-invalid={fieldState.invalid}
-                                    className="min-w-0"
-                                >
-                                    <FieldLabel htmlFor="title">
-                                        Title
-                                    </FieldLabel>
-
-                                    <Input
-                                        {...field}
-                                        id="title"
-                                        placeholder="e.g. Physics Mechanics Chapter 1"
-                                        aria-invalid={fieldState.invalid}
-                                        disabled={isCreatingDoc || isUploadingStarted}
-                                    />
-
-                                    {fieldState.invalid && (
-                                        <FieldError
-                                            errors={[fieldState.error]}
-                                        />
-                                    )}
-                                </Field>
-                            )}
-                        />
-
-                        {/* Description */}
-                        {showDescription ? (
-                            <Controller
-                                name="description"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field
-                                        data-invalid={fieldState.invalid}
-                                        className="min-w-0"
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <FieldLabel htmlFor="description">
-                                                Description
+                                {/* Title */}
+                                <Controller
+                                    name="title"
+                                    control={form.control}
+                                    render={({ field, fieldState }) => (
+                                        <Field
+                                            data-invalid={fieldState.invalid}
+                                            className="min-w-0"
+                                        >
+                                            <FieldLabel htmlFor="title">
+                                                Title
                                             </FieldLabel>
 
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={handleRemoveDescription}
+                                            <Input
+                                                {...field}
+                                                id="title"
+                                                placeholder="e.g. Physics Mechanics Chapter 1"
+                                                aria-invalid={fieldState.invalid}
                                                 disabled={isCreatingDoc || isUploadingStarted}
-                                                className="h-7 shrink-0 px-2 text-muted-foreground hover:text-foreground"
+                                            />
+
+                                            {fieldState.invalid && (
+                                                <FieldError
+                                                    errors={[fieldState.error]}
+                                                />
+                                            )}
+                                        </Field>
+                                    )}
+                                />
+
+                                {/* Description */}
+                                {showDescription ? (
+                                    <Controller
+                                        name="description"
+                                        control={form.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={fieldState.invalid}
+                                                className="min-w-0"
                                             >
-                                                <X className="size-3.5" />
-                                                <span className="hidden sm:inline text-xs">
-                                                    Remove
-                                                </span>
-                                            </Button>
-                                        </div>
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <FieldLabel htmlFor="description">
+                                                        Description
+                                                    </FieldLabel>
 
-                                        <Textarea
-                                            {...field}
-                                            id="description"
-                                            placeholder="Describe what this document contains..."
-                                            rows={3}
-                                            aria-invalid={fieldState.invalid}
-                                            disabled={isCreatingDoc || isUploadingStarted}
-                                        />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={handleRemoveDescription}
+                                                        disabled={isCreatingDoc || isUploadingStarted}
+                                                        className="h-7 shrink-0 px-2 text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        <X className="size-3.5" />
+                                                        <span className="hidden sm:inline text-xs">
+                                                            Remove
+                                                        </span>
+                                                    </Button>
+                                                </div>
 
-                                        {fieldState.invalid && (
-                                            <FieldError
-                                                errors={[fieldState.error]}
-                                            />
+                                                <Textarea
+                                                    {...field}
+                                                    id="description"
+                                                    placeholder="Describe what this document contains..."
+                                                    rows={3}
+                                                    aria-invalid={fieldState.invalid}
+                                                    disabled={isCreatingDoc || isUploadingStarted}
+                                                />
+
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[fieldState.error]}
+                                                    />
+                                                )}
+                                            </Field>
                                         )}
-                                    </Field>
-                                )}
-                            />
-                        ) : (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setShowDescription(true)}
-                                disabled={isCreatingDoc || isUploadingStarted}
-                                className="w-full border-dashed sm:w-fit text-xs h-8"
-                            >
-                                <Plus className="size-3.5" />
-                                Add description
-                            </Button>
-                        )}
-
-                        {/* File Dropzones with live upload progress */}
-                        <div className="grid gap-6 md:grid-cols-2 pt-2">
-                            {/* PDFs */}
-                            <Controller
-                                name="pdfs"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field
-                                        data-invalid={fieldState.invalid}
-                                        className="min-w-0"
+                                    />
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setShowDescription(true)}
+                                        disabled={isCreatingDoc || isUploadingStarted}
+                                        className="w-full border-dashed sm:w-fit text-xs h-8"
                                     >
-                                        <FieldLabel htmlFor="pdfs">
-                                            PDF Files
-                                        </FieldLabel>
-
-                                        <FileDropzone
-                                            id="pdfs"
-                                            label="PDF files"
-                                            title="Upload PDF files"
-                                            description="Select one or more PDF files (max 50 MB each)"
-                                            accept="application/pdf"
-                                            icon={FileText}
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            onFilesAdded={handleFilesAdded}
-                                            onFileRemoved={handleFileRemoved}
-                                            uploadStates={uploadStates}
-                                            onPauseFile={pauseFile}
-                                            onResumeFile={resumeFile}
-                                            onRetryFile={retryFile}
-                                            disabled={isCreatingDoc || isUploadingStarted}
-                                            invalid={fieldState.invalid}
-                                        />
-
-                                        {fieldState.invalid && (
-                                            <FieldError
-                                                errors={[fieldState.error]}
-                                            />
-                                        )}
-                                    </Field>
+                                        <Plus className="size-3.5" />
+                                        Add description
+                                    </Button>
                                 )}
-                            />
 
-                            {/* Images */}
-                            <Controller
-                                name="images"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field
-                                        data-invalid={fieldState.invalid}
-                                        className="min-w-0"
-                                    >
-                                        <FieldLabel htmlFor="images">
-                                            Images
-                                        </FieldLabel>
+                                {/* File Dropzones with live upload progress */}
+                                <div className="grid gap-6 md:grid-cols-2 pt-2">
+                                    {/* PDFs */}
+                                    <Controller
+                                        name="pdfs"
+                                        control={form.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={fieldState.invalid}
+                                                className="min-w-0"
+                                            >
+                                                <FieldLabel htmlFor="pdfs">
+                                                    PDF Files
+                                                </FieldLabel>
 
-                                        <FileDropzone
-                                            id="images"
-                                            label="Images"
-                                            title="Upload images"
-                                            description="Images will be uploaded in selected order"
-                                            accept="image/*"
-                                            icon={ImageIcon}
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            onFilesAdded={handleFilesAdded}
-                                            onFileRemoved={handleFileRemoved}
-                                            uploadStates={uploadStates}
-                                            onPauseFile={pauseFile}
-                                            onResumeFile={resumeFile}
-                                            onRetryFile={retryFile}
-                                            disabled={isCreatingDoc || isUploadingStarted}
-                                            invalid={fieldState.invalid}
-                                            numbered
-                                        />
+                                                <FileDropzone
+                                                    id="pdfs"
+                                                    label="PDF files"
+                                                    title="Upload PDF files"
+                                                    description="Select one or more PDF files (max 50 MB each)"
+                                                    accept="application/pdf"
+                                                    icon={FileText}
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    onFilesAdded={handleFilesAdded}
+                                                    onFileRemoved={handleFileRemoved}
+                                                    uploadStates={uploadStates}
+                                                    onPauseFile={pauseFile}
+                                                    onResumeFile={resumeFile}
+                                                    onRetryFile={retryFile}
+                                                    disabled={isCreatingDoc || isUploadingStarted}
+                                                    invalid={fieldState.invalid}
+                                                />
 
-                                        {fieldState.invalid && (
-                                            <FieldError
-                                                errors={[fieldState.error]}
-                                            />
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[fieldState.error]}
+                                                    />
+                                                )}
+                                            </Field>
                                         )}
-                                    </Field>
-                                )}
-                            />
-                        </div>
-                    </FieldGroup>
+                                    />
 
-                    {!isUploadingStarted ? (
-                        <Button
-                            type="submit"
-                            className="h-11 w-full text-sm font-semibold shadow-sm"
-                            disabled={isCreatingDoc || totalFilesCount === 0}
-                        >
-                            {isCreatingDoc ? (
-                                <>
+                                    {/* Images */}
+                                    <Controller
+                                        name="images"
+                                        control={form.control}
+                                        render={({ field, fieldState }) => (
+                                            <Field
+                                                data-invalid={fieldState.invalid}
+                                                className="min-w-0"
+                                            >
+                                                <FieldLabel htmlFor="images">
+                                                    Images
+                                                </FieldLabel>
+
+                                                <FileDropzone
+                                                    id="images"
+                                                    label="Images"
+                                                    title="Upload images"
+                                                    description="Images will be uploaded in selected order"
+                                                    accept="image/*"
+                                                    icon={ImageIcon}
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    onFilesAdded={handleFilesAdded}
+                                                    onFileRemoved={handleFileRemoved}
+                                                    uploadStates={uploadStates}
+                                                    onPauseFile={pauseFile}
+                                                    onResumeFile={resumeFile}
+                                                    onRetryFile={retryFile}
+                                                    disabled={isCreatingDoc || isUploadingStarted}
+                                                    invalid={fieldState.invalid}
+                                                    numbered
+                                                />
+
+                                                {fieldState.invalid && (
+                                                    <FieldError
+                                                        errors={[fieldState.error]}
+                                                    />
+                                                )}
+                                            </Field>
+                                        )}
+                                    />
+                                </div>
+                            </FieldGroup>
+
+                            {!isUploadingStarted ? (
+                                <Button
+                                    type="submit"
+                                    className="h-11 w-full text-sm font-semibold shadow-sm"
+                                    disabled={isCreatingDoc || totalFilesCount === 0}
+                                >
+                                    {isCreatingDoc ? (
+                                        <>
+                                            <Loader2 className="mr-2 size-4 animate-spin" />
+                                            Creating...
+                                        </>
+                                    ) : (
+                                        "Create"
+                                    )}
+                                </Button>
+                            ) : !isAllComplete ? (
+                                <Button
+                                    type="button"
+                                    className="h-11 w-full text-sm font-semibold shadow-sm"
+                                    disabled
+                                >
                                     <Loader2 className="mr-2 size-4 animate-spin" />
-                                    Creating...
-                                </>
+                                    Uploading...
+                                </Button>
                             ) : (
-                                "Create"
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-10 w-full font-medium"
+                                    onClick={handleReset}
+                                >
+                                    <CheckCircle2 className="mr-2 size-4 text-emerald-500" />
+                                    Start New Document Upload
+                                </Button>
                             )}
-                        </Button>
-                    ) : !isAllComplete ? (
-                        <Button
-                            type="button"
-                            className="h-11 w-full text-sm font-semibold shadow-sm"
-                            disabled
-                        >
-                            <Loader2 className="mr-2 size-4 animate-spin" />
-                            Uploading...
-                        </Button>
-                    ) : (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="h-10 w-full font-medium"
-                            onClick={handleReset}
-                        >
-                            <CheckCircle2 className="mr-2 size-4 text-emerald-500" />
-                            Start New Document Upload
-                        </Button>
-                    )}
-                </form>
-            </CardContent>
+                        </form>
+                </div>
 
-            <CardFooter className="border-t pt-4 text-xs text-muted-foreground flex justify-between">
-                <span>Max 50MB per file</span>
-            </CardFooter>
-        </Card>
+                <div className="border-t px-4 sm:px-6 py-3 text-xs text-muted-foreground">
+                    Max 50MB per file
+                </div>
+            </CollapsibleContent>
+        </Collapsible>
     );
 }
 
