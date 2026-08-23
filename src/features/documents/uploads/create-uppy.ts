@@ -43,8 +43,8 @@ export function createDocumentUppy() {
                 throw new Error(`No token available for file: ${file.name}`);
             }
             return {
-                // apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-                // Authorization: `Bearer ${token}`,
+                apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+                Authorization: `Bearer ${token}`,
                 "x-signature": token,
                 "x-upsert": "true",
             };

@@ -27,8 +27,6 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { layout } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import { MiniHorizontalList } from "@/components/shared/MiniHorizontalList";
@@ -118,7 +116,6 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
         try {
             const result = await onSumbitAction(payload);
             if (result.success) {
-                toast.success("Document session created! Starting resumable upload...");
                 setCredentials(result.data.files);
                 setIsUploadingStarted(true);
                 await upload();
@@ -126,7 +123,7 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                 toast.error(result.error.message);
             }
         } catch (error) {
-            toast.error("Failed to create document upload session.");
+            toast.error("Failed to create document upload.");
             console.error(error);
         } finally {
             setIsCreatingDoc(false);
@@ -166,88 +163,59 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
         <Card className="w-full shadow-sm">
             <CardHeader className="border-b pb-4">
                 <CardTitle className="text-lg font-bold flex items-center justify-between">
-                    <span>Create Document & Upload Files</span>
+                    <span>Create Document</span>
                     {isUploadingStarted && (
-                        <Badge
-                            variant={isAllComplete ? "outline" : "default"}
-                            className={cn(
-                                "text-xs font-mono",
-                                isAllComplete && "border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40",
+                        <div className="flex items-center gap-1.5">
+                            {!isAllComplete && (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-[11px] gap-1 px-2"
+                                        onClick={pauseAll}
+                                    >
+                                        <Pause className="size-3" />
+                                        Pause All
+                                    </Button>
+
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-[11px] gap-1 px-2"
+                                        onClick={resumeAll}
+                                    >
+                                        <Play className="size-3" />
+                                        Resume All
+                                    </Button>
+
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-[11px] gap-1 px-2"
+                                        onClick={retryAll}
+                                    >
+                                        <RotateCcw className="size-3" />
+                                        Retry All
+                                    </Button>
+                                </>
                             )}
-                        >
-                            {isAllComplete ? (
-                                <span className="flex items-center gap-1">
-                                    <CheckCircle2 className="size-3" />
-                                    All Uploads Complete
-                                </span>
-                            ) : (
-                                <span>Batch Upload: {totalProgress}%</span>
-                            )}
-                        </Badge>
+
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-[11px] gap-1 px-2 text-destructive hover:text-destructive"
+                                onClick={handleReset}
+                            >
+                                <Trash2 className="size-3" />
+                                Reset
+                            </Button>
+                        </div>
                     )}
                 </CardTitle>
-
-                {isUploadingStarted && (
-                    <div className="space-y-2 pt-2">
-                        <Progress value={totalProgress} className="h-2 w-full" />
-
-                        <div className="flex items-center justify-between gap-2 pt-1 text-xs">
-                            <span className="text-muted-foreground">
-                                Uploading batch ({totalFilesCount} {totalFilesCount === 1 ? "file" : "files"})
-                            </span>
-
-                            <div className="flex items-center gap-1.5">
-                                {!isAllComplete && (
-                                    <>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-7 text-[11px] gap-1 px-2"
-                                            onClick={pauseAll}
-                                        >
-                                            <Pause className="size-3" />
-                                            Pause All
-                                        </Button>
-
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-7 text-[11px] gap-1 px-2"
-                                            onClick={resumeAll}
-                                        >
-                                            <Play className="size-3" />
-                                            Resume All
-                                        </Button>
-
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-7 text-[11px] gap-1 px-2"
-                                            onClick={retryAll}
-                                        >
-                                            <RotateCcw className="size-3" />
-                                            Retry All
-                                        </Button>
-                                    </>
-                                )}
-
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 text-[11px] gap-1 px-2 text-destructive hover:text-destructive"
-                                    onClick={handleReset}
-                                >
-                                    <Trash2 className="size-3" />
-                                    Reset
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </CardHeader>
 
             <CardContent className="pt-6">
@@ -468,27 +436,36 @@ export function DocumentForm({ onSumbitAction }: DocumentFormProps) {
                             {isCreatingDoc ? (
                                 <>
                                     <Loader2 className="mr-2 size-4 animate-spin" />
-                                    Creating Document & Generating Signed URLs...
+                                    Creating...
                                 </>
                             ) : (
-                                `Submit & Upload ${totalFilesCount} ${totalFilesCount === 1 ? "File" : "Files"}`
+                                "Create"
                             )}
+                        </Button>
+                    ) : !isAllComplete ? (
+                        <Button
+                            type="button"
+                            className="h-11 w-full text-sm font-semibold shadow-sm"
+                            disabled
+                        >
+                            <Loader2 className="mr-2 size-4 animate-spin" />
+                            Uploading...
                         </Button>
                     ) : (
                         <Button
                             type="button"
-                            variant="secondary"
-                            className="h-10 w-full"
+                            variant="outline"
+                            className="h-10 w-full font-medium"
                             onClick={handleReset}
                         >
-                            {isAllComplete ? "Start New Document Upload" : "Clear & Start Over"}
+                            <CheckCircle2 className="mr-2 size-4 text-emerald-500" />
+                            Start New Document Upload
                         </Button>
                     )}
                 </form>
             </CardContent>
 
             <CardFooter className="border-t pt-4 text-xs text-muted-foreground flex justify-between">
-                <span>Direct TUS Resumable Upload to Supabase Storage</span>
                 <span>Max 50MB per file</span>
             </CardFooter>
         </Card>
