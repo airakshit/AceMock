@@ -9,38 +9,38 @@ import { account, session, user, verification } from "@/db/schemas/auth";
 import { v7 as uuidv7 } from "uuid";
 
 export const auth = betterAuth({
-    database: drizzleAdapter(db, {
-        provider: "pg",
-        schema: {
-            user,
-            session,
-            account,
-            verification,
-        },
-    }),
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      user,
+      session,
+      account,
+      verification,
+    },
+  }),
 
-    secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL,
-    emailAndPassword: {
-        enabled: true,
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  emailAndPassword: {
+    enabled: true,
+  },
+  socialProviders: {
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
     },
-    socialProviders: {
-        google: {
-            clientId: env.GOOGLE_CLIENT_ID,
-            clientSecret: env.GOOGLE_CLIENT_SECRET,
-        },
-    },
+  },
 
-    session: {
-        expiresIn: 60 * 60 * 24 * 7, // 7 days
-        updateAge: 60 * 60 * 24, // Refresh periodically
-    },
+  session: {
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 24, // Refresh periodically
+  },
 
-    advanced: {
-        cookiePrefix: "mock-ace",
-        database: {
-            generateId: () => uuidv7(),
-        },
+  advanced: {
+    cookiePrefix: "mock-ace",
+    database: {
+      generateId: () => uuidv7(),
     },
-    plugins: [lastLoginMethod(), nextCookies()],
+  },
+  plugins: [lastLoginMethod(), nextCookies()],
 });

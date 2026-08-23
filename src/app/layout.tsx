@@ -7,29 +7,28 @@ import { GeistSans } from "geist/font/sans";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const caveat = Lobster({
-    variable: "--font-caveat",
-    subsets: ["latin"],
-    weight: ["400"],
+  variable: "--font-caveat",
+  subsets: ["latin"],
+  weight: ["400"],
 });
 
 export default function RootLayout({
-    children,
+  children,
 }: Readonly<{
-    children: React.ReactNode;
+  children: React.ReactNode;
 }>) {
-    return (
-        <html
-            lang="en"
-            
-            className={`${GeistSans.variable} ${GeistMono.variable} ${caveat.variable}`}
-        >
-            <head>
-                <link rel="icon" href="/favicon/favicon.ico" sizes="any" />
-            </head>
-            <body className="font-sans antialiased">
-                <Toaster position="top-right" />
-                <TooltipProvider>{children}</TooltipProvider>
-            </body>
-        </html>
-    );
+  return (
+    <html
+      lang="en"
+      className={`${GeistSans.variable} ${GeistMono.variable} ${caveat.variable}`}
+    >
+      <head>
+        <link rel="icon" href="/favicon/favicon.ico" sizes="any" />
+      </head>
+      <body className="font-sans antialiased">
+        <Toaster position="top-right" />
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
+    </html>
+  );
 }

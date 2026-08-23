@@ -5,41 +5,41 @@ export type ThemePreference = "light" | "dark" | "system";
 export const THEME_OPTIONS: ThemePreference[] = ["light", "dark", "system"];
 
 export function isThemePreference(
-    value: string | null,
+  value: string | null,
 ): value is ThemePreference {
-    return value === "light" || value === "dark" || value === "system";
+  return value === "light" || value === "dark" || value === "system";
 }
 
 export function resolveIsDark(theme: ThemePreference): boolean {
-    if (theme === "dark") {
-        return true;
-    }
+  if (theme === "dark") {
+    return true;
+  }
 
-    if (theme === "light") {
-        return false;
-    }
+  if (theme === "light") {
+    return false;
+  }
 
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 export function applyTheme(theme: ThemePreference) {
-    const root = document.documentElement;
-    const isDark = resolveIsDark(theme);
+  const root = document.documentElement;
+  const isDark = resolveIsDark(theme);
 
-    root.classList.toggle("dark", isDark);
-    root.style.colorScheme = isDark ? "dark" : "light";
+  root.classList.toggle("dark", isDark);
+  root.style.colorScheme = isDark ? "dark" : "light";
 }
 
 export function getStoredTheme(): ThemePreference {
-    if (typeof window === "undefined") {
-        return "system";
-    }
+  if (typeof window === "undefined") {
+    return "system";
+  }
 
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return isThemePreference(stored) ? stored : "system";
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  return isThemePreference(stored) ? stored : "system";
 }
 
 export function setThemePreference(theme: ThemePreference) {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    applyTheme(theme);
+  window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  applyTheme(theme);
 }

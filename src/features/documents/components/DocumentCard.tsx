@@ -81,8 +81,13 @@ export function DocumentCard({ document }: DocumentCardProps) {
     const StatusIcon = statusInfo.icon;
 
     const pdfCount = document.files.filter((f) => f.fileType === "pdf").length;
-    const imageCount = document.files.filter((f) => f.fileType === "image").length;
-    const totalSize = document.files.reduce((acc, f) => acc + (f.fileSize || 0), 0);
+    const imageCount = document.files.filter(
+        (f) => f.fileType === "image",
+    ).length;
+    const totalSize = document.files.reduce(
+        (acc, f) => acc + (f.fileSize || 0),
+        0,
+    );
 
     return (
         <div className="w-full rounded-xl border bg-card text-card-foreground shadow-2xs hover:border-primary/30 transition-all duration-200 overflow-hidden">
@@ -93,7 +98,8 @@ export function DocumentCard({ document }: DocumentCardProps) {
                     <div className="flex flex-wrap items-center gap-2">
                         {/* Content Type Badge */}
                         <span className="inline-flex items-center rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
-                            {contentTypeLabels[document.contentType] || document.contentType}
+                            {contentTypeLabels[document.contentType] ||
+                                document.contentType}
                         </span>
 
                         {/* Status Badge with custom colors */}
@@ -106,8 +112,10 @@ export function DocumentCard({ document }: DocumentCardProps) {
                             <StatusIcon
                                 className={cn(
                                     "size-3.5",
-                                    document.status === "uploading" && "animate-spin",
-                                    document.status === "processing" && "animate-pulse",
+                                    document.status === "uploading" &&
+                                        "animate-spin",
+                                    document.status === "processing" &&
+                                        "animate-pulse",
                                 )}
                             />
                             <span>{statusInfo.label}</span>
@@ -143,7 +151,8 @@ export function DocumentCard({ document }: DocumentCardProps) {
                         {imageCount > 0 && (
                             <span className="inline-flex items-center gap-1">
                                 <ImageIcon className="size-3.5 text-blue-500" />
-                                {imageCount} {imageCount === 1 ? "Image" : "Images"}
+                                {imageCount}{" "}
+                                {imageCount === 1 ? "Image" : "Images"}
                             </span>
                         )}
 
@@ -165,7 +174,9 @@ export function DocumentCard({ document }: DocumentCardProps) {
                             onClick={() => setIsFilesOpen(!isFilesOpen)}
                             className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                         >
-                            <span>{isFilesOpen ? "Hide Files" : "View Files"}</span>
+                            <span>
+                                {isFilesOpen ? "Hide Files" : "View Files"}
+                            </span>
                             {isFilesOpen ? (
                                 <ChevronUp className="size-4" />
                             ) : (
@@ -197,12 +208,14 @@ export function DocumentCard({ document }: DocumentCardProps) {
                                             <FileIcon
                                                 className={cn(
                                                     "size-3.5",
-                                                    isPdf ? "text-rose-500" : "text-blue-500",
+                                                    isPdf
+                                                        ? "text-rose-500"
+                                                        : "text-blue-500",
                                                 )}
                                             />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="font-medium text-foreground truncate max-w-[180px] sm:max-w-[220px]">
+                                            <p className="font-medium text-foreground truncate max-w-45 sm:max-w-55">
                                                 {file.originalFilename}
                                             </p>
                                             <p className="text-[10px] text-muted-foreground font-mono">

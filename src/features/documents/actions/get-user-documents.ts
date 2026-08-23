@@ -7,18 +7,18 @@ import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 
 export async function getUserDocumentsAction(): Promise<
-    ServerActionResult<GetUserDocumentsActionResponse>
+  ServerActionResult<GetUserDocumentsActionResponse>
 > {
-    try {
-        const session = await requireSession();
-        const docs = await documentsService.getUserDocuments(session.user.id);
+  try {
+    const session = await requireSession();
+    const docs = await documentsService.getUserDocuments(session.user.id);
 
-        return {
-            success: true,
-            data: docs,
-            message: "Documents retrieved successfully",
-        };
-    } catch (error) {
-        return handleActionError(error);
-    }
+    return {
+      success: true,
+      data: docs,
+      message: "Documents retrieved successfully",
+    };
+  } catch (error) {
+    return handleActionError(error);
+  }
 }

@@ -5,30 +5,30 @@ import { topics } from "./topics";
 import { questions } from "./questions";
 
 export const subjectsRelations = relations(subjects, ({ many }) => ({
-    topics: many(topics),
+  topics: many(topics),
 }));
 
 export const topicsRelations = relations(topics, ({ one, many }) => ({
-    subject: one(subjects, {
-        fields: [topics.subjectId],
-        references: [subjects.id],
-    }),
+  subject: one(subjects, {
+    fields: [topics.subjectId],
+    references: [subjects.id],
+  }),
 
-    questions: many(questions),
+  questions: many(questions),
 }));
 
 export const passagesRelations = relations(passages, ({ many }) => ({
-    questions: many(questions),
+  questions: many(questions),
 }));
 
 export const questionsRelations = relations(questions, ({ one }) => ({
-    topic: one(topics, {
-        fields: [questions.topicId],
-        references: [topics.id],
-    }),
+  topic: one(topics, {
+    fields: [questions.topicId],
+    references: [topics.id],
+  }),
 
-    passage: one(passages, {
-        fields: [questions.passageId],
-        references: [passages.id],
-    }),
+  passage: one(passages, {
+    fields: [questions.passageId],
+    references: [passages.id],
+  }),
 }));

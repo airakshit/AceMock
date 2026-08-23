@@ -1,62 +1,68 @@
 import { SignedUrlResponseObject } from "../storage-service";
-import { DocumentContentType, DocumentStatus, DocumentFileStatus, DocumentFileType } from "../types";
+import {
+  DocumentContentType,
+  DocumentStatus,
+  DocumentFileStatus,
+  DocumentFileType,
+} from "../types";
 
 interface UserIdInterface {
-    userId: string;
+  userId: string;
 }
 
 interface FilePayload {
-    clientFileId: string;
-    name: string;
-    size: number;
-    type: string;
+  clientFileId: string;
+  name: string;
+  size: number;
+  type: string;
 }
 
 export interface CreateNewDocumentActionPayload {
-    title: string;
-    description?: string;
-    contentType: DocumentContentType;
-    pdfs: FilePayload[];
-    images: FilePayload[];
+  title: string;
+  description?: string;
+  contentType: DocumentContentType;
+  pdfs: FilePayload[];
+  images: FilePayload[];
 }
 export interface CreateNewDocumentActionResponse {
-    documentId: string;
-    files: SignedUrlResponseObject[]
+  documentId: string;
+  files: SignedUrlResponseObject[];
 }
 
 export interface FinalizeDocumentUploadActionPayload {
-    documentId: string;
-    fileIds: string[]
+  documentId: string;
+  fileIds: string[];
 }
 
 export interface FinalizeDocumentUploadActionResponse {
-    fileIds: string[];
+  fileIds: string[];
 }
-export type FinalizeDocumentUplaodActionResponse = FinalizeDocumentUploadActionResponse;
+export type FinalizeDocumentUplaodActionResponse =
+  FinalizeDocumentUploadActionResponse;
 
 export interface DocumentFileDTO {
-    id: string;
-    documentId: string;
-    originalFilename: string;
-    mimeType: string;
-    fileType: DocumentFileType;
-    fileSize: number;
-    status: DocumentFileStatus;
-    storageUrl: string;
-    createdAt: Date;
-    updatedAt: Date;
+  id: string;
+  documentId: string;
+  originalFilename: string;
+  mimeType: string;
+  fileType: DocumentFileType;
+  fileSize: number;
+  status: DocumentFileStatus;
+  storageUrl: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface DocumentItemDTO {
-    id: string;
-    userId: string;
-    title: string;
-    description: string | null;
-    contentType: DocumentContentType;
-    status: DocumentStatus;
-    createdAt: Date;
-    updatedAt: Date;
-    files: DocumentFileDTO[];
+  id: string;
+  userId: string;
+  title: string;
+  description: string | null;
+  contentType: DocumentContentType;
+  status: DocumentStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  files: DocumentFileDTO[];
 }
 
-export type GetUserDocumentsActionResponse = DocumentItemDTO[];
+export type GetUserDocumentsActionResponse = DocumentItemDTO[];
