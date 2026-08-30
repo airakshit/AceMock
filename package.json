@@ -8,9 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
-    "test:run": "vitest run"
-  
-
+    "test:run": "vitest run",
+    "db:seed": "tsx src/db/seed/run.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -27,6 +26,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.4.0",
+    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "embla-carousel-react": "^8.6.0",
     "geist": "^1.7.2",
@@ -61,6 +61,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^4.1.11"
   }
