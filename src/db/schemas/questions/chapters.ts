@@ -1,12 +1,12 @@
 import { pgTable, text, uuid, timestamp } from "drizzle-orm/pg-core";
-import { subjects } from "./subjects";
+import { sections } from "./sections";
 
-export const topics = pgTable("topics", {
+export const chapters = pgTable("chapters", {
   id: uuid("id").primaryKey(),
 
-  subjectId: uuid("subject_id")
+  sectionId: uuid("section_id")
     .notNull()
-    .references(() => subjects.id, {
+    .references(() => sections.id, {
       onDelete: "cascade",
     }),
 

@@ -6,31 +6,33 @@ import {
   jsonb,
   timestamp,
   varchar,
+  pgEnum,
 } from "drizzle-orm/pg-core";
-import { subjects } from "./subjects";
-import { topics } from "./topics";
+import { chapters } from "./chapters";
 import { passages } from "./passages";
-import { documentPages } from "../documents";
+import { documentFiles } from "../documents";
+
+export const questionDifficutlyEnum = pgEnum("question_difficulty_enum", [
+  "easy",
+  "medium",
+  "hard",
+]);
 
 export const questions = pgTable("questions", {
   id: uuid("id").primaryKey(),
-  sourcePageId: uuid("source_page_id")
-    .references(() => documentPages.id, { onDelete: "cascade" })
+  question: text("question").notNull(),
+
+  chapterId: uuid("chapter_id")
+    .references(() => chapters.id, {
+      onDelete: "restrict",
+    })
     .notNull(),
-
-  subjectId: uuid("subject_id")
-    .notNull()
-    .references(() => subjects.id, { onDelete: "restrict" }),
-
-  topicId: uuid("topic_id").references(() => topics.id, {
+  passageId: uuid("passage_id").references(() => passages.id, {
     onDelete: "restrict",
   }),
-
-  passageId: uuid("passage_id").references(() => passages.id, {
+  fileId: uuid("file_id").references(() => documentFiles.id, {
     onDelete: "set null",
   }),
-
-  question: text("question").notNull(),
 
   options: jsonb("options")
     .$type<
@@ -47,13 +49,12 @@ export const questions = pgTable("questions", {
 
   marks: integer("marks").notNull().default(1),
 
-  difficulty: varchar("difficulty", {
-    length: 20,
-  }),
+  difficulty: questionDifficutlyEnum("difficulty").default("medium").notNull(),
 
+  diagram_url: text("diagram_url"),
+  hint: text("hint"),
   solution: text("solution"),
-
-  diagramUrl: text("diagram_url"),
+  solution_diagram_url: text("solution_diagram_url"),
 
   createdAt: timestamp("created_at", {
     withTimezone: true,

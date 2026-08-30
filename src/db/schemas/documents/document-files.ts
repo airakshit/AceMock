@@ -4,42 +4,34 @@ import {
   uuid,
   timestamp,
   text,
-  bigint,
+  numeric,
 } from "drizzle-orm/pg-core";
 import { documents } from "./documents";
 
-export const documentFileTypeEnum = pgEnum("document_file_type", [
-  "pdf",
-  "image",
-]);
-
-export const documentFileStatusEnum = pgEnum("document_file_status", [
+export const fileUploadStatusEnum = pgEnum("file_upload_status_enum", [
   "uploading",
   "uploaded",
   "failed",
 ]);
 
 export const documentFiles = pgTable("document_files", {
-  id: uuid("id").primaryKey(),
+  id: uuid("id").primaryKey().notNull(),
   documentId: uuid("document_id")
     .notNull()
-    .references(() => documents.id, {
-      onDelete: "cascade",
-    }),
+    .references(() => documents.id),
 
-  originalFilename: text("original_filename").notNull(),
+  filename: text("filename").notNull(),
+  fileSize: numeric("file_size").notNull(),
+
   mimeType: text("mime_type").notNull(),
-  fileType: documentFileTypeEnum("file_type").notNull(),
-  fileSize: bigint("file_size", {
-    mode: "number",
-  }).notNull(),
-  status: documentFileStatusEnum("status").notNull().default("uploading"),
-  storageUrl: text("storage_url").notNull(),
+  storagePath: text("storage_path").notNull(),
+  uploadStatus: fileUploadStatusEnum("upload_status").notNull(),
   createdAt: timestamp("created_at", {
     withTimezone: true,
   })
     .notNull()
     .defaultNow(),
+
   updatedAt: timestamp("updated_at", {
     withTimezone: true,
   })
