@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { documentContentTypeEnum } from "@/db/schemas";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_PDFS = 2;
@@ -45,8 +44,6 @@ export const documentFormSchema = z.object({
     .trim()
     .max(2000, "Description must be 2000 characters or less")
     .optional(),
-
-  contentType: z.enum(documentContentTypeEnum.enumValues),
 
   pdfs: z
     .array(pdfFileSchema)

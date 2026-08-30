@@ -2,7 +2,6 @@ import { documents, documentFiles } from "@/db/schemas";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
-import { DocumentContentType, DocumentStatus } from "../types";
 
 export class DocumentsRepository {
   async create(
@@ -11,7 +10,6 @@ export class DocumentsRepository {
     data: {
       documentId: string;
       title: string;
-      contentType: DocumentContentType;
       description?: string;
     },
   ) {
@@ -22,7 +20,6 @@ export class DocumentsRepository {
         userId: userId,
         title: data.title,
         description: data.description,
-        contentType: data.contentType,
       })
       .returning();
 
@@ -93,8 +90,6 @@ export class DocumentsRepository {
     data: {
       title?: string;
       description?: string;
-      contentType?: DocumentContentType;
-      status?: DocumentStatus;
     },
   ) {
     const [document] = await db

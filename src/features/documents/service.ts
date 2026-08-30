@@ -5,7 +5,6 @@ import {
 } from "./actions/types";
 import { documentsRepository } from "./repositories/documents.repository";
 import { documentFilesRepository } from "./repositories/document-files.repository";
-import { documentFileTypeEnum } from "@/db/schemas";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
 import { supabaseStorageClient } from "./storage-service";
@@ -24,11 +23,10 @@ class DocumentsService {
         serverFileId: documentFileId,
         clientFileId: value.clientFileId,
         documentFileId: documentFileId,
-        originalFilename: value.name,
+        filename: value.name,
         mimeType: value.type,
-        fileType: documentFileTypeEnum.enumValues[0],
         fileSize: value.size,
-        storageUrl: storagePaths.getDocumentFileSourceUrl(
+        storagePath: storagePaths.getDocumentFileSourceUrl(
           userId,
           documentId,
           documentFileId,
@@ -41,11 +39,10 @@ class DocumentsService {
       return {
         serverFileId: documentFileId,
         clientFileId: value.clientFileId,
-        originalFilename: value.name,
+        filename: value.name,
         mimeType: value.type,
-        fileType: documentFileTypeEnum.enumValues[1],
         fileSize: value.size,
-        storageUrl: storagePaths.getDocumentFileSourceUrl(
+        storagePath: storagePaths.getDocumentFileSourceUrl(
           userId,
           documentId,
           documentFileId,
@@ -59,7 +56,6 @@ class DocumentsService {
         documentId: documentId,
         title: payload.title,
         description: payload.description,
-        contentType: payload.contentType,
       });
 
       const files = await documentFilesRepository.createMany(tx, newDoc.id, [
@@ -77,14 +73,14 @@ class DocumentsService {
         return {
           clientFileId: value.clientFileId,
           serverFileId: value.serverFileId,
-          storagePath: value.storageUrl,
+          storagePath: value.storagePath,
         };
       }),
       ...images.map((value) => {
         return {
           clientFileId: value.clientFileId,
           serverFileId: value.serverFileId,
-          storagePath: value.storageUrl,
+          storagePath: value.storagePath,
         };
       }),
     ]);
@@ -118,18 +114,6 @@ class DocumentsService {
       payload.fileIds,
       "uploaded",
     );
-
-    const allFiles = await documentFilesRepository.findByDocument(
-      db,
-      payload.documentId,
-    );
-
-    const allUploaded = allFiles.every((f) => f.status === "uploaded");
-    if (allUploaded && allFiles.length > 0) {
-      await documentsRepository.update(db, payload.documentId, userId, {
-        status: "ready",
-      });
-    }
 
     return {
       fileIds: updatedFiles.map((f) => f.id),

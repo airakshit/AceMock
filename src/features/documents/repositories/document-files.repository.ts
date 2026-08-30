@@ -2,18 +2,17 @@ import { documentFiles } from "@/db/schemas";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
-import { DocumentFileStatus, DocumentFileType } from "../types";
+import { FileUploadStatus } from "../types";
 
 export class DocumentFilesRepository {
   async create(
     db: DbExecutor,
     documentId: string,
     data: {
-      originalFilename: string;
+      filename: string;
       mimeType: string;
-      fileType: DocumentFileType;
       fileSize: number;
-      storageUrl: string;
+      storagePath: string;
     },
   ) {
     const fileId = generateUUIDv7();
@@ -23,11 +22,10 @@ export class DocumentFilesRepository {
       .values({
         id: fileId,
         documentId,
-        originalFilename: data.originalFilename,
-        mimeType: data.mimeType,
-        fileType: data.fileType,
+        filename: data.filename,
         fileSize: data.fileSize,
-        storageUrl: data.storageUrl,
+        mimeType: data.mimeType,
+        storagePath: data.storagePath,
       })
       .returning();
 
@@ -39,21 +37,19 @@ export class DocumentFilesRepository {
     documentId: string,
     files: Array<{
       serverFileId: string;
-      originalFilename: string;
+      filename: string;
       mimeType: string;
-      fileType: DocumentFileType;
       fileSize: number;
-      storageUrl: string;
+      storagePath: string;
     }>,
   ) {
     const values = files.map((file) => ({
       id: file.serverFileId,
       documentId,
-      originalFilename: file.originalFilename,
-      mimeType: file.mimeType,
-      fileType: file.fileType,
+      filename: file.filename,
       fileSize: file.fileSize,
-      storageUrl: file.storageUrl,
+      mimeType: file.mimeType,
+      storagePath: file.storagePath,
     }));
 
     const createdFiles = await db
@@ -106,12 +102,11 @@ export class DocumentFilesRepository {
     fileId: string,
     documentId: string,
     data: {
-      originalFilename?: string;
+      filename?: string;
       mimeType?: string;
-      fileType?: DocumentFileType;
       fileSize?: number;
-      storageUrl?: string;
-      status?: DocumentFileStatus;
+      storagePath?: string;
+      uploadStatus?: FileUploadStatus;
     },
   ) {
     const [file] = await db
@@ -149,14 +144,14 @@ export class DocumentFilesRepository {
     db: DbExecutor,
     documentId: string,
     fileIds: string[],
-    status: DocumentFileStatus,
+    status: FileUploadStatus,
   ) {
     if (fileIds.length === 0) return [];
 
     return db
       .update(documentFiles)
       .set({
-        status,
+        uploadStatus: status,
         updatedAt: new Date(),
       })
       .where(

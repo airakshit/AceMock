@@ -46,10 +46,10 @@ The output format should be following:
             "sn": 1
             "question": "...",
             "options": [
-                {"key": "A", "content": "..."},
-                {"key": "B", "content": "..."},
-                {"key": "C", "content": "..."},
-                {"key": "D", "content": "..."}
+                {"key": "A", "text": "..."},
+                {"key": "B", "text": "..."},
+                {"key": "C", "text": "..."},
+                {"key": "D", "text": "..."}
             ],
             "answerKey": "A",
             "subject": "Physics",

@@ -1,13 +1,11 @@
 import { LabelIconValueItem } from "@/components/types";
 import {
   Atom,
-  BookOpen,
-  FileQuestionIcon,
   FlaskConical,
   Languages,
   Sigma,
 } from "lucide-react";
-import { documentContentTypeEnum } from "@/db/schemas";
+import { SubjectsEnum } from "./types";
 
 export const MORE_INFORMATION_NEW_DOCUMENT = `A document is a collection of related questions. Provide sources for specific purpose like single chapters, full tests etc.`;
 
@@ -15,31 +13,21 @@ export const contentTypeItems: LabelIconValueItem[] = [
   {
     label: "Physics",
     icon: Atom,
-    value: documentContentTypeEnum.enumValues[0],
+    value: SubjectsEnum.PHYSICS,
   },
   {
     label: "Chemistry",
     icon: FlaskConical,
-    value: documentContentTypeEnum.enumValues[2],
+    value: SubjectsEnum.CHEMISTRY,
   },
   {
     label: "Mathematics",
     icon: Sigma,
-    value: documentContentTypeEnum.enumValues[1],
+    value: SubjectsEnum.MATHEMATICS,
   },
   {
     label: "English",
     icon: Languages,
-    value: documentContentTypeEnum.enumValues[3],
-  },
-  {
-    label: "Mock Test",
-    icon: FileQuestionIcon,
-    value: documentContentTypeEnum.enumValues[4],
-  },
-  {
-    label: "Study Notes",
-    icon: BookOpen,
-    value: documentContentTypeEnum.enumValues[5],
+    value: SubjectsEnum.ENGLISH,
   },
 ];

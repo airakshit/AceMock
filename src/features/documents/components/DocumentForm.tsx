@@ -37,9 +37,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { layout } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
-import { MiniHorizontalList } from "@/components/shared/MiniHorizontalList";
-import { contentTypeItems } from "../constants";
-
 import {
   documentFormSchema,
   type DocumentFormData,
@@ -95,7 +92,6 @@ export function DocumentForm({
     defaultValues: {
       title: "",
       description: "",
-      contentType: undefined,
       pdfs: [],
       images: [],
     },
@@ -128,7 +124,6 @@ export function DocumentForm({
 
     const payload: CreateNewDocumentActionPayload = {
       title: data.title,
-      contentType: data.contentType,
       description: data.description,
       pdfs: pdfPayloads,
       images: imagePayloads,
@@ -186,7 +181,6 @@ export function DocumentForm({
     form.reset({
       title: "",
       description: "",
-      contentType: undefined,
       pdfs: [],
       images: [],
     });
@@ -202,7 +196,7 @@ export function DocumentForm({
     removeFile(clientFileId);
   };
 
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   const isAllComplete = isUploadingStarted && totalProgress === 100;
 
@@ -301,27 +295,6 @@ export function DocumentForm({
             className={cn(layout.fieldStack, "space-y-6")}
           >
             <FieldGroup className={layout.fieldStack}>
-              {/* Content Type */}
-              <Controller
-                name="contentType"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid} className="min-w-0">
-                    <FieldLabel>Content Type</FieldLabel>
-
-                    <MiniHorizontalList
-                      items={contentTypeItems}
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-
               {/* Title */}
               <Controller
                 name="title"

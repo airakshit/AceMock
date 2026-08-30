@@ -1,10 +1,5 @@
 import { SignedUrlResponseObject } from "../storage-service";
-import {
-  DocumentContentType,
-  DocumentStatus,
-  DocumentFileStatus,
-  DocumentFileType,
-} from "../types";
+import { FileUploadStatus } from "../types";
 
 interface UserIdInterface {
   userId: string;
@@ -20,7 +15,6 @@ interface FilePayload {
 export interface CreateNewDocumentActionPayload {
   title: string;
   description?: string;
-  contentType: DocumentContentType;
   pdfs: FilePayload[];
   images: FilePayload[];
 }
@@ -43,12 +37,11 @@ export type FinalizeDocumentUplaodActionResponse =
 export interface DocumentFileDTO {
   id: string;
   documentId: string;
-  originalFilename: string;
+  filename: string;
   mimeType: string;
-  fileType: DocumentFileType;
   fileSize: number;
-  status: DocumentFileStatus;
-  storageUrl: string;
+  storagePath: string;
+  uploadStatus: FileUploadStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,8 +51,6 @@ export interface DocumentItemDTO {
   userId: string;
   title: string;
   description: string | null;
-  contentType: DocumentContentType;
-  status: DocumentStatus;
   createdAt: Date;
   updatedAt: Date;
   files: DocumentFileDTO[];

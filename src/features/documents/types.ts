@@ -1,20 +1,9 @@
-import {
-  documentFileTypeEnum,
-  documentStatusEnum,
-  documentFileStatusEnum,
-  documentPageStatusEnum,
-  documentContentTypeEnum,
-} from "@/db/schemas";
+import { fileUploadStatusEnum } from "@/db/schemas";
 
-export type DocumentStatus = (typeof documentStatusEnum.enumValues)[number];
-
-export type DocumentFileType = (typeof documentFileTypeEnum.enumValues)[number];
-
-export type DocumentFileStatus =
-  (typeof documentFileStatusEnum.enumValues)[number];
-
-export type DocumentPageStatus =
-  (typeof documentPageStatusEnum.enumValues)[number];
-
-export type DocumentContentType =
-  (typeof documentContentTypeEnum.enumValues)[number];
+export type FileUploadStatus = typeof fileUploadStatusEnum.enumValues[number];
+export enum SubjectsEnum{
+    PHYSICS = "physics",
+    CHEMISTRY = "chemistry",
+    MATHEMATICS = "mathematics",
+    ENGLISH = "english"
+}

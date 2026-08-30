@@ -4,7 +4,7 @@ import {
   uuid,
   timestamp,
   text,
-  numeric,
+  bigint,
 } from "drizzle-orm/pg-core";
 import { documents } from "./documents";
 
@@ -21,11 +21,13 @@ export const documentFiles = pgTable("document_files", {
     .references(() => documents.id),
 
   filename: text("filename").notNull(),
-  fileSize: numeric("file_size").notNull(),
+  fileSize: bigint("file_size", { mode: "number" }).notNull(),
 
   mimeType: text("mime_type").notNull(),
   storagePath: text("storage_path").notNull(),
-  uploadStatus: fileUploadStatusEnum("upload_status").notNull(),
+  uploadStatus: fileUploadStatusEnum("upload_status")
+    .notNull()
+    .default("uploading"),
   createdAt: timestamp("created_at", {
     withTimezone: true,
   })
