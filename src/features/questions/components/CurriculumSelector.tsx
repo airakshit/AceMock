@@ -2,11 +2,7 @@
 
 import { useMemo } from "react";
 import { CURRICULUM } from "@/constants/curriculum";
-import {
-  Field,
-  FieldError,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -174,9 +170,7 @@ export function CurriculumSelector({
           className="w-full"
         >
           <NativeSelectOption value="" disabled>
-            {sections.length === 0
-              ? "No sections available"
-              : "Select Section"}
+            {sections.length === 0 ? "No sections available" : "Select Section"}
           </NativeSelectOption>
           {sections.map((sec) => (
             <NativeSelectOption key={sec.slug} value={sec.slug}>
@@ -200,13 +194,11 @@ export function CurriculumSelector({
           className="w-full"
         >
           <NativeSelectOption value="" disabled>
-            {chapters.length === 0
-              ? "No chapters available"
-              : "Select Chapter"}
+            {chapters.length === 0 ? "No chapters available" : "Select Chapter"}
           </NativeSelectOption>
           {chapters.map((ch: CurriculumChapter) => (
             <NativeSelectOption key={ch.slug} value={ch.slug}>
-              {ch.name} (Grade {ch.grade})
+              {ch.name}
             </NativeSelectOption>
           ))}
         </NativeSelect>

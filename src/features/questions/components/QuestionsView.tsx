@@ -4,7 +4,7 @@ import { QuestionForm } from "./QuestionForm";
 
 export function QuestionsView() {
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="space-y-8">
       <section className="space-y-4">
         <QuestionForm />
       </section>

@@ -1,8 +1,6 @@
 "use client";
 
-import { CheckCircle2, Circle } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { QuestionOption, QuestionOptionKey } from "../types";
 
@@ -34,14 +32,9 @@ export function OptionsEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Answer Options (4 Required)
-        </p>
-        <span className="text-xs text-muted-foreground">
-          Click the checkmark to set the correct answer
-        </span>
-      </div>
+      <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        Answer Options (4 Required)
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {OPTION_KEYS.map((key, index) => {
@@ -56,7 +49,7 @@ export function OptionsEditor({
             <div
               key={key}
               className={cn(
-                "relative flex items-center gap-2.5 rounded-xl border p-2.5 transition-all bg-card/60",
+                "flex items-center gap-2.5 rounded-xl border p-2.5 transition-all bg-card/60",
                 isCorrect
                   ? "border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/20"
                   : "border-border hover:border-primary/40",
@@ -66,7 +59,7 @@ export function OptionsEditor({
               {/* Option Key Badge */}
               <div
                 className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-lg font-bold text-xs font-mono transition-colors",
+                  "flex size-8 shrink-0 items-center justify-center rounded-lg font-bold text-sm font-mono transition-colors",
                   isCorrect
                     ? "bg-emerald-500 text-white shadow-xs"
                     : "bg-muted text-muted-foreground",
@@ -80,7 +73,7 @@ export function OptionsEditor({
                 <Input
                   value={currentOpt.text}
                   disabled={disabled}
-                  placeholder={`Option ${key} text...`}
+                  placeholder={`Option ${key}...`}
                   onChange={(e) => handleTextChange(key, e.target.value)}
                   className={cn(
                     "h-8 text-sm bg-transparent border-none shadow-none focus-visible:ring-0 px-1",
@@ -88,45 +81,60 @@ export function OptionsEditor({
                   )}
                 />
                 {errorMessage && (
-                  <p className="text-[11px] text-destructive px-1 mt-0.5">
+                  <p className="text-xs text-destructive px-1 mt-0.5">
                     {errorMessage}
                   </p>
                 )}
               </div>
-
-              {/* Correct Answer Selection Toggle */}
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => onCorrectOptionChange(key)}
-                className={cn(
-                  "flex items-center gap-1 shrink-0 rounded-lg px-2 py-1 text-xs font-medium transition-all cursor-pointer select-none",
-                  isCorrect
-                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                  disabled && "pointer-events-none opacity-50",
-                )}
-                title={
-                  isCorrect
-                    ? `Option ${key} is marked as correct`
-                    : `Mark Option ${key} as correct`
-                }
-              >
-                {isCorrect ? (
-                  <>
-                    <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
-                    <span className="hidden sm:inline">Correct</span>
-                  </>
-                ) : (
-                  <>
-                    <Circle className="size-3.5 opacity-40 shrink-0" />
-                    <span className="hidden sm:inline">Mark Correct</span>
-                  </>
-                )}
-              </button>
             </div>
           );
         })}
+      </div>
+
+      {/* Correct Answer — mini radio row */}
+      <div className="flex items-center gap-3 pt-1 pl-0.5">
+        <span className="text-xs font-medium text-muted-foreground shrink-0">
+          Correct answer:
+        </span>
+        <div className="flex items-center gap-5">
+          {OPTION_KEYS.map((key) => {
+            const isCorrect = correctOption === key;
+            return (
+              <label
+                key={key}
+                className={cn(
+                  "flex items-center gap-1.5 cursor-pointer select-none group",
+                  disabled && "pointer-events-none opacity-50",
+                )}
+                onClick={() => !disabled && onCorrectOptionChange(key)}
+              >
+                {/* Mini radio circle */}
+                <span
+                  className={cn(
+                    "inline-flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                    isCorrect
+                      ? "border-emerald-500 bg-emerald-500"
+                      : "border-muted-foreground/40 bg-background group-hover:border-emerald-400",
+                  )}
+                >
+                  {isCorrect && (
+                    <span className="block size-1.5 rounded-full bg-white" />
+                  )}
+                </span>
+                <span
+                  className={cn(
+                    "text-sm font-mono font-semibold transition-colors",
+                    isCorrect
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-muted-foreground group-hover:text-foreground",
+                  )}
+                >
+                  {key}
+                </span>
+              </label>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

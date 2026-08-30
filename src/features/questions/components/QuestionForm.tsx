@@ -207,7 +207,7 @@ export function QuestionForm({
               Create Question
             </h3>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Add a multiple-choice question with diagram, 4 options, and detailed solution.
           </p>
         </div>
@@ -229,7 +229,7 @@ export function QuestionForm({
         {/* 1. Curriculum (Subject, Section, Chapter) */}
         <section className="rounded-xl border bg-background/50 p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Curriculum & Chapter
             </p>
             <Badge variant="secondary" className="text-[11px] font-mono">
@@ -261,10 +261,10 @@ export function QuestionForm({
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid} className="min-w-0">
                 <div className="flex items-center justify-between">
-                  <FieldLabel htmlFor="question" className="text-xs font-semibold">
+                  <FieldLabel htmlFor="question" className="text-sm font-semibold">
                     Question Statement *
                   </FieldLabel>
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     Markdown / LaTeX supported
                   </span>
                 </div>
@@ -341,7 +341,7 @@ export function QuestionForm({
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="marks" className="text-xs font-semibold">
+                <FieldLabel htmlFor="marks" className="text-sm font-semibold">
                   Marks
                 </FieldLabel>
                 <Input
@@ -367,7 +367,7 @@ export function QuestionForm({
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="difficulty" className="text-xs font-semibold">
+                <FieldLabel htmlFor="difficulty" className="text-sm font-semibold">
                   Difficulty Level
                 </FieldLabel>
                 <NativeSelect
@@ -396,11 +396,11 @@ export function QuestionForm({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Lightbulb className="size-4 text-amber-500" />
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 Hint & Solution
               </p>
             </div>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               Either solution text or solution diagram is required *
             </span>
           </div>
@@ -411,7 +411,7 @@ export function QuestionForm({
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="hint" className="text-xs font-medium">
+                <FieldLabel htmlFor="hint" className="text-sm font-medium">
                   Hint (Optional)
                 </FieldLabel>
                 <Input
@@ -435,7 +435,7 @@ export function QuestionForm({
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="solution" className="text-xs font-medium">
+                <FieldLabel htmlFor="solution" className="text-sm font-medium">
                   Solution Explanation
                 </FieldLabel>
                 <Textarea
