@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUppyState } from "@uppy/react";
 import { createDocumentUppy } from "./create-uppy";
-import type { SignedUrlResponseObject } from "../storage-service";
+import type { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import type { DocumentFileItem } from "../schemas";
 import type { FileProgressState, UploadStatus } from "./upload.types";
 import { env } from "@/config/env/client";

@@ -3,7 +3,7 @@ import { CreateQuestionActionPayload, CreateQuestionActionResponse } from "./act
 import { questionsRepository } from "./repositories/questions.repository";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
-import { supabaseStorageClient } from "../documents/storage-service";
+import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
 
 class QuestionsService {

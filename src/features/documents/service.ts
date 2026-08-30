@@ -7,7 +7,7 @@ import { documentsRepository } from "./repositories/documents.repository";
 import { documentFilesRepository } from "./repositories/document-files.repository";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
-import { supabaseStorageClient } from "./storage-service";
+import { supabaseStorageClient } from "../shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
 
 class DocumentsService {

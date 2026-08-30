@@ -1,4 +1,4 @@
-import { SignedUrlResponseObject } from "../storage-service";
+import { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import { FileUploadStatus } from "../types";
 
 interface UserIdInterface {

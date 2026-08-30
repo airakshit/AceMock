@@ -1,4 +1,4 @@
-import { SignedUrlResponseObject } from "@/features/documents/storage-service";
+import { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import { QuestionDifficulty, QuestionOption, QuestionOptionKey } from "../types";
 
 export interface CreateQuestionFilePayload {
