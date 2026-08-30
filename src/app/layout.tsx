@@ -1,4 +1,5 @@
 import "./globals.css";
+import "katex/dist/katex.min.css";
 import { Toaster } from "sonner";
 import { Lobster } from "next/font/google";
 import { GeistMono } from "geist/font/mono";
