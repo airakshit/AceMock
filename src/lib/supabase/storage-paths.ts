@@ -32,4 +32,20 @@ export const storagePaths = {
       `/pages/page-${pageNo}.${extention}`
     );
   },
+
+  getQuestionDiagramPath(
+    userId: string,
+    questionId: string,
+    fileName: string,
+  ): string {
+    return `admin/${userId}/questions/${questionId}/diagram/${fileName}`;
+  },
+
+  getQuestionSolutionDiagramPath(
+    userId: string,
+    questionId: string,
+    fileName: string,
+  ): string {
+    return `admin/${userId}/questions/${questionId}/solution_diagram/${fileName}`;
+  },
 };

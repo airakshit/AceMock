@@ -1,5 +1,6 @@
 import {
   ClipboardList,
+  HelpCircle,
   LayoutDashboard,
   SlidersHorizontal,
 } from "lucide-react";
@@ -21,6 +22,11 @@ export const APP_NAV_ITEMS: NavItem[] = [
     title: "Documents",
     href: "/documents",
     icon: SlidersHorizontal,
+  },
+  {
+    title: "Questions",
+    href: "/questions",
+    icon: HelpCircle,
   },
 ];
 
