@@ -99,6 +99,8 @@ class SupabaseStorageClient {
     const { data, error } = await this._supabaseClient.storage
       .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
       .download(objectPath);
+    
+    
 
     if (error) {
       console.log(

@@ -15,6 +15,7 @@
     "@base-ui/react": "^1.7.0",
     "@better-auth/drizzle-adapter": "^1.6.26",
     "@hookform/resolvers": "^5.7.1",
+    "@hyzyla/pdfium": "^2.1.13",
     "@shadcn/react": "^0.3.0",
     "@supabase/supabase-js": "^2.109.0",
     "@tanstack/react-query": "^5.101.4",
