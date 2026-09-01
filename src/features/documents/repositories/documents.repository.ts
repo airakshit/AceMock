@@ -54,6 +54,23 @@ export class DocumentsRepository {
       .orderBy(desc(documents.createdAt));
   }
 
+  async findFilesByDocumentId(db: DbExecutor, documentId: string) {
+    const data = await db
+      .select({
+        fileId: documentFiles.id,
+        storagePath: documentFiles.storagePath,
+        mimeType: documentFiles.mimeType,
+        filename: documentFiles.filename,
+        fileSize: documentFiles.fileSize,
+        fileUploadStatus: documentFiles.uploadStatus,
+      })
+      .from(documents)
+      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
+      .where(eq(documents.id, documentId))
+
+    return data;
+  }
+
   async findByUserWithFiles(db: DbExecutor, userId: string) {
     const userDocs = await db
       .select()

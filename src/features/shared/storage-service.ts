@@ -191,6 +191,32 @@ class SupabaseStorageClient {
       return null;
     }
   }
+
+  async downloadSingle(objectPath: string): Promise<DownloadedObject> {
+    return this._downloadObject(objectPath);
+  }
+
+  async upload(
+    storagePath: string,
+    fileBody: Buffer | Blob | ArrayBuffer,
+    options?: { contentType?: string; upsert?: boolean },
+  ) {
+    const { data, error } = await this._supabaseClient.storage
+      .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
+      .upload(storagePath, fileBody, {
+        contentType: options?.contentType,
+        upsert: options?.upsert ?? true,
+      });
+
+    if (error) {
+      console.log(
+        `Error uploading file: [PATH]: ${storagePath} [MESSAGE]: ${error.message}, [STATUS]: ${error.status}, [CAUSE]: ${error.cause}`,
+      );
+      throw error;
+    }
+
+    return data;
+  }
 }
 
 export const supabaseStorageClient = new SupabaseStorageClient(
