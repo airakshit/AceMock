@@ -8,13 +8,14 @@ import {
 } from "drizzle-orm/pg-core";
 import { documentFiles } from "./document-files";
 
-export const processedPageStatusEnum = pgEnum("processed_page_status_enum", [
-  "processing",
-  "completed",
-  "failed",
+export const filePageOCRStatusEnum = pgEnum("file_pages_ocr_status_enum", [
+  "not_started",
+  "ocr",
+  "success",
+  "ocr_failed",
 ]);
 
-export const processedPages = pgTable("processed_pages", {
+export const filePages = pgTable("file_pages", {
   id: uuid("id").primaryKey().notNull(),
 
   fileId: uuid("file_id")
@@ -23,11 +24,12 @@ export const processedPages = pgTable("processed_pages", {
 
   pageNo: integer("page_no").notNull().default(0),
 
-  processingStatus: processedPageStatusEnum("processing_status")
+  ocrStatus: filePageOCRStatusEnum("ocr_status")
     .notNull()
-    .default("processing"),
+    .default("not_started"),
 
-  rawOcrText: text("raw_ocr_text").notNull(),
+  ocrText: text("ocr_text"),
+
   createdAt: timestamp("created_at", {
     withTimezone: true,
   })

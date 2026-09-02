@@ -1,9 +1,17 @@
-import { fileUploadStatusEnum } from "@/db/schemas";
+import {
+  filePageOCRStatusEnum,
+  fileProcessingStatusEnum,
+  fileUploadStatusEnum,
+} from "@/db/schemas";
 
-export type FileUploadStatus = typeof fileUploadStatusEnum.enumValues[number];
-export enum SubjectsEnum{
-    PHYSICS = "physics",
-    CHEMISTRY = "chemistry",
-    MATHEMATICS = "mathematics",
-    ENGLISH = "english"
+export type FileUploadStatus = (typeof fileUploadStatusEnum.enumValues)[number];
+export type FileProcessingStatus =
+  (typeof fileProcessingStatusEnum.enumValues)[number];
+export type FilePageOCRStatus =
+  (typeof filePageOCRStatusEnum.enumValues)[number];
+export enum SubjectsEnum {
+  PHYSICS = "physics",
+  CHEMISTRY = "chemistry",
+  MATHEMATICS = "mathematics",
+  ENGLISH = "english",
 }

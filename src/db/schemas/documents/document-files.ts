@@ -14,6 +14,13 @@ export const fileUploadStatusEnum = pgEnum("file_upload_status_enum", [
   "failed",
 ]);
 
+export const fileProcessingStatusEnum = pgEnum("file_processing_status_enum", [
+  "not_started",
+  "processing",
+  "success",
+  "failed",
+]);
+
 export const documentFiles = pgTable("document_files", {
   id: uuid("id").primaryKey().notNull(),
   documentId: uuid("document_id")
@@ -28,6 +35,11 @@ export const documentFiles = pgTable("document_files", {
   uploadStatus: fileUploadStatusEnum("upload_status")
     .notNull()
     .default("uploading"),
+
+  processingStatus: fileProcessingStatusEnum("processing_stauts")
+    .notNull()
+    .default("not_started"),
+
   createdAt: timestamp("created_at", {
     withTimezone: true,
   })

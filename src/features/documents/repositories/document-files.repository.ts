@@ -2,7 +2,7 @@ import { documentFiles } from "@/db/schemas";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
-import { FileUploadStatus } from "../types";
+import { FileProcessingStatus, FileUploadStatus } from "../types";
 
 export class DocumentFilesRepository {
   async create(
@@ -95,6 +95,22 @@ export class DocumentFilesRepository {
       .from(documentFiles)
       .where(eq(documentFiles.documentId, documentId))
       .orderBy(desc(documentFiles.createdAt));
+  }
+
+  async updateStatusByDocumentId(
+    db: DbExecutor,
+    documentId: string,
+    status: FileProcessingStatus,
+  ) {
+    const files = await db
+      .update(documentFiles)
+      .set({
+        processingStatus: status,
+      })
+      .where(eq(documentFiles.documentId, documentId))
+      .returning();
+
+    return files;
   }
 
   async update(

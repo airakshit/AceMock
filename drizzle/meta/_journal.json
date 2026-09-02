@@ -29,6 +29,13 @@
       "when": 1788080748862,
       "tag": "0003_unique-constraint-on-chapters-slug-column",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788370148155,
+      "tag": "0004_robust_tomas",
+      "breakpoints": true
     }
   ]
 }

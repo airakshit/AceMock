@@ -5,6 +5,7 @@ import { storagePaths } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
 import { documentFilesRepository } from "@/features/documents/repositories/document-files.repository";
 import { performance } from "node:perf_hooks";
+import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
 
 export interface ProcessDocumentEventData {
   userId: string;
@@ -22,15 +23,21 @@ export const processDocument = inngest.createFunction(
     const { documentId, userId } = data;
 
     let start = performance.now();
+
     const docFiles = await step.run(
-      "fetch-document-info-with-files",
+      `document-${documentId}-files-as-processing`,
       async () => {
-        return documentFilesRepository.findByDocument(db, documentId);
+        return await documentFilesRepository.updateStatusByDocumentId(
+          db,
+          documentId,
+          "processing",
+        );
       },
     );
+
     logger.info(
       {
-        step: "fetch-document-info-with-files",
+        step: "document-files-as-processing",
         finishedIn: `${(performance.now() - start) / 1000}s`,
       },
       "Step Completed.",
@@ -45,9 +52,6 @@ export const processDocument = inngest.createFunction(
       };
     }
 
-    // 2. Preprocess each file in parallel using Promise.all and step.run per file
-    start = performance.now();
-
     const processedFiles = await Promise.all(
       docFiles.map((file) =>
         step.run(`preprocess-file-${file.id}`, async () => {
@@ -56,6 +60,7 @@ export const processDocument = inngest.createFunction(
           const downloaded = await supabaseStorageClient.downloadSingle(
             file.storagePath,
           );
+
           logger.info(
             {
               file: file.filename,
@@ -139,6 +144,37 @@ export const processDocument = inngest.createFunction(
           };
         }),
       ),
+    );
+
+    await step.run(`document-${documentId}-files-as-success`, async () => {
+      return await documentFilesRepository.updateStatusByDocumentId(
+        db,
+        documentId,
+        "success",
+      );
+    });
+
+    start = performance.now();
+    const pages = await step.run(`create-ready-pages`, async () => {
+      const data: Array<{ fileId: string; pageNo: number }> = [];
+
+      processedFiles.forEach((file) => {
+        file.pages.forEach((page) => {
+          data.push({
+            fileId: file.id,
+            pageNo: page.pageNumber,
+          });
+        });
+      });
+      return await filePagesRepository.createMany(db, data);
+    });
+    logger.info(
+      {
+        step: "create-ready-pages",
+        createdPages: pages.length,
+        finishedIn: `${(performance.now() - start) / 1000}s`,
+      },
+      "Step Completed.",
     );
 
     return {
