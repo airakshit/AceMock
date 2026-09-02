@@ -5,7 +5,7 @@ import { storagePaths } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
 import { documentFilesRepository } from "@/features/documents/repositories/document-files.repository";
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
-
+import { performance } from "node:perf_hooks";
 
 export interface ProcessDocumentEventData {
   userId: string;
@@ -18,14 +18,24 @@ export const processDocument = inngest.createFunction(
     triggers: { event: "document/process" },
   },
 
-  async ({ event, step }) => {
+  async ({ event, step, logger }) => {
     const data = event.data as ProcessDocumentEventData;
     const { documentId, userId } = data;
 
-
-    const docFiles = await step.run("fetch-document-info-with-files", async () => {
-      return documentFilesRepository.findByDocument(db, documentId);
-    });
+    let start = performance.now();
+    const docFiles = await step.run(
+      "fetch-document-info-with-files",
+      async () => {
+        return documentFilesRepository.findByDocument(db, documentId);
+      },
+    );
+    logger.info(
+      {
+        step: "fetch-document-info-with-files",
+        finishedIn: performance.now() - start,
+      },
+      "Step Completed.",
+    );
 
     if (!docFiles || docFiles.length === 0) {
       return {
@@ -37,12 +47,21 @@ export const processDocument = inngest.createFunction(
     }
 
     // 2. Preprocess each file in parallel using Promise.all and step.run per file
+    start = performance.now();
     const processedFiles = await Promise.all(
       docFiles.map((file) =>
         step.run(`preprocess-file-${file.id}`, async () => {
           // Download file blob from Supabase storage
+          start = performance.now();
           const downloaded = await supabaseStorageClient.downloadSingle(
             file.storagePath,
+          );
+          logger.info(
+            {
+              function: "downloadSingle",
+              finishedIn: performance.now() - start,
+            },
+            "Function Completed.",
           );
 
           if (!downloaded || !downloaded.data) {
@@ -52,9 +71,18 @@ export const processDocument = inngest.createFunction(
           }
 
           // Preprocess document blob into normalized page images (WEBP)
+          start = performance.now();
           const pages = await processFileBlob(downloaded.data, file.mimeType);
+          logger.info(
+            {
+              function: "processFileBlob",
+              finishedIn: performance.now() - start,
+            },
+            "Function Completed.",
+          );
 
           // Upload each preprocessed page to Supabase storage
+          logger.info({ pages: pages.length }, "Uploading these pages.");
           const uploadedPages = await Promise.all(
             pages.map(async (page) => {
               const pageStoragePath = storagePaths.getDocumentFilePageSourceUrl(
@@ -66,10 +94,19 @@ export const processDocument = inngest.createFunction(
                 page.pageNumber,
               );
 
+              start = performance.now();
               await supabaseStorageClient.upload(pageStoragePath, page.buffer, {
                 contentType: page.contentType,
                 upsert: true,
               });
+              logger.info(
+                {
+                  function: "uploadSingle",
+                  page: page.pageNumber,
+                  finishedIn: performance.now() - start,
+                },
+                "Uploaded a page.",
+              );
 
               return {
                 pageNumber: page.pageNumber,
@@ -79,6 +116,14 @@ export const processDocument = inngest.createFunction(
                 contentType: page.contentType,
               };
             }),
+          );
+          logger.info(
+            {
+              function: "uploadfiles",
+              files: uploadedPages.length,
+              finishedIn: performance.now() - start,
+            },
+            "Function Completed.",
           );
 
           return {
@@ -98,5 +143,3 @@ export const processDocument = inngest.createFunction(
     };
   },
 );
-
-
