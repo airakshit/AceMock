@@ -4,7 +4,6 @@ import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
 import { documentFilesRepository } from "@/features/documents/repositories/document-files.repository";
-import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { performance } from "node:perf_hooks";
 
 export interface ProcessDocumentEventData {
@@ -32,7 +31,7 @@ export const processDocument = inngest.createFunction(
     logger.info(
       {
         step: "fetch-document-info-with-files",
-        finishedIn: performance.now() - start,
+        finishedIn: `${(performance.now() - start) / 1000}s`,
       },
       "Step Completed.",
     );
@@ -48,6 +47,7 @@ export const processDocument = inngest.createFunction(
 
     // 2. Preprocess each file in parallel using Promise.all and step.run per file
     start = performance.now();
+
     const processedFiles = await Promise.all(
       docFiles.map((file) =>
         step.run(`preprocess-file-${file.id}`, async () => {
@@ -58,8 +58,9 @@ export const processDocument = inngest.createFunction(
           );
           logger.info(
             {
+              file: file.filename,
               function: "downloadSingle",
-              finishedIn: performance.now() - start,
+              finishedIn: `${(performance.now() - start) / 1000}s`,
             },
             "Function Completed.",
           );
@@ -75,14 +76,16 @@ export const processDocument = inngest.createFunction(
           const pages = await processFileBlob(downloaded.data, file.mimeType);
           logger.info(
             {
+              file: file.filename,
               function: "processFileBlob",
-              finishedIn: performance.now() - start,
+              finishedIn: `${(performance.now() - start) / 1000}s`,
             },
             "Function Completed.",
           );
 
           // Upload each preprocessed page to Supabase storage
           logger.info({ pages: pages.length }, "Uploading these pages.");
+          start = performance.now();
           const uploadedPages = await Promise.all(
             pages.map(async (page) => {
               const pageStoragePath = storagePaths.getDocumentFilePageSourceUrl(
@@ -101,11 +104,12 @@ export const processDocument = inngest.createFunction(
               });
               logger.info(
                 {
-                  function: "uploadSingle",
+                  file: file.filename,
+                  function: "uploadSinglePage",
                   page: page.pageNumber,
-                  finishedIn: performance.now() - start,
+                  finishedIn: `${(performance.now() - start) / 1000}s`,
                 },
-                "Uploaded a page.",
+                "Function Completed.",
               );
 
               return {
@@ -117,11 +121,12 @@ export const processDocument = inngest.createFunction(
               };
             }),
           );
+
           logger.info(
             {
               function: "uploadfiles",
               files: uploadedPages.length,
-              finishedIn: performance.now() - start,
+              finishedIn: `${(performance.now() - start) / 1000}s`,
             },
             "Function Completed.",
           );
