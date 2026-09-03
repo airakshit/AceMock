@@ -11,6 +11,7 @@ export class ServerActionError extends Error {
 
 export function handleActionError(err: any): ServerActionResult<never> {
   if (err instanceof ServerActionError) {
+    console.log(`The error is : ${err}, SERVER_ACTION_ERROR`);
     return {
       success: false,
       error: {
@@ -21,6 +22,7 @@ export function handleActionError(err: any): ServerActionResult<never> {
   }
 
   console.log(`The error is : ${err}`);
+  throw err;
 
   return {
     success: false,

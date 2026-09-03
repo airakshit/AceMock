@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1788065912240,
-      "tag": "0000_new-and-reviewed-db-design",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1788067198111,
-      "tag": "0001_default-value-to-upload_status-field-in-document-files_table",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1788067428049,
-      "tag": "0002_file-size-column-numeric-to-bigint",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1788080748862,
-      "tag": "0003_unique-constraint-on-chapters-slug-column",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1788370148155,
-      "tag": "0004_robust_tomas",
+      "when": 1788402790688,
+      "tag": "0000_brief_jack_power",
       "breakpoints": true
     }
   ]

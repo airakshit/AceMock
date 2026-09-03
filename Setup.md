@@ -16,4 +16,3 @@ For generating auth related database tables, we will use
 npx auth@latest generate --config "src/lib/auth/auth.ts" --output "src/db/schemas/auth.ts"
 ```
 This will generate tables according to **Better Auth Service.**
-

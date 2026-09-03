@@ -1,1 +1,0 @@
-ALTER TABLE "document_files" ALTER COLUMN "file_size" SET DATA TYPE bigint;

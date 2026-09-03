@@ -1,1 +1,0 @@
-ALTER TABLE "document_files" ALTER COLUMN "upload_status" SET DEFAULT 'uploading';

@@ -36,7 +36,7 @@ export const documentFiles = pgTable("document_files", {
     .notNull()
     .default("uploading"),
 
-  processingStatus: fileProcessingStatusEnum("processing_stauts")
+  processingStatus: fileProcessingStatusEnum("processing_status")
     .notNull()
     .default("not_started"),
 

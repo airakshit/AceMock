@@ -1,1 +1,0 @@
-ALTER TABLE "chapters" ADD CONSTRAINT "chapters_slug_unique" UNIQUE("slug");

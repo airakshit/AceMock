@@ -3,10 +3,10 @@ import { user } from "@/db/schemas/auth";
 
 export const documentsTable = "documents";
 
-export const documentQuestionTypeEnum = pgEnum("document_question_type_enum", [
-  "",
-  "mcq",
-]);
+// export const documentQuestionTypeEnum = pgEnum("document_question_type_enum", [
+//   "",
+//   "mcq",
+// ]);
 
 export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().notNull(),

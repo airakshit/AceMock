@@ -1,16 +1,17 @@
+CREATE TYPE "public"."file_processing_status_enum" AS ENUM('not_started', 'processing', 'success', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."file_upload_status_enum" AS ENUM('uploading', 'uploaded', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."document_question_type_enum" AS ENUM('', 'mcq');--> statement-breakpoint
-CREATE TYPE "public"."processed_page_status_enum" AS ENUM('processing', 'completed', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."file_pages_ocr_status_enum" AS ENUM('not_started', 'ocr', 'success', 'ocr_failed');--> statement-breakpoint
 CREATE TYPE "public"."question_difficulty_enum" AS ENUM('easy', 'medium', 'hard');--> statement-breakpoint
 CREATE TYPE "public"."visibility_enum" AS ENUM('public', 'private');--> statement-breakpoint
 CREATE TABLE "document_files" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"document_id" uuid NOT NULL,
 	"filename" text NOT NULL,
-	"file_size" numeric NOT NULL,
+	"file_size" bigint NOT NULL,
 	"mime_type" text NOT NULL,
 	"storage_path" text NOT NULL,
-	"upload_status" "file_upload_status_enum" NOT NULL,
+	"upload_status" "file_upload_status_enum" DEFAULT 'uploading' NOT NULL,
+	"processing_status" "file_processing_status_enum" DEFAULT 'not_started' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -24,12 +25,12 @@ CREATE TABLE "documents" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "processed_pages" (
+CREATE TABLE "file_pages" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"file_id" uuid NOT NULL,
 	"page_no" integer DEFAULT 0 NOT NULL,
-	"processing_status" "processed_page_status_enum" DEFAULT 'processing' NOT NULL,
-	"raw_ocr_text" text NOT NULL,
+	"ocr_status" "file_pages_ocr_status_enum" DEFAULT 'not_started' NOT NULL,
+	"ocr_text" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -59,7 +60,8 @@ CREATE TABLE "chapters" (
 	"name" text NOT NULL,
 	"slug" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "chapters_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
 CREATE TABLE "passages" (
@@ -158,7 +160,7 @@ CREATE TABLE "verification" (
 --> statement-breakpoint
 ALTER TABLE "document_files" ADD CONSTRAINT "document_files_document_id_documents_id_fk" FOREIGN KEY ("document_id") REFERENCES "public"."documents"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "documents" ADD CONSTRAINT "documents_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "processed_pages" ADD CONSTRAINT "processed_pages_file_id_document_files_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."document_files"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "file_pages" ADD CONSTRAINT "file_pages_file_id_document_files_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."document_files"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sections" ADD CONSTRAINT "sections_subject_id_subjects_id_fk" FOREIGN KEY ("subject_id") REFERENCES "public"."subjects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_section_id_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."sections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "questions" ADD CONSTRAINT "questions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint

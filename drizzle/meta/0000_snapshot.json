@@ -1,5 +1,5 @@
 {
-  "id": "9709b8e8-62e2-4282-8382-1760df719d6e",
+  "id": "b8919233-b7b6-48dc-9cd4-3401617a6342",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -28,7 +28,7 @@
         },
         "file_size": {
           "name": "file_size",
-          "type": "numeric",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": true
         },
@@ -49,7 +49,16 @@
           "type": "file_upload_status_enum",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'uploading'"
+        },
+        "processing_status": {
+          "name": "processing_status",
+          "type": "file_processing_status_enum",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_started'"
         },
         "created_at": {
           "name": "created_at",
@@ -153,8 +162,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.processed_pages": {
-      "name": "processed_pages",
+    "public.file_pages": {
+      "name": "file_pages",
       "schema": "",
       "columns": {
         "id": {
@@ -176,19 +185,19 @@
           "notNull": true,
           "default": 0
         },
-        "processing_status": {
-          "name": "processing_status",
-          "type": "processed_page_status_enum",
+        "ocr_status": {
+          "name": "ocr_status",
+          "type": "file_pages_ocr_status_enum",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'processing'"
+          "default": "'not_started'"
         },
-        "raw_ocr_text": {
-          "name": "raw_ocr_text",
+        "ocr_text": {
+          "name": "ocr_text",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -207,9 +216,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "processed_pages_file_id_document_files_id_fk": {
-          "name": "processed_pages_file_id_document_files_id_fk",
-          "tableFrom": "processed_pages",
+        "file_pages_file_id_document_files_id_fk": {
+          "name": "file_pages_file_id_document_files_id_fk",
+          "tableFrom": "file_pages",
           "tableTo": "document_files",
           "columnsFrom": [
             "file_id"
@@ -413,7 +422,15 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "chapters_slug_unique": {
+          "name": "chapters_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1125,6 +1142,16 @@
     }
   },
   "enums": {
+    "public.file_processing_status_enum": {
+      "name": "file_processing_status_enum",
+      "schema": "public",
+      "values": [
+        "not_started",
+        "processing",
+        "success",
+        "failed"
+      ]
+    },
     "public.file_upload_status_enum": {
       "name": "file_upload_status_enum",
       "schema": "public",
@@ -1134,21 +1161,14 @@
         "failed"
       ]
     },
-    "public.document_question_type_enum": {
-      "name": "document_question_type_enum",
+    "public.file_pages_ocr_status_enum": {
+      "name": "file_pages_ocr_status_enum",
       "schema": "public",
       "values": [
-        "",
-        "mcq"
-      ]
-    },
-    "public.processed_page_status_enum": {
-      "name": "processed_page_status_enum",
-      "schema": "public",
-      "values": [
-        "processing",
-        "completed",
-        "failed"
+        "not_started",
+        "ocr",
+        "success",
+        "ocr_failed"
       ]
     },
     "public.question_difficulty_enum": {
