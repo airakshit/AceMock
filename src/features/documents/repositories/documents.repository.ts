@@ -108,6 +108,7 @@ export class DocumentsRepository {
     data: {
       title?: string;
       description?: string;
+      status?: DocumentProcessingStatus;
     },
   ) {
     const [document] = await db

@@ -1,0 +1,2 @@
+ALTER TABLE "file_pages" ADD COLUMN "survived_validation" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "file_pages" ADD COLUMN "ocr_model" text DEFAULT 'dots-studio/dots-3-note-preview:free' NOT NULL;

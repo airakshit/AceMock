@@ -77,10 +77,10 @@ question, answer key or solution.
 
 ## JSON Fields Rule
 
-1. If questions are grouped by section with details like marks, section name. Put it under the following keys.
+1. If questions are grouped by section with details like marks, section name, start and end if they are available. Put it under the following keys.
    sectionLabel: "I",
    sectionStart: 1     // It is the question from which the section starts
-   sectionEnd: 60      // It is the question number where section ends.
+   sectionEnd: 60      // It is the question number where section ends. Specify it if explicitly specified. Do no rely on last question of the page.
    marks: 2            // It is the marks for question, each question under the section is assigned to.
 
    Recognize patterns like, 1x60=60 which means, section has 60 questions with one mark each.
@@ -142,7 +142,7 @@ Return ONLY valid JSON matching this exact structure:
   "marks": 1,
   "data": [
     {
-      "sn": 1,
+      "serialNo": 1,
       "question": "Question text with $inline math$ and $\\\\ce{chemistry}$",
       "options": {
         "A": "Option text.",

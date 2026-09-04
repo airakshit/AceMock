@@ -1,14 +1,13 @@
 import { inngest } from "../../client";
 import { RetryAfterError } from "inngest";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { GroqLLMService, GroqModels } from "@/services/llm/llm.service";
-import { paperTextExtractionPrompt } from "@/services/llm/prompts";
+import { paperTextExtractionPrompt, paperTextStructuredExtractionPrompt } from "@/services/llm/prompts";
 import { env } from "@/config/env/server";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
 import { db } from "@/db";
-import { getGroqRateLimitDelayMs } from "@/services/llm/rate-limit";
 import type { OcrPageResult } from "./ocr-types";
 import { OpenRouterLLMService, OpenRouterModels } from "@/services/llm";
+import { structuredOCRExtractionSchema } from "./schema";
 
 export interface OcrPageEventData {
   userId: string;
@@ -20,33 +19,41 @@ export interface OcrPageEventData {
   storagePath: string;
 }
 
+export const TOTAL_RETRIES = 2;
+
 export const ocrPage = inngest.createFunction(
   {
     id: "ocr-page",
     triggers: { event: "page/ocr" },
-    retries: 10,
+    retries: TOTAL_RETRIES,
     concurrency: {
-      limit: 1, // Enforce sequential execution across pages to respect Groq TPM quota
+      limit: 3, // Enforce sequential execution across pages to respect TPM quota
     },
   },
 
-  async ({ event, step, logger }) => {
+  async ({ event, step, logger, attempt }) => {
     const data = event.data as OcrPageEventData;
     const { fileId, pageId, pageNo, storagePath } = data;
+
+    await step.run('update-file-ocr-status', async () => {
+      await filePagesRepository.updateStatusByPageId(db, pageId, "ocr")
+    })
 
     // 1. Generate a signed URL for the page image in Supabase storage
     const signedUrl = await step.run("get-page-access-url", async () => {
       return await supabaseStorageClient.getPageAccessUrl(storagePath);
     });
 
+    const MODEL_TO_USE = OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW;
+
     // 2. Send image to LLM for raw OCR text transcription
     const result = await step.run("llm-ocr-extraction", async () => {
       const openRouter = new OpenRouterLLMService(
         process.env.OPENROUTER_API_KEY!,
-        OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW,
+        MODEL_TO_USE,
       );
       const rawText = await openRouter.call(
-        paperTextExtractionPrompt,
+        paperTextStructuredExtractionPrompt,
         undefined,
         [signedUrl],
       );
@@ -85,18 +92,38 @@ export const ocrPage = inngest.createFunction(
       //   throw err;
       // }
 
-      // Remove reasoning model <think>...</think> tags if present
-      const cleanedText = rawText
-        ? rawText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
-        : null;
+      // Remove reasoning model <think>...</think> and ```json tags if present
+
+      if (!rawText) {
+        if (attempt != TOTAL_RETRIES) throw Error("No response returned by LLM.")
+      }
+
+      const cleanedText = rawText ? rawText
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .replace(/^```json\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim() : null;
 
       const ocrStatus = cleanedText ? "success" : "failed";
+
+      if (!cleanedText && attempt != TOTAL_RETRIES) throw Error("No response returned by LLM.")
+
+      let survivedValidation: boolean = false;
+
+      if (cleanedText) {
+        const result = structuredOCRExtractionSchema.safeParse(
+          JSON.parse(cleanedText)
+        );
+        survivedValidation = result.success;
+      }
 
       // Persist the raw OCR text to the database
       await filePagesRepository.update(db, pageId, fileId, {
         pageNo,
-        ocrText: cleanedText ?? undefined,
+        ocrText: cleanedText ? cleanedText : undefined,
         ocrStatus,
+        ocrModel: MODEL_TO_USE,
+        survivedValidation: survivedValidation
       });
 
       return {
@@ -104,6 +131,7 @@ export const ocrPage = inngest.createFunction(
         pageId,
         fileId,
         rawText: cleanedText,
+        surviesValidation: survivedValidation,
         status: ocrStatus,
       };
     });

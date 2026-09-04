@@ -100,8 +100,13 @@ export class FilePagesRepository {
       pageNo: number;
       ocrText?: string;
       ocrStatus?: FilePageOCRStatus;
+      survivedValidation?: boolean;
+      ocrModel?: string;
     },
   ) {
+    if (!data.ocrModel) delete data.ocrModel;
+    if (!data.survivedValidation) delete data.survivedValidation;
+
     const [page] = await db
       .update(filePages)
       .set({

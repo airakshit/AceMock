@@ -18,9 +18,13 @@ export const OpenRouterModels = {
     LLAMA_3_2_90B_VISION: "meta-llama/llama-3.2-90b-vision-instruct:free",
     /** Mistral Pixtral 12B - Multimodal vision model from Mistral */
     PIXTRAL_12B: "mistralai/pixtral-12b:free",
+
     DOTS_3_NOTE_PREVIEW: "dots-studio/dots-3-note-preview:free",
-    NVIDIA_LLAMA_NEMOTRON_VL_1B_V2: "nvidia/llama-nemotron-rerank-vl-1b-v2:free",
-    MINIMAX_M3: "minimax/minimax-m3:free"
+    NVIDIA_NEMOTRON_3_NANO_OMNI: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    THINKING_MACHINES_INKLING_SMALL: "thinkingmachines/inkling-small:free",
+
+    MINIMAX_M3: "minimax/minimax-m3:free",
+
   },
 
   /**

@@ -42,6 +42,13 @@ export const extractQuestions = inngest.createFunction(
       };
     }
 
+    await step.run(
+      "mark-documents-as-extracting-questions",
+      async () => {
+        await documentsRepository.update(db, docData.documentId, userId, { status: "extracting_questions" })
+      }
+    )
+
     // Collect all pages across all files for fan-out
     const pagesToProcess: Array<{
       fileId: string;

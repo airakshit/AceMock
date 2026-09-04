@@ -26,26 +26,21 @@ export const processDocument = inngest.createFunction(
 
     let start = performance.now();
 
-    const docFiles = await step.run(`mark-files-as-processing`, async () => {
+    await step.run(`mark-document-as-processing`, async () => {
       await documentsRepository.updateProcessingStatus(
         db,
         documentId,
         "processing",
       );
+    })
+
+    const docFiles = await step.run(`mark-files-as-processing`, async () => {
       return await documentFilesRepository.updateStatusByDocumentId(
         db,
         documentId,
         "processing",
       );
     });
-
-    logger.info(
-      {
-        step: "document-files-as-processing",
-        finishedIn: `${(performance.now() - start) / 1000}s`,
-      },
-      "Step Completed.",
-    );
 
     if (!docFiles || docFiles.length === 0) {
       await step.run(`mark-document-as-failed-no-files`, async () => {
