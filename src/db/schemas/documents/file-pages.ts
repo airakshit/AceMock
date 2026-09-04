@@ -22,7 +22,7 @@ export const filePages = pgTable("file_pages", {
 
   fileId: uuid("file_id")
     .notNull()
-    .references(() => documentFiles.id),
+    .references(() => documentFiles.id, { onDelete: "cascade" }),
 
   pageNo: integer("page_no").notNull().default(0),
 

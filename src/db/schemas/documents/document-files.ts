@@ -25,7 +25,7 @@ export const documentFiles = pgTable("document_files", {
   id: uuid("id").primaryKey().notNull(),
   documentId: uuid("document_id")
     .notNull()
-    .references(() => documents.id),
+    .references(() => documents.id, { onDelete: "cascade" }),
 
   filename: text("filename").notNull(),
   fileSize: bigint("file_size", { mode: "number" }).notNull(),
