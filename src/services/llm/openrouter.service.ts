@@ -1,9 +1,5 @@
 import { BaseLLMService } from "./base-llm.service";
 
-/**
- * Grouped OpenRouter models for easy selection.
- * Free models are tagged with `:free` on OpenRouter.
- */
 export const OpenRouterModels = {
   /**
    * Free Vision & Multimodal models capable of processing images, LaTeX formulas, and OCR.
@@ -23,7 +19,8 @@ export const OpenRouterModels = {
     /** Mistral Pixtral 12B - Multimodal vision model from Mistral */
     PIXTRAL_12B: "mistralai/pixtral-12b:free",
     DOTS_3_NOTE_PREVIEW: "dots-studio/dots-3-note-preview:free",
-    NVIDIA_LLAMA_NEMOTRON_VL_1B_V2: "nvidia/llama-nemotron-rerank-vl-1b-v2:free"
+    NVIDIA_LLAMA_NEMOTRON_VL_1B_V2: "nvidia/llama-nemotron-rerank-vl-1b-v2:free",
+    MINIMAX_M3: "minimax/minimax-m3:free"
   },
 
   /**
@@ -39,23 +36,11 @@ export const OpenRouterModels = {
     /** Google Gemini 2.0 Flash Lite */
     GEMINI_2_FLASH_LITE: "google/gemini-2.0-flash-lite-preview:free",
   },
-
-  /**
-   * Top Premium Paid Multimodal Vision Models (pay-as-you-go).
-   */
-  PREMIUM_VISION: {
-    CLAUDE_3_5_SONNET: "anthropic/claude-3.5-sonnet",
-    GPT_4O: "openai/gpt-4o",
-    GPT_4O_MINI: "openai/gpt-4o-mini",
-    GEMINI_2_FLASH: "google/gemini-2.0-flash-001",
-    QWEN_2_5_VL_72B_PAID: "qwen/qwen-2.5-vl-72b-instruct",
-  },
 } as const;
 
 export type OpenRouterModel =
   | (typeof OpenRouterModels.FREE_VISION)[keyof typeof OpenRouterModels.FREE_VISION]
   | (typeof OpenRouterModels.FREE_TEXT)[keyof typeof OpenRouterModels.FREE_TEXT]
-  | (typeof OpenRouterModels.PREMIUM_VISION)[keyof typeof OpenRouterModels.PREMIUM_VISION]
   | (string & {});
 
 export interface OpenRouterServiceOptions {
