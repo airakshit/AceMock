@@ -38,7 +38,7 @@ const MOCK_QUESTIONS: QuestionCardType[] = [
     options: [
       {
         key: "A",
-        content: "$\ce{C2H5OH + 3O2 -> 2CO2 + 3H2O}$",
+        content: "\ce{Ag2S} > \ce{HgS} > \ce{CuS}",
       },
       {
         key: "B",

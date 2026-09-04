@@ -113,22 +113,96 @@ Keep only the json fields which has meaningful data. Do not keep null. Never mis
 
 ## LaTeX & Markdown Formatting Rules for Content Fields (CRITICAL)
 
-The frontend renders all \`question\`, \`content\`, and \`explanation\` fields using ReactMarkdown + remarkMath + KaTeX + mhchem:
+All string fields (\`question\`, option values, \`solution\`) are rendered by a pipeline of:
+  ReactMarkdown → remark-math (v6) → KaTeX (0.18) + mhchem extension
 
-1. **Inline Math**: Wrap ALL mathematical symbols, variables, numbers with units, and formulas in single dollar signs: \`$formula$\`.
-   - Examples: \`$x$\`, \`$E = mc^2$\`, \`$v = 20\\text{ m/s}$\`, \`$\\frac{a}{b}$\`, \`$\\sqrt{3}$\`
-   - Do NOT leave spaces after the opening \`$\` or before the closing \`$\` (write \`$x$\`, NOT \`$ x $\`).
-   - NEVER use \\(...\\) or \\\\(...\\\\) as delimiters.
+This pipeline ONLY recognizes \`$...$\` for inline math and \`$$...$$\` for display math.
+It does NOT support \\(...\\), \\[...\\], or any other delimiter.
 
-2. **Display Math**: For standalone equations, use double dollar signs: \`$$formula$$\`.
-   - NEVER use \\[...] or \\\\[...\\\\].
+### Rule 1 — Dollar-Sign Delimiters (NO EXCEPTIONS)
 
-3. **Chemistry**: Use KaTeX mhchem notation: \`$\\ce{formula}$\`.
-   - Examples: \`$\\ce{H2SO4}$\`, \`$\\ce{SO4^2-}$\`, \`$\\ce{Ca^2+}$\`, \`$\\ce{2H2 + O2 -> 2H2O}$\`
+| Intent            | Correct (in JSON value)             | WRONG — will break rendering            |
+|-------------------|-------------------------------------|------------------------------------------|
+| Inline math       | \`"$x^2 + 1$"\`                      | \`"\\\\(x^2 + 1\\\\)"\`, bare \`x^2 + 1\`    |
+| Display math      | \`"$$\\\\int_0^1 x\\\\,dx$$"\`           | \`"\\\\[\\\\int_0^1 x\\\\,dx\\\\]"\`            |
 
-4. **Physical Units**: Wrap units in \`\\text{...}\` inside math mode, e.g. \`$9.8\\text{ m/s}^2$\`, \`$5\\text{ N}$\`.
+- NO spaces immediately inside the \`$\` delimiters: write \`$x$\`, never \`$ x $\`.
+- Every mathematical symbol, variable, number with unit, or formula MUST be inside \`$...$\` or \`$$...$$\`. Never leave math bare in plain text.
 
-5. **Backslash Escaping in JSON**: Since the output is JSON, all LaTeX backslashes MUST be escaped with a double backslash (e.g. \`"\\\\frac{1}{2}"\`, \`"\\\\alpha"\`, \`"\\\\ce{H2O}"\`).
+### Rule 2 — JSON Backslash Escaping (THE MOST COMMON ERROR SOURCE)
+
+Because the output is a JSON string, every LaTeX backslash must be written as \`\\\\\` (two characters) in the JSON value.
+After \`JSON.parse()\`, the double backslash becomes a single backslash, which is what KaTeX needs.
+
+| What KaTeX sees (after parse) | What you write in JSON string |
+|-------------------------------|-------------------------------|
+| \`\\frac{1}{2}\`                | \`\\\\frac{1}{2}\`              |
+| \`\\alpha\`                     | \`\\\\alpha\`                   |
+| \`\\ce{H2O}\`                   | \`\\\\ce{H2O}\`                 |
+| \`\\text{ m/s}\`                | \`\\\\text{ m/s}\`              |
+| \`\\vec{F}\`                    | \`\\\\vec{F}\`                  |
+| \`\\sqrt{3}\`                   | \`\\\\sqrt{3}\`                 |
+
+⚠️ NEVER use quadruple backslashes (\`\\\\\\\\\`). That creates \`\\\\\` after parse, which KaTeX does NOT understand.
+
+### Rule 3 — Chemistry: ALWAYS use \\\\ce{...} (mhchem syntax)
+
+ALL chemical formulas, ions, and reactions MUST use the \\\\ce{} command inside dollar-sign math mode.
+
+**Formulas & Compounds:**
+- \`"$\\\\ce{H2O}$"\`, \`"$\\\\ce{H2SO4}$"\`, \`"$\\\\ce{C2H5OH}$"\`, \`"$\\\\ce{Ca(OH)2}$"\`
+
+**Ions & Charges:**
+- \`"$\\\\ce{SO4^{2-}}$"\`, \`"$\\\\ce{Ca^{2+}}$"\`, \`"$\\\\ce{Fe^{3+}}$"\`, \`"$\\\\ce{NH4+}$"\`
+- Multi-character charges MUST use braces: \`^{2-}\` not \`^2-\`
+
+**Reaction Arrows:**
+- Forward: \`"$\\\\ce{A -> B}$"\`
+- Reversible: \`"$\\\\ce{N2 + 3H2 <=> 2NH3}$"\`
+- With conditions above arrow: \`"$\\\\ce{2H2O ->[\\\\Delta] 2H2 + O2}$"\`
+
+**State symbols & gas/precipitate:**
+- \`"$\\\\ce{H2 ^}$"\` for gas evolution (↑)
+- \`"$\\\\ce{BaSO4 v}$"\` for precipitate (↓)
+
+**Full reaction examples in JSON:**
+\`\`\`
+"$\\\\ce{C2H5OH + 3O2 -> 2CO2 + 3H2O}$"
+"$\\\\ce{Zn + 2HCl -> ZnCl2 + H2 ^}$"
+"$\\\\ce{AgNO3 + NaCl -> AgCl v + NaNO3}$"
+\`\`\`
+
+**Ordering / comparison of compounds** (e.g. solubility series):
+\`"$\\\\ce{Ag2S}$ > $\\\\ce{HgS}$ > $\\\\ce{CuS}$"\`
+— Use separate \`$\\\\ce{...}$\` blocks joined by plain-text operators.
+
+### Rule 4 — Physics: Math Symbols, Units, Vectors
+
+- **Variables & constants**: \`"$m$"\`, \`"$g$"\`, \`"$v_0$"\`, \`"$\\\\theta$"\`
+- **Units MUST use \\\\text{} inside math mode**:
+  \`"$v = 20\\\\text{ m/s}$"\`, \`"$g = 9.8\\\\text{ m/s}^2$"\`, \`"$5\\\\text{ N}$"\`, \`"$R = 8.314\\\\text{ J/(mol·K)}$"\`
+- **Vectors**: \`"$\\\\vec{F}$"\` or \`"$\\\\mathbf{F}$"\`
+- **Greek letters**: \`"$\\\\alpha$"\`, \`"$\\\\beta$"\`, \`"$\\\\omega$"\`, \`"$\\\\lambda$"\`, \`"$\\\\mu$"\`, \`"$\\\\Delta$"\`
+
+### Rule 5 — Mathematics: Fractions, Roots, Calculus, Subscripts
+
+- **Fractions**: \`"$\\\\frac{a}{b}$"\` or \`"$\\\\dfrac{a}{b}$"\` (display-style in inline)
+- **Roots**: \`"$\\\\sqrt{x}$"\`, \`"$\\\\sqrt[3]{V}$"\`
+- **Integrals**: \`"$\\\\int_{a}^{b} f(x)\\\\,dx$"\`
+- **Summations**: \`"$\\\\sum_{i=1}^{n} x_i$"\`
+- **Limits**: \`"$\\\\lim_{x \\\\to 0} \\\\frac{\\\\sin x}{x}$"\`
+- **Subscripts/Superscripts**: Multi-character exponents MUST use braces: \`"$x^{10}$"\` not \`"$x^10$"\`, \`"$a_{ij}$"\` not \`"$a_ij$"\`
+
+### Rule 6 — Common Pitfalls (AVOID THESE)
+
+| Mistake                                  | Why it breaks                                        | Fix                                        |
+|------------------------------------------|------------------------------------------------------|--------------------------------------------|
+| Bare chemistry: \`H2SO4\`                  | Renders as plain text, no subscripts                 | \`"$\\\\ce{H2SO4}$"\`                        |
+| \`\\\\(x^2\\\\)\` delimiters                   | remark-math ignores these; renders literal text      | \`"$x^2$"\`                                  |
+| \`\\\\\\\\ frac{1}{2}\` (quadruple backslash)  | Becomes \`\\\\frac\` after parse, KaTeX error           | \`"\\\\frac{1}{2}"\`                           |
+| \`$ x $\` (spaces inside dollars)           | remark-math may fail to tokenize                     | \`"$x$"\`                                    |
+| \`$\\\\ce{Fe^3+}$\` (multi-char charge)      | Ambiguous superscript parse                          | \`"$\\\\ce{Fe^{3+}}$"\`                       |
+| Mixing \\\\ce with bare math operators      | \`\\\\ce{Ag2S > HgS}\` misparses \`>\` as arrow          | Separate: \`$\\\\ce{Ag2S}$ > $\\\\ce{HgS}$\`   |
 
 ---
 
@@ -143,19 +217,44 @@ Return ONLY valid JSON matching this exact structure:
   "data": [
     {
       "serialNo": 1,
-      "question": "Question text with $inline math$ and $\\\\ce{chemistry}$",
+      "question": "A body of mass $m$ is thrown vertically upward with velocity $v$. Find the maximum height.",
       "options": {
-        "A": "Option text.",
-        "B": "Option text.",
-        "C": "Option text.",
-        "D": "Option text."
+        "A": "$\\\\dfrac{v^2}{2g}$",
+        "B": "$\\\\dfrac{v^2}{4g}$",
+        "C": "$\\\\dfrac{v^2}{8g}$",
+        "D": "$\\\\dfrac{3v^2}{4g}$"
        },
-       "answerKey": "A",
+       "answerKey": "B",
        "subject": "Physics",
        "marks": "1",
-       "solution": "Step by step explanation with $equations$"
+       "solution": "Using $v^2 = u^2 - 2gh$, setting $v = 0$: $$h = \\\\frac{v^2}{2g}$$"
+    },
+    {
+      "serialNo": 2,
+      "question": "The balanced equation for combustion of $\\\\ce{C2H5OH}$ is:",
+      "options": {
+        "A": "$\\\\ce{C2H5OH + 3O2 -> 2CO2 + 3H2O}$",
+        "B": "$\\\\ce{C2H5OH + 2O2 -> 2CO2 + 2H2O}$",
+        "C": "$\\\\ce{C2H5OH + O2 -> CO2 + H2O}$",
+        "D": "$\\\\ce{2C2H5OH + 5O2 -> 4CO2 + 6H2O}$"
+       },
+       "answerKey": "A",
+       "subject": "Chemistry"
+    },
+    {
+      "serialNo": 3,
+      "question": "If $f(x) = \\\\int_0^x \\\\frac{\\\\sin t}{t}\\\\,dt$, then $\\\\lim_{x \\\\to 0} \\\\dfrac{f(x)}{x}$ equals:",
+      "options": {
+        "A": "$0$",
+        "B": "$1$",
+        "C": "$\\\\dfrac{1}{2}$",
+        "D": "Does not exist"
+       },
+       "answerKey": "B",
+       "subject": "Maths",
+       "solution": "By L'Hôpital's rule: $$\\\\lim_{x \\\\to 0} \\\\frac{f(x)}{x} = \\\\lim_{x \\\\to 0} \\\\frac{\\\\sin x}{x} = 1$$"
     }
-  ],
+  ]
 }
 
 **Always return parsable JSON. No any formatting or extra text. Just JSON.**

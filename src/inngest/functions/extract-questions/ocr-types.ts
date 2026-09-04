@@ -21,6 +21,9 @@ export interface OcrPageResult {
   /** OCR execution status */
   status: "success" | "failed";
 
+  /** Whether the OCR text successfully conformed to structuredOCRExtractionSchema */
+  survivedValidation: boolean;
+
   /** Error message if OCR processing failed */
   error?: string | null;
 }

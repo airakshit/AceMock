@@ -1,13 +1,11 @@
 import { inngest } from "../../client";
-import { RetryAfterError } from "inngest";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { paperTextExtractionPrompt, paperTextStructuredExtractionPrompt } from "@/services/llm/prompts";
-import { env } from "@/config/env/server";
+import { paperTextStructuredExtractionPrompt } from "@/services/llm/prompts";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
 import { db } from "@/db";
 import type { OcrPageResult } from "./ocr-types";
 import { OpenRouterLLMService, OpenRouterModels } from "@/services/llm";
-import { structuredOCRExtractionSchema } from "./schema";
+import { parseAndValidateStructuredOCR } from "./utils";
 
 export interface OcrPageEventData {
   userId: string;
@@ -21,6 +19,7 @@ export interface OcrPageEventData {
 
 export const TOTAL_RETRIES = 2;
 
+
 export const ocrPage = inngest.createFunction(
   {
     id: "ocr-page",
@@ -31,13 +30,14 @@ export const ocrPage = inngest.createFunction(
     },
   },
 
-  async ({ event, step, logger, attempt }) => {
+  async ({ event, step, logger, attempt }): Promise<OcrPageResult> => {
     const data = event.data as OcrPageEventData;
     const { fileId, pageId, pageNo, storagePath } = data;
 
-    await step.run('update-file-ocr-status', async () => {
-      await filePagesRepository.updateStatusByPageId(db, pageId, "ocr")
-    })
+    // 0. Update file page status to "ocr"
+    await step.run("update-file-ocr-status", async () => {
+      await filePagesRepository.updateStatusByPageId(db, pageId, "ocr");
+    });
 
     // 1. Generate a signed URL for the page image in Supabase storage
     const signedUrl = await step.run("get-page-access-url", async () => {
@@ -46,96 +46,75 @@ export const ocrPage = inngest.createFunction(
 
     const MODEL_TO_USE = OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW;
 
-    // 2. Send image to LLM for raw OCR text transcription
-    const result = await step.run("llm-ocr-extraction", async () => {
-      const openRouter = new OpenRouterLLMService(
-        process.env.OPENROUTER_API_KEY!,
-        MODEL_TO_USE,
-      );
-      const rawText = await openRouter.call(
-        paperTextStructuredExtractionPrompt,
-        undefined,
-        [signedUrl],
-      );
-
-
-      // const groqService = new GroqLLMService(
-      //   env.GROQ_API_KEY,
-      //   GroqModels.QWEN_VISION_MODEL,
-      // );
-
-      // let rawText: string | null = null;
-      // try {
-      //   rawText = await groqService.call(
-      //     paperTextExtractionPrompt,
-      //     undefined,
-      //     [signedUrl],
-      //   );
-      // } catch (err: unknown) {
-      //   const delayMs = getGroqRateLimitDelayMs(err);
-      //   if (delayMs !== null) {
-      //     const seconds = Math.ceil(delayMs / 1000);
-      //     logger.warn(
-      //       {
-      //         pageNo,
-      //         delayMs,
-      //         retryAfterSeconds: seconds,
-      //       },
-      //       `Groq rate limit (429) encountered. Retrying step in ${seconds}s as specified in headers...`,
-      //     );
-      //     throw new RetryAfterError(
-      //       `Groq rate limit exceeded on page ${pageNo}. Retrying in ${seconds}s`,
-      //       delayMs,
-      //       { cause: err },
-      //     );
-      //   }
-      //   throw err;
-      // }
-
-      // Remove reasoning model <think>...</think> and ```json tags if present
-
-      if (!rawText) {
-        if (attempt != TOTAL_RETRIES) throw Error("No response returned by LLM.")
-      }
-
-      const cleanedText = rawText ? rawText
-        .replace(/<think>[\s\S]*?<\/think>/gi, "")
-        .replace(/^```json\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim() : null;
-
-      const ocrStatus = cleanedText ? "success" : "failed";
-
-      if (!cleanedText && attempt != TOTAL_RETRIES) throw Error("No response returned by LLM.")
-
-      let survivedValidation: boolean = false;
-
-      if (cleanedText) {
-        const result = structuredOCRExtractionSchema.safeParse(
-          JSON.parse(cleanedText)
+    // 2. Send image to LLM for raw OCR text transcription & validation
+    const extraction = await step.run(
+      "llm-ocr-extraction",
+      async (): Promise<{
+        rawText: string | null;
+        ocrStatus: "success" | "failed";
+        survivedValidation: boolean;
+      }> => {
+        const openRouter = new OpenRouterLLMService(
+          process.env.OPENROUTER_API_KEY!,
+          MODEL_TO_USE,
         );
-        survivedValidation = result.success;
-      }
 
-      // Persist the raw OCR text to the database
+        const rawText = await openRouter.call(
+          paperTextStructuredExtractionPrompt,
+          undefined,
+          [signedUrl],
+        );
+
+        if (!rawText && attempt !== TOTAL_RETRIES) {
+          throw new Error("No response returned by LLM.");
+        }
+
+        const { cleanedText, survivedValidation, validationErrors } =
+          parseAndValidateStructuredOCR(rawText);
+
+        if (!cleanedText && attempt !== TOTAL_RETRIES) {
+          throw new Error("No valid response text could be extracted from LLM.");
+        }
+
+        if (!survivedValidation && validationErrors) {
+          logger.warn(
+            {
+              pageNo,
+              pageId,
+              validationErrors,
+            },
+            `Structured OCR validation failed for page ${pageNo}`,
+          );
+        }
+
+        const ocrStatus: "success" | "failed" = cleanedText ? "success" : "failed";
+
+        return {
+          rawText: cleanedText,
+          ocrStatus,
+          survivedValidation,
+        };
+      },
+    );
+
+    // 3. Persist the raw OCR text & validation result to the database in a dedicated step
+    await step.run("update-page-ocr-result", async () => {
       await filePagesRepository.update(db, pageId, fileId, {
         pageNo,
-        ocrText: cleanedText ? cleanedText : undefined,
-        ocrStatus,
+        ocrText: extraction.rawText ?? undefined,
+        ocrStatus: extraction.ocrStatus,
         ocrModel: MODEL_TO_USE,
-        survivedValidation: survivedValidation
+        survivedValidation: extraction.survivedValidation,
       });
-
-      return {
-        pageNo,
-        pageId,
-        fileId,
-        rawText: cleanedText,
-        surviesValidation: survivedValidation,
-        status: ocrStatus,
-      };
     });
 
-    return result;
+    return {
+      pageNo,
+      pageId,
+      fileId,
+      rawText: extraction.rawText,
+      survivedValidation: extraction.survivedValidation,
+      status: extraction.ocrStatus,
+    };
   },
 );

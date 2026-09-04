@@ -104,8 +104,8 @@ export class FilePagesRepository {
       ocrModel?: string;
     },
   ) {
-    if (!data.ocrModel) delete data.ocrModel;
-    if (!data.survivedValidation) delete data.survivedValidation;
+    if (data.ocrModel === undefined) delete data.ocrModel;
+    if (data.survivedValidation === undefined) delete data.survivedValidation;
 
     const [page] = await db
       .update(filePages)
