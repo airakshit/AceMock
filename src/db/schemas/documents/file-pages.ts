@@ -12,7 +12,7 @@ export const filePageOCRStatusEnum = pgEnum("file_pages_ocr_status_enum", [
   "not_started",
   "ocr",
   "success",
-  "ocr_failed",
+  "failed",
 ]);
 
 export const filePages = pgTable("file_pages", {

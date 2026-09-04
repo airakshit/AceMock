@@ -8,6 +8,11 @@ export const documentsTable = "documents";
 //   "mcq",
 // ]);
 
+export const documentProcessingStatusEnum = pgEnum(
+  "document_processing_status_enum",
+  ["not_started", "processing", "extracting_questions", "success", "failed"],
+);
+
 export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().notNull(),
   userId: uuid("user_id")
@@ -15,6 +20,9 @@ export const documents = pgTable("documents", {
     .references(() => user.id),
   title: text("title").notNull(),
   description: text("description"),
+  processingStatus: documentProcessingStatusEnum("processing_status")
+    .notNull()
+    .default("not_started"),
   createdAt: timestamp("created_at", {
     withTimezone: true,
   })
