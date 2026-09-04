@@ -98,6 +98,7 @@ export class FilePagesRepository {
     fileId: string,
     data: {
       pageNo: number;
+      ocrText?: string;
       ocrStatus?: FilePageOCRStatus;
     },
   ) {

@@ -99,8 +99,6 @@ class SupabaseStorageClient {
     const { data, error } = await this._supabaseClient.storage
       .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
       .download(objectPath);
-    
-    
 
     if (error) {
       console.log(
@@ -194,6 +192,51 @@ class SupabaseStorageClient {
 
   async downloadSingle(objectPath: string): Promise<DownloadedObject> {
     return this._downloadObject(objectPath);
+  }
+
+  async getPageAccessUrls(
+    objectPaths: string[],
+    expiresIn = 600,
+  ): Promise<Array<{ path: string; signedUrl: string }>> {
+    if (objectPaths.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this._supabaseClient.storage
+      .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
+      .createSignedUrls(objectPaths, expiresIn);
+
+    if (error) {
+      console.log(
+        `Error generating signed URLs: [MESSAGE]: ${error.message}, ` +
+          `[STATUS]: ${error.status}, [CAUSE]: ${error.cause}`,
+      );
+
+      throw error;
+    }
+
+    return data.map((item) => ({
+      path: item.path as string,
+      signedUrl: item.signedUrl as string,
+    }));
+  }
+
+  async getPageAccessUrl(
+    objectPath: string,
+    expiresIn = 600,
+  ): Promise<string> {
+    const { data, error } = await this._supabaseClient.storage
+      .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
+      .createSignedUrl(objectPath, expiresIn);
+
+    if (error) {
+      console.log(
+        `Error generating signed URL for path ${objectPath}: [MESSAGE]: ${error.message}, [STATUS]: ${error.status}`,
+      );
+      throw error;
+    }
+
+    return data.signedUrl;
   }
 
   async upload(

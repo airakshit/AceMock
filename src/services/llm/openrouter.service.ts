@@ -22,6 +22,8 @@ export const OpenRouterModels = {
     LLAMA_3_2_90B_VISION: "meta-llama/llama-3.2-90b-vision-instruct:free",
     /** Mistral Pixtral 12B - Multimodal vision model from Mistral */
     PIXTRAL_12B: "mistralai/pixtral-12b:free",
+    DOTS_3_NOTE_PREVIEW: "dots-studio/dots-3-note-preview:free",
+    NVIDIA_LLAMA_NEMOTRON_VL_1B_V2: "nvidia/llama-nemotron-rerank-vl-1b-v2:free"
   },
 
   /**
@@ -91,14 +93,14 @@ export class OpenRouterLLMService extends BaseLLMService<OpenRouterModel> {
 
     const content = hasImages
       ? [
-          { type: "text", text: prompt },
-          ...imageUrls
-            .filter(Boolean)
-            .map((url) => ({
-              type: "image_url",
-              image_url: { url },
-            })),
-        ]
+        { type: "text", text: prompt },
+        ...imageUrls
+          .filter(Boolean)
+          .map((url) => ({
+            type: "image_url",
+            image_url: { url },
+          })),
+      ]
       : prompt;
 
     const headers: Record<string, string> = {

@@ -9,6 +9,7 @@ const serverEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url(),
   DATABASE_URL: z.string().min(1),
   GROQ_API_KEY: z.string(),
+  OPENROUTER_API_KEY: z.string().optional(),
 
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),

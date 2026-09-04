@@ -4,8 +4,10 @@ import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
 import { documentFilesRepository } from "@/features/documents/repositories/document-files.repository";
+import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { performance } from "node:perf_hooks";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
+import { EXTRACT_QUESTIONS_EVENT } from "./extract-questions/extract-questions";
 
 export interface ProcessDocumentEventData {
   userId: string;
@@ -24,16 +26,18 @@ export const processDocument = inngest.createFunction(
 
     let start = performance.now();
 
-    const docFiles = await step.run(
-      `document-${documentId}-files-as-processing`,
-      async () => {
-        return await documentFilesRepository.updateStatusByDocumentId(
-          db,
-          documentId,
-          "processing",
-        );
-      },
-    );
+    const docFiles = await step.run(`mark-files-as-processing`, async () => {
+      await documentsRepository.updateProcessingStatus(
+        db,
+        documentId,
+        "processing",
+      );
+      return await documentFilesRepository.updateStatusByDocumentId(
+        db,
+        documentId,
+        "processing",
+      );
+    });
 
     logger.info(
       {
@@ -44,6 +48,14 @@ export const processDocument = inngest.createFunction(
     );
 
     if (!docFiles || docFiles.length === 0) {
+      await step.run(`mark-document-as-failed-no-files`, async () => {
+        await documentsRepository.updateProcessingStatus(
+          db,
+          documentId,
+          "failed",
+        );
+      });
+
       return {
         success: true,
         message: "No files found to process.",
@@ -146,7 +158,7 @@ export const processDocument = inngest.createFunction(
       ),
     );
 
-    await step.run(`document-${documentId}-files-as-success`, async () => {
+    await step.run(`mark-files-as-success`, async () => {
       return await documentFilesRepository.updateStatusByDocumentId(
         db,
         documentId,
@@ -166,7 +178,13 @@ export const processDocument = inngest.createFunction(
           });
         });
       });
-      return await filePagesRepository.createMany(db, data);
+      const createdPages = await filePagesRepository.createMany(db, data);
+      await documentsRepository.updateProcessingStatus(
+        db,
+        documentId,
+        "extracting_questions",
+      );
+      return createdPages;
     });
     logger.info(
       {
@@ -177,6 +195,31 @@ export const processDocument = inngest.createFunction(
       "Step Completed.",
     );
 
+    if (pages.length === 0) {
+      await step.run("mark-document-as-failed-no-pages", async () => {
+        await documentsRepository.updateProcessingStatus(
+          db,
+          documentId,
+          "failed",
+        );
+      });
+
+      return {
+        success: false,
+        message: "No pages generated from processed files.",
+        documentId,
+      };
+    }
+
+    // Trigger question extraction workflow asynchronously
+    await step.sendEvent("trigger-extract-questions", {
+      name: EXTRACT_QUESTIONS_EVENT,
+      data: {
+        userId,
+        documentId,
+      },
+    });
+
     return {
       success: true,
       documentId,
@@ -184,3 +227,4 @@ export const processDocument = inngest.createFunction(
     };
   },
 );
+

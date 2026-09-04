@@ -2,6 +2,7 @@ import { documents, documentFiles } from "@/db/schemas";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { generateUUIDv7 } from "../../shared/utils";
 import { DbExecutor } from "../../shared/types";
+import { DocumentProcessingStatus } from "../types";
 
 export class DocumentsRepository {
   async create(
@@ -116,6 +117,23 @@ export class DocumentsRepository {
         updatedAt: new Date(),
       })
       .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
+      .returning();
+
+    return document;
+  }
+
+  async updateProcessingStatus(
+    db: DbExecutor,
+    documentId: string,
+    status: DocumentProcessingStatus,
+  ) {
+    const [document] = await db
+      .update(documents)
+      .set({
+        processingStatus: status,
+        updatedAt: new Date(),
+      })
+      .where(eq(documents.id, documentId))
       .returning();
 
     return document;
