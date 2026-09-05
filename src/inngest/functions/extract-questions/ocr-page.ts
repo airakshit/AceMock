@@ -1,6 +1,9 @@
 import { inngest } from "../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { paperTextStructuredExtractionPrompt } from "@/services/llm/prompts";
+import {
+  paperTextStructuredExtractionPromptV1,
+  paperTextStructuredExtractionPromptV2,
+} from "@/services/llm/prompts";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
 import { db } from "@/db";
 import type { OcrPageResult } from "./ocr-types";
@@ -52,6 +55,7 @@ export const ocrPage = inngest.createFunction(
         rawText: string | null;
         ocrStatus: "success" | "failed";
         survivedValidation: boolean;
+        isRelevant: boolean;
       }> => {
         const openRouter = new OpenRouterLLMService(
           process.env.OPENROUTER_API_KEY!,
@@ -59,7 +63,7 @@ export const ocrPage = inngest.createFunction(
         );
 
         const rawText = await openRouter.call(
-          paperTextStructuredExtractionPrompt,
+          paperTextStructuredExtractionPromptV2,
           undefined,
           [signedUrl],
         );
@@ -68,8 +72,12 @@ export const ocrPage = inngest.createFunction(
           throw new Error("No response returned by LLM.");
         }
 
-        const { cleanedText, survivedValidation, validationErrors } =
-          parseAndValidateStructuredOCR(rawText);
+        const {
+          cleanedText,
+          survivedValidation,
+          validationErrors,
+          parsedStructuredData,
+        } = parseAndValidateStructuredOCR(rawText);
 
         if (!cleanedText && attempt !== TOTAL_RETRIES) {
           throw new Error(
@@ -92,8 +100,15 @@ export const ocrPage = inngest.createFunction(
           ? "success"
           : "failed";
 
+        let isRelevant: boolean = true;
+
+        if (!(parsedStructuredData?.isRelevant === undefined)) {
+          isRelevant = parsedStructuredData.isRelevant;
+        }
+
         return {
           rawText: cleanedText,
+          isRelevant: isRelevant,
           ocrStatus,
           survivedValidation,
         };
@@ -108,6 +123,7 @@ export const ocrPage = inngest.createFunction(
         ocrStatus: extraction.ocrStatus,
         ocrModel: MODEL_TO_USE,
         survivedValidation: extraction.survivedValidation,
+        isRelevant: extraction.isRelevant,
       });
     });
 
@@ -118,6 +134,7 @@ export const ocrPage = inngest.createFunction(
       rawText: extraction.rawText,
       survivedValidation: extraction.survivedValidation,
       status: extraction.ocrStatus,
+      isRelevant: extraction.isRelevant,
     };
   },
 );

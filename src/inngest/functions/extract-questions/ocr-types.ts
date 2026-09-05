@@ -24,6 +24,9 @@ export interface OcrPageResult {
   /** Whether the OCR text successfully conformed to structuredOCRExtractionSchema */
   survivedValidation: boolean;
 
+  // Whether if the page is relevant or not.
+  isRelevant: boolean;
+
   /** Error message if OCR processing failed */
   error?: string | null;
 }

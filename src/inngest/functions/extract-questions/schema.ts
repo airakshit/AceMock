@@ -3,11 +3,11 @@ import { z } from "zod";
 const optionKeySchema = z.enum(["A", "B", "C", "D"]);
 
 const subjectSchema = z.enum([
-  "Physics",
-  "Chemistry",
-  "Maths",
-  "Grammar",
-  "Comprehension",
+  "physics",
+  "chemistry",
+  "maths",
+  "grammar",
+  "comprehension",
 ]);
 
 const questionDataSchema = z
@@ -32,7 +32,14 @@ const questionDataSchema = z
     // Answer key — only A/B/C/D
     answerKey: z
       .string()
-      .transform((value) => value.toUpperCase())
+      .transform((value) =>
+        value
+          .toUpperCase()
+          .replace(".", "")
+          .replace("(", "")
+          .replace(")", "")
+          .trim(),
+      )
       .pipe(optionKeySchema)
       .optional(),
 
@@ -65,6 +72,8 @@ const questionDataSchema = z
 
 export const structuredOCRExtractionSchema = z
   .object({
+    isRelevant: z.boolean().optional(),
+
     sectionLabel: z.string().optional(),
 
     sectionStart: z.number().int().positive().optional(),
@@ -79,6 +88,6 @@ export const structuredOCRExtractionSchema = z
   })
   .strict();
 
-export type StructuredOCRExtractionResponse = z.infer<
+export type StructuredSchemaParseResult = z.infer<
   typeof structuredOCRExtractionSchema
 >;

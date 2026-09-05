@@ -61,7 +61,7 @@ The frontend uses ReactMarkdown + remarkMath + KaTeX + mhchem. You MUST strictly
 Return ONLY the transcribed text. Do NOT add preamble, conversational remarks, or metadata.
 `;
 
-export const paperTextStructuredExtractionPrompt = `
+export const paperTextStructuredExtractionPromptV1 = `
 You are an expert OCR and exam parsing engine.
 Extract all questions and solutions from the text/image and return a strict and parsable JSON object.
 
@@ -203,5 +203,232 @@ Return ONLY valid JSON matching this exact structure:
 }
 
 **Never creatre your own json fields. No matter what.**
+**Always return parsable JSON. No any formatting or extra text. Just JSON.**
+`;
+
+export const paperTextStructuredExtractionPromptV2 = `
+You are an expert OCR and exam parsing engine.
+Extract all questions and solutions from the text/image and return a strict and parsable JSON object.
+
+---
+## Input Data
+**Entities**: Questions, Solutions and Options are entities to extract.
+
+You will receive a single page that is part of a multi-page file containing above entities to Physics, Chemistry, Maths
+and English.
+---
+
+
+---
+## JSON SCHEMA
+{
+  "type": "object",
+  "properties": {
+    "isRelevant": {
+      "type": "boolean",
+      "description": "Marks the relevancy of the page with defined entities."
+    },
+    "sectionLabel": {
+      "type": "string",
+      "description": "Section/Group label/name of the page, such as I, II, A, B. Include if entities are grouped."
+    },
+    "sectionStart": {
+      "type": "integer",
+      "description": "Question number from which the section starts."
+    },
+    "sectionEnd": {
+      "type": "integer",
+      "description": "Question number where the section ends. Include only when explicitly specified."
+    },
+    "eachMarks": {
+      "type": "number",
+      "description": "Marks assigned to each question in the section/group."
+    },
+    "paragraph": {
+      "type": "string",
+      "description": "English paragraph/passage appearing on the page."
+    },
+
+    "data": {
+      "type": "array",
+      "description": "Array containing questions, solutions, options, answer keys, or continuation entities.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "serialNo": {
+            "type": "integer",
+            "description": "Primary serial number. May represent a question, solution, or answer-key entry."
+          },
+          "subject": {
+            "type": "string",
+            "enum": [
+              "physics",
+              "chemistry",
+              "maths",
+              "grammar",
+              "comprehension"
+            ]
+          },
+          "question": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "A": {
+                "type": "string"
+              },
+              "B": {
+                "type": "string"
+              },
+              "C": {
+                "type": "string"
+              },
+              "D": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "answerKey": {
+            "type": "string",
+            "enum": ["A", "B", "C", "D"]
+          },
+          "solution": {
+            "type": "string"
+          },
+          "svgQuestion": {
+            "type": "string",
+            "description": "SVG markup representing a diagram contained in the question."
+          },
+          "svgSolution": {
+            "type": "string",
+            "description": "SVG markup representing a diagram contained in the solution."
+          },
+          "svgOptions": {
+            "type": "object",
+            "properties": {
+              "A": {
+                "type": "string"
+              },
+              "B": {
+                "type": "string"
+              },
+              "C": {
+                "type": "string"
+              },
+              "D": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "incomplete": {
+            "type": "boolean",
+            "description": "True when the question or solution is incomplete. Do not use it for incomplete options."
+          },
+          "optionIncomplete": {
+            "type": "boolean",
+            "description": "True when fewer than four options are present."
+          },
+          "isContinuation": {
+            "type": "boolean",
+            "description": "True when the entity is a continuation from the previous page."
+          }
+        },
+        "required": ["serialNo", "subject"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["data"],
+  "additionalProperties": false
+}
+---
+ 
+---
+## JSON Rules
+1. Mark isRelevant as false if the page is blank or do not have one of the stated entities.
+2. Only include the fields stated. Do not add your own fields.
+3. Do not include the null fields in the output.
+4. In case of continuation entity, infer the serialNo from the entities around it.
+5. Only include svgs if there is any diagram related to entities.
+6. Notice patterns like: 60 questions, 1x60=60 marks to populate the section related fields.
+   But do not populate on your own.
+7. If question is of english and not of grammar, mark the subject as 'comprehension'.
+8. Always give answerKey in uppercase A, B, C and D. No other extra text.
+---
+
+
+## LaTeX & Markdown Formatting Rules for Content Fields (CRITICAL)
+ 
+Content fields (\`question\`, options, \`solution\`) render via ReactMarkdown + remark-math + KaTeX + mhchem.
+Only \`$...$\` (inline) and \`$$...$$\` (display) math delimiters work. No \\(...\\) or \\[...\\].
+ 
+1. **Math**: wrap every symbol/formula in \`$...$\` or \`$$...$$\`. No spaces inside dollars: \`$x$\` not \`$ x $\`.
+2. **Chemistry**: always use \`$\\\\ce{...}$\` — never bare text like \`H2O\`. mhchem auto-subscripts numbers, so write \`\\\\ce{H2SO4}\`, not \`\\\\ce{H_2SO_4}\`.
+   Charges: \`\\\\ce{Fe^{3+}}\` (brace multi-char charges). Arrows: \`->\`, \`<=>\` (plain ASCII hyphen only, never a Unicode minus \`−\`).
+3. **Braces are mandatory**: every command needs \`{ }\` right after it — \`\\\\ce{H2O}\` not \`\\\\ceH2O\`, \`\\\\frac{1}{2}\` not \`\\\\frac12\`.
+4. **Units/vectors/greek**: \`\\\\text{ m/s}\` for units inside math, \`\\\\vec{F}\` for vectors, \`\\\\alpha \\\\theta \\\\Delta\` etc. for greek letters.
+5. **ASCII only**: convert all Unicode math glyphs (−, ×, ÷, ², ₂, °, curly quotes) to their LaTeX/ASCII form (\`-\`, \`\\\\times\`, \`\\\\div\`, \`^2\`, \`_2\`, \`\\\\circ\`, \`'\`/\`"\`). OCR often outputs Unicode look-alikes that silently break parsing.
+6. **JSON escaping**: every LaTeX backslash must be doubled in the JSON string (\`\\\\frac\`, \`\\\\ce\`) so \`JSON.parse()\` restores a single backslash. Never use 4 backslashes.
+ 
+Before output, check: every \\\\ce{} has \`{}\` and is inside \`$...$\`; no Unicode minus/dash anywhere; backslashes are all doubled; \`$\`/\`$$\` pairs match; output is valid parsable JSON only.
+
+Ensure that the json you produce is parsable using JSON.prase() of JavaScript.
+---
+
+
+## Example JSON Schema
+
+Return ONLY valid JSON matching this exact structure:
+{
+  "sectionLabel": "Section-I",
+  "sectionStart": 1,
+  "sectionEnds": 60,
+  "marks": 1,
+  "data": [
+    {
+      "serialNo": 1,
+      "question": "A body of mass $m$ is thrown vertically upward with velocity $v$. Find the maximum height.",
+      "options": {
+        "A": "$\\\\dfrac{v^2}{2g}$",
+        "B": "$\\\\dfrac{v^2}{4g}$",
+        "C": "$\\\\dfrac{v^2}{8g}$",
+        "D": "$\\\\dfrac{3v^2}{4g}$"
+       },
+       "answerKey": "B",
+       "subject": "Physics",
+       "marks": "1",
+       "solution": "Using $v^2 = u^2 - 2gh$, setting $v = 0$: $$h = \\\\frac{v^2}{2g}$$"
+    },
+    {
+      "serialNo": 2,
+      "question": "The balanced equation for combustion of $\\\\ce{C2H5OH}$ is:",
+      "options": {
+        "A": "$\\\\ce{C2H5OH + 3O2 -> 2CO2 + 3H2O}$",
+        "B": "$\\\\ce{C2H5OH + 2O2 -> 2CO2 + 2H2O}$",
+        "C": "$\\\\ce{C2H5OH + O2 -> CO2 + H2O}$",
+        "D": "$\\\\ce{2C2H5OH + 5O2 -> 4CO2 + 6H2O}$"
+       },
+       "answerKey": "A",
+       "subject": "Chemistry"
+    },
+    {
+      "serialNo": 3,
+      "question": "If $f(x) = \\\\int_0^x \\\\frac{\\\\sin t}{t}\\\\,dt$, then $\\\\lim_{x \\\\to 0} \\\\dfrac{f(x)}{x}$ equals:",
+      "options": {
+        "A": "$0$",
+        "B": "$1$",
+        "C": "$\\\\dfrac{1}{2}$",
+        "D": "Does not exist"
+       },
+       "answerKey": "B",
+       "subject": "Maths",
+       "solution": "By L'Hôpital's rule: $$\\\\lim_{x \\\\to 0} \\\\frac{f(x)}{x} = \\\\lim_{x \\\\to 0} \\\\frac{\\\\sin x}{x} = 1$$"
+    }
+  ]
+}
+
 **Always return parsable JSON. No any formatting or extra text. Just JSON.**
 `;

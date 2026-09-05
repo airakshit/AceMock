@@ -102,6 +102,7 @@ export class FilePagesRepository {
       ocrStatus?: FilePageOCRStatus;
       survivedValidation?: boolean;
       ocrModel?: string;
+      isRelevant?: boolean;
     },
   ) {
     if (data.ocrModel === undefined) delete data.ocrModel;
