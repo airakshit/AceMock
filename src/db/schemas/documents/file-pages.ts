@@ -33,7 +33,10 @@ export const filePages = pgTable("file_pages", {
   ocrText: text("ocr_text"),
 
   survivedValidation: boolean("survived_validation").notNull().default(true),
-  ocrModel: text("ocr_model").notNull().default(OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW),
+  isRelevant: boolean("is_relevant").notNull().default(true),
+  ocrModel: text("ocr_model")
+    .notNull()
+    .default(OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW),
 
   createdAt: timestamp("created_at", {
     withTimezone: true,

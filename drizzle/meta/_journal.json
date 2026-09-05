@@ -29,6 +29,13 @@
       "when": 1788539372381,
       "tag": "0003_flashy_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788613163554,
+      "tag": "0004_chemical_trish_tilby",
+      "breakpoints": true
     }
   ]
 }
