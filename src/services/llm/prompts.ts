@@ -71,140 +71,85 @@ You will recieve different pages that might contain questions with options, solu
 Each page is a part of a question set. You will receive questions related to Physics, Chemistry, Maths
 and English. The questions will be indexed by serial numbers which can be used accross pages to represent
 question, answer key or solution.
+
+**Entities**: Questions, Solutions and Options are stated as entities.
 ---
 
 ---
 
 ## JSON Fields Rule
 
+### Page level fields. (Rules: 1-2)
+
+Fields: sectionLabel, sectionStart, sectionEnd, eachMarks, paragraph
+These are only five fields to include for page level data. Others are not allowed.
+
 1. If questions are grouped by section with details like marks, section name, start and end if they are available. Put it under the following keys.
    sectionLabel: "I",
    sectionStart: 1     // It is the question from which the section starts
    sectionEnd: 60      // It is the question number where section ends. Specify it if explicitly specified. Do no rely on last question of the page.
-   marks: 2            // It is the marks for question, each question under the section is assigned to.
-
+   eachMarks: 2            // It is the marks for each question under the section.
    Recognize patterns like, 1x60=60 which means, section has 60 questions with one mark each.
-
 2. If the page contains the english paragraph keep it in 'paragraph' key.
 
 
-### For 'data': [] property of JSON.
+### For 'data': [] property of JSON. (Rules: 3-9)
+This will be array with the follwing fields.
 
 3. The 'serialNo': key is a key that contains the number. This number might represent the question, solution or a answer key. 
    It is the primary key. Never forget this in data of any type.
-
 4. subject: "Physics" | "Chemistry" | "Maths" | "Grammar" | "Comprehension"  
    - Always Required
    - If the question is of english, and is not grammar type, mark 'subject' as 'Comprehension'. Because 
     passage might be in another page.
-
 5. Keep the options key and the answer key always A, B, C or D. Map numbers or roman labels to ABCD too.
-6. If the question contain the diagram generate the <svg></svg> code in a string so that no parsing error occurs..
+   Always keep A, B, C, and D uppercase.
 7. If the page contains the answer key table return, {"serialNo": 1, "answerKey": "B"} objects in data[]
-8. If the data of question like question text, question options or solution text is incomplete and seems to appear on other 
-   page mark it as 'incomplete': true. 
-   Do this only if other questions in the same page has the data.
-9. If the data feels like continuation of data from previous page mark it as, 'isContinuation': true.
+
+**Rules for digrams**
+6. If the question contain the diagram generate the <svg></svg> code in a string so that no parsing error occurs.
+   Since diagram can be in any of the entities put them in:
+   i. {..., "svgQuestion": "<svg></svg>"}
+   ii. {..., "svgSolution": "<svg></svg>"}
+   iii. {..., "svgOptions": {"A": "<svg></svg>", "B": "<svg></svg>", "C", "<svg></svg>", "D": "<svg></svg>"}}
+
+**Rules for partial entity content .**
+8. incomplete: boolean, optionIncomplete: true
+   If question and solution are incomplete mark 'incomplete': true 
+   If options do not have 4 options, put 'optionIncomplete': true
+
+9. 'isContinuation': boolean
+   If the data feels like continuation of data from previous page mark this field true.
+   The continuation will not likely have serialNo. So infer it with respect to succeding entity serialNo.
+
+In case of incomplete or continuation, also include the partial entity(question/solution/options) under respective field.
+
 
 Keep only the json fields which has meaningful data. Do not keep null. Never miss the required fields.
+And most importantly, never construct your own json fields.
 ---
 
----
 
+---
+ 
 ## LaTeX & Markdown Formatting Rules for Content Fields (CRITICAL)
+ 
+Content fields (\`question\`, options, \`solution\`) render via ReactMarkdown + remark-math + KaTeX + mhchem.
+Only \`$...$\` (inline) and \`$$...$$\` (display) math delimiters work. No \\(...\\) or \\[...\\].
+ 
+1. **Math**: wrap every symbol/formula in \`$...$\` or \`$$...$$\`. No spaces inside dollars: \`$x$\` not \`$ x $\`.
+2. **Chemistry**: always use \`$\\\\ce{...}$\` — never bare text like \`H2O\`. mhchem auto-subscripts numbers, so write \`\\\\ce{H2SO4}\`, not \`\\\\ce{H_2SO_4}\`.
+   Charges: \`\\\\ce{Fe^{3+}}\` (brace multi-char charges). Arrows: \`->\`, \`<=>\` (plain ASCII hyphen only, never a Unicode minus \`−\`).
+3. **Braces are mandatory**: every command needs \`{ }\` right after it — \`\\\\ce{H2O}\` not \`\\\\ceH2O\`, \`\\\\frac{1}{2}\` not \`\\\\frac12\`.
+4. **Units/vectors/greek**: \`\\\\text{ m/s}\` for units inside math, \`\\\\vec{F}\` for vectors, \`\\\\alpha \\\\theta \\\\Delta\` etc. for greek letters.
+5. **ASCII only**: convert all Unicode math glyphs (−, ×, ÷, ², ₂, °, curly quotes) to their LaTeX/ASCII form (\`-\`, \`\\\\times\`, \`\\\\div\`, \`^2\`, \`_2\`, \`\\\\circ\`, \`'\`/\`"\`). OCR often outputs Unicode look-alikes that silently break parsing.
+6. **JSON escaping**: every LaTeX backslash must be doubled in the JSON string (\`\\\\frac\`, \`\\\\ce\`) so \`JSON.parse()\` restores a single backslash. Never use 4 backslashes.
+ 
+Before output, check: every \\\\ce{} has \`{}\` and is inside \`$...$\`; no Unicode minus/dash anywhere; backslashes are all doubled; \`$\`/\`$$\` pairs match; output is valid parsable JSON only.
 
-All string fields (\`question\`, option values, \`solution\`) are rendered by a pipeline of:
-  ReactMarkdown → remark-math (v6) → KaTeX (0.18) + mhchem extension
-
-This pipeline ONLY recognizes \`$...$\` for inline math and \`$$...$$\` for display math.
-It does NOT support \\(...\\), \\[...\\], or any other delimiter.
-
-### Rule 1 — Dollar-Sign Delimiters (NO EXCEPTIONS)
-
-| Intent            | Correct (in JSON value)             | WRONG — will break rendering            |
-|-------------------|-------------------------------------|------------------------------------------|
-| Inline math       | \`"$x^2 + 1$"\`                      | \`"\\\\(x^2 + 1\\\\)"\`, bare \`x^2 + 1\`    |
-| Display math      | \`"$$\\\\int_0^1 x\\\\,dx$$"\`           | \`"\\\\[\\\\int_0^1 x\\\\,dx\\\\]"\`            |
-
-- NO spaces immediately inside the \`$\` delimiters: write \`$x$\`, never \`$ x $\`.
-- Every mathematical symbol, variable, number with unit, or formula MUST be inside \`$...$\` or \`$$...$$\`. Never leave math bare in plain text.
-
-### Rule 2 — JSON Backslash Escaping (THE MOST COMMON ERROR SOURCE)
-
-Because the output is a JSON string, every LaTeX backslash must be written as \`\\\\\` (two characters) in the JSON value.
-After \`JSON.parse()\`, the double backslash becomes a single backslash, which is what KaTeX needs.
-
-| What KaTeX sees (after parse) | What you write in JSON string |
-|-------------------------------|-------------------------------|
-| \`\\frac{1}{2}\`                | \`\\\\frac{1}{2}\`              |
-| \`\\alpha\`                     | \`\\\\alpha\`                   |
-| \`\\ce{H2O}\`                   | \`\\\\ce{H2O}\`                 |
-| \`\\text{ m/s}\`                | \`\\\\text{ m/s}\`              |
-| \`\\vec{F}\`                    | \`\\\\vec{F}\`                  |
-| \`\\sqrt{3}\`                   | \`\\\\sqrt{3}\`                 |
-
-⚠️ NEVER use quadruple backslashes (\`\\\\\\\\\`). That creates \`\\\\\` after parse, which KaTeX does NOT understand.
-
-### Rule 3 — Chemistry: ALWAYS use \\\\ce{...} (mhchem syntax)
-
-ALL chemical formulas, ions, and reactions MUST use the \\\\ce{} command inside dollar-sign math mode.
-
-**Formulas & Compounds:**
-- \`"$\\\\ce{H2O}$"\`, \`"$\\\\ce{H2SO4}$"\`, \`"$\\\\ce{C2H5OH}$"\`, \`"$\\\\ce{Ca(OH)2}$"\`
-
-**Ions & Charges:**
-- \`"$\\\\ce{SO4^{2-}}$"\`, \`"$\\\\ce{Ca^{2+}}$"\`, \`"$\\\\ce{Fe^{3+}}$"\`, \`"$\\\\ce{NH4+}$"\`
-- Multi-character charges MUST use braces: \`^{2-}\` not \`^2-\`
-
-**Reaction Arrows:**
-- Forward: \`"$\\\\ce{A -> B}$"\`
-- Reversible: \`"$\\\\ce{N2 + 3H2 <=> 2NH3}$"\`
-- With conditions above arrow: \`"$\\\\ce{2H2O ->[\\\\Delta] 2H2 + O2}$"\`
-
-**State symbols & gas/precipitate:**
-- \`"$\\\\ce{H2 ^}$"\` for gas evolution (↑)
-- \`"$\\\\ce{BaSO4 v}$"\` for precipitate (↓)
-
-**Full reaction examples in JSON:**
-\`\`\`
-"$\\\\ce{C2H5OH + 3O2 -> 2CO2 + 3H2O}$"
-"$\\\\ce{Zn + 2HCl -> ZnCl2 + H2 ^}$"
-"$\\\\ce{AgNO3 + NaCl -> AgCl v + NaNO3}$"
-\`\`\`
-
-**Ordering / comparison of compounds** (e.g. solubility series):
-\`"$\\\\ce{Ag2S}$ > $\\\\ce{HgS}$ > $\\\\ce{CuS}$"\`
-— Use separate \`$\\\\ce{...}$\` blocks joined by plain-text operators.
-
-### Rule 4 — Physics: Math Symbols, Units, Vectors
-
-- **Variables & constants**: \`"$m$"\`, \`"$g$"\`, \`"$v_0$"\`, \`"$\\\\theta$"\`
-- **Units MUST use \\\\text{} inside math mode**:
-  \`"$v = 20\\\\text{ m/s}$"\`, \`"$g = 9.8\\\\text{ m/s}^2$"\`, \`"$5\\\\text{ N}$"\`, \`"$R = 8.314\\\\text{ J/(mol·K)}$"\`
-- **Vectors**: \`"$\\\\vec{F}$"\` or \`"$\\\\mathbf{F}$"\`
-- **Greek letters**: \`"$\\\\alpha$"\`, \`"$\\\\beta$"\`, \`"$\\\\omega$"\`, \`"$\\\\lambda$"\`, \`"$\\\\mu$"\`, \`"$\\\\Delta$"\`
-
-### Rule 5 — Mathematics: Fractions, Roots, Calculus, Subscripts
-
-- **Fractions**: \`"$\\\\frac{a}{b}$"\` or \`"$\\\\dfrac{a}{b}$"\` (display-style in inline)
-- **Roots**: \`"$\\\\sqrt{x}$"\`, \`"$\\\\sqrt[3]{V}$"\`
-- **Integrals**: \`"$\\\\int_{a}^{b} f(x)\\\\,dx$"\`
-- **Summations**: \`"$\\\\sum_{i=1}^{n} x_i$"\`
-- **Limits**: \`"$\\\\lim_{x \\\\to 0} \\\\frac{\\\\sin x}{x}$"\`
-- **Subscripts/Superscripts**: Multi-character exponents MUST use braces: \`"$x^{10}$"\` not \`"$x^10$"\`, \`"$a_{ij}$"\` not \`"$a_ij$"\`
-
-### Rule 6 — Common Pitfalls (AVOID THESE)
-
-| Mistake                                  | Why it breaks                                        | Fix                                        |
-|------------------------------------------|------------------------------------------------------|--------------------------------------------|
-| Bare chemistry: \`H2SO4\`                  | Renders as plain text, no subscripts                 | \`"$\\\\ce{H2SO4}$"\`                        |
-| \`\\\\(x^2\\\\)\` delimiters                   | remark-math ignores these; renders literal text      | \`"$x^2$"\`                                  |
-| \`\\\\\\\\ frac{1}{2}\` (quadruple backslash)  | Becomes \`\\\\frac\` after parse, KaTeX error           | \`"\\\\frac{1}{2}"\`                           |
-| \`$ x $\` (spaces inside dollars)           | remark-math may fail to tokenize                     | \`"$x$"\`                                    |
-| \`$\\\\ce{Fe^3+}$\` (multi-char charge)      | Ambiguous superscript parse                          | \`"$\\\\ce{Fe^{3+}}$"\`                       |
-| Mixing \\\\ce with bare math operators      | \`\\\\ce{Ag2S > HgS}\` misparses \`>\` as arrow          | Separate: \`$\\\\ce{Ag2S}$ > $\\\\ce{HgS}$\`   |
-
+Ensure that the json you produce is parsable using JSON.prase() of JavaScript.
 ---
+
 
 ## Example JSON Schema
 
@@ -257,5 +202,6 @@ Return ONLY valid JSON matching this exact structure:
   ]
 }
 
+**Never creatre your own json fields. No matter what.**
 **Always return parsable JSON. No any formatting or extra text. Just JSON.**
 `;

@@ -3,14 +3,15 @@ import { z } from "zod";
 const optionKeySchema = z.enum(["A", "B", "C", "D"]);
 
 const subjectSchema = z.enum([
-    "Physics",
-    "Chemistry",
-    "Maths",
-    "Grammar",
-    "Comprehension",
+  "Physics",
+  "Chemistry",
+  "Maths",
+  "Grammar",
+  "Comprehension",
 ]);
 
-const questionDataSchema = z.object({
+const questionDataSchema = z
+  .object({
     // Primary identifier — required for every data item
     serialNo: z.number().int().positive(),
 
@@ -19,53 +20,65 @@ const questionDataSchema = z.object({
 
     // Options are only present when the question has options
     options: z
-        .object({
-            A: z.string().optional(),
-            B: z.string().optional(),
-            C: z.string().optional(),
-            D: z.string().optional(),
-        })
-        .strict()
-        .optional(),
+      .object({
+        A: z.string().optional(),
+        B: z.string().optional(),
+        C: z.string().optional(),
+        D: z.string().optional(),
+      })
+      .strict()
+      .optional(),
 
     // Answer key — only A/B/C/D
-    answerKey: optionKeySchema.optional(),
+    answerKey: z
+      .string()
+      .transform((value) => value.toUpperCase())
+      .pipe(optionKeySchema)
+      .optional(),
 
     // Required according to your prompt
     subject: subjectSchema,
 
-    // Can be a string because your example uses "1"
-    marks: z.string().optional(),
+    marks: z.coerce.number().optional(),
 
     // Step-by-step solution
     solution: z.string().optional(),
 
-    // Generated SVG diagram
-    diagram: z.string().optional(),
-
     // Page/question continuation metadata
+    optionIncomplete: z.boolean().optional(),
     incomplete: z.boolean().optional(),
     isContinuation: z.boolean().optional(),
-}).strict();
+
+    svgQuestion: z.string().optional(),
+    svgSolution: z.string().optional(),
+    svgOptions: z
+      .object({
+        A: z.string().optional(),
+        B: z.string().optional(),
+        C: z.string().optional(),
+        D: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 export const structuredOCRExtractionSchema = z
-    .object({
-        sectionLabel: z.string().optional(),
+  .object({
+    sectionLabel: z.string().optional(),
 
-        sectionStart: z.number().int().positive().optional(),
+    sectionStart: z.number().int().positive().optional(),
 
-        sectionEnds: z.number().int().positive().optional(),
+    sectionEnd: z.number().int().positive().optional(),
 
-        marks: z.number().optional(),
+    eachMarks: z.number().optional(),
 
-        paragraph: z.string().optional(),
+    paragraph: z.string().optional(),
 
-        data: z.array(questionDataSchema),
-    })
-    .strict();
-
-
+    data: z.array(questionDataSchema),
+  })
+  .strict();
 
 export type StructuredOCRExtractionResponse = z.infer<
-    typeof structuredOCRExtractionSchema
+  typeof structuredOCRExtractionSchema
 >;

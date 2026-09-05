@@ -1,18 +1,57 @@
 import { structuredOCRExtractionSchema } from "./schema";
 
-/**
- * Robustly parses and validates raw LLM OCR response into structured JSON.
- * - Strips `<think>...</think>` reasoning tokens
- * - Extracts JSON from markdown code blocks or outermost braces
- * - Handles minor JSON malformations (e.g. trailing commas)
- * - Validates schema with Zod and collects descriptive error paths
- */
-export function parseAndValidateStructuredOCR(rawText: string | null): {
+type StructuredOCRParseResult = {
     cleanedText: string | null;
     survivedValidation: boolean;
     validationErrors?: string[];
-} {
-    if (!rawText || !rawText.trim()) {
+};
+
+const THINK_TAG = /<think>[\s\S]*?<\/think>/gi;
+const CODE_FENCE = /```(?:json)?\s*([\s\S]*?)\s*```/i;
+const TRAILING_COMMA = /,\s*([\]}])/g;
+
+/** Pulls the JSON payload out of markdown fences, or the outermost {}. */
+function extractJsonPayload(text: string): string {
+    const fenced = text.match(CODE_FENCE)?.[1];
+    if (fenced) return fenced.trim();
+
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    return start !== -1 && end > start ? text.slice(start, end + 1).trim() : text;
+}
+
+/** Parses JSON, retrying once with trailing commas stripped. */
+function tryParseJson(
+    text: string,
+): { ok: true; json: unknown; source: string } | { ok: false; error: string } {
+    try {
+        return { ok: true, json: JSON.parse(text), source: text };
+    } catch {
+        const sanitized = text.replace(TRAILING_COMMA, "$1");
+        try {
+            return { ok: true, json: JSON.parse(sanitized), source: sanitized };
+        } catch (err) {
+            return {
+                ok: false,
+                error: err instanceof Error ? err.message : "Failed to parse JSON string.",
+            };
+        }
+    }
+}
+
+/**
+ * Cleans, parses, and validates a raw LLM OCR response against the
+ * structured OCR schema.
+ *
+ * - Strips `<think>...</think>` reasoning tokens
+ * - Extracts JSON from markdown fences or the outermost `{}`
+ * - Recovers from trailing commas
+ * - Validates the result with Zod
+ */
+export function parseAndValidateStructuredOCR(
+    rawText: string | null,
+): StructuredOCRParseResult {
+    if (!rawText?.trim()) {
         return {
             cleanedText: null,
             survivedValidation: false,
@@ -20,59 +59,28 @@ export function parseAndValidateStructuredOCR(rawText: string | null): {
         };
     }
 
-    // 1. Remove reasoning model <think>...</think> tags
-    let cleaned = rawText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    const withoutThinking = rawText.replace(THINK_TAG, "").trim();
+    const jsonPayload = extractJsonPayload(withoutThinking);
 
-    // 2. Extract JSON payload from markdown fences or outermost braces
-    let jsonString = cleaned;
-    const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (codeBlockMatch && codeBlockMatch[1]) {
-        jsonString = codeBlockMatch[1].trim();
-    } else {
-        const firstBrace = cleaned.indexOf("{");
-        const lastBrace = cleaned.lastIndexOf("}");
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            jsonString = cleaned.slice(firstBrace, lastBrace + 1).trim();
-        }
-    }
-
-    // 3. Attempt JSON parse with fallback for trailing commas
-    let parsedJson: unknown = null;
-    try {
-        parsedJson = JSON.parse(jsonString);
-        cleaned = jsonString;
-    } catch {
-        try {
-            const sanitized = jsonString.replace(/,\s*([\]}])/g, "$1");
-            parsedJson = JSON.parse(sanitized);
-            cleaned = sanitized;
-        } catch (parseError) {
-            return {
-                cleanedText: cleaned,
-                survivedValidation: false,
-                validationErrors: [
-                    parseError instanceof Error ? parseError.message : "Failed to parse JSON string.",
-                ],
-            };
-        }
-    }
-
-    // 4. Validate against Zod schema
-    const parseResult = structuredOCRExtractionSchema.safeParse(parsedJson);
-
-    if (!parseResult.success) {
-        const errorMessages = parseResult.error.issues.map(
-            (issue) => `${issue.path.join(".") || "root"}: ${issue.message}`,
-        );
+    const parsed = tryParseJson(jsonPayload);
+    if (!parsed.ok) {
         return {
-            cleanedText: cleaned,
+            cleanedText: jsonPayload,
             survivedValidation: false,
-            validationErrors: errorMessages,
+            validationErrors: [parsed.error],
         };
     }
 
-    return {
-        cleanedText: cleaned,
-        survivedValidation: true,
-    };
+    const result = structuredOCRExtractionSchema.safeParse(parsed.json);
+    if (!result.success) {
+        return {
+            cleanedText: parsed.source,
+            survivedValidation: false,
+            validationErrors: result.error.issues.map(
+                (issue) => `${issue.path.join(".") || "root"}: ${issue.message}`,
+            ),
+        };
+    }
+
+    return { cleanedText: parsed.source, survivedValidation: true };
 }

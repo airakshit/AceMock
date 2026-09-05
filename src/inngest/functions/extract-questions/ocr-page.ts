@@ -19,7 +19,6 @@ export interface OcrPageEventData {
 
 export const TOTAL_RETRIES = 2;
 
-
 export const ocrPage = inngest.createFunction(
   {
     id: "ocr-page",
@@ -44,7 +43,7 @@ export const ocrPage = inngest.createFunction(
       return await supabaseStorageClient.getPageAccessUrl(storagePath);
     });
 
-    const MODEL_TO_USE = OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW;
+    const MODEL_TO_USE = OpenRouterModels.FREE_VISION.MINIMAX_M3;
 
     // 2. Send image to LLM for raw OCR text transcription & validation
     const extraction = await step.run(
@@ -73,7 +72,9 @@ export const ocrPage = inngest.createFunction(
           parseAndValidateStructuredOCR(rawText);
 
         if (!cleanedText && attempt !== TOTAL_RETRIES) {
-          throw new Error("No valid response text could be extracted from LLM.");
+          throw new Error(
+            "No valid response text could be extracted from LLM.",
+          );
         }
 
         if (!survivedValidation && validationErrors) {
@@ -87,7 +88,9 @@ export const ocrPage = inngest.createFunction(
           );
         }
 
-        const ocrStatus: "success" | "failed" = cleanedText ? "success" : "failed";
+        const ocrStatus: "success" | "failed" = cleanedText
+          ? "success"
+          : "failed";
 
         return {
           rawText: cleanedText,
@@ -97,7 +100,7 @@ export const ocrPage = inngest.createFunction(
       },
     );
 
-    // 3. Persist the raw OCR text & validation result to the database in a dedicated step
+    // 3. Persist the cleaned (not parsed) OCR text & validation result to the database in a dedicated step
     await step.run("update-page-ocr-result", async () => {
       await filePagesRepository.update(db, pageId, fileId, {
         pageNo,

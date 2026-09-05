@@ -22,7 +22,6 @@ export function handleActionError(err: any): ServerActionResult<never> {
   }
 
   console.log(`The error is : ${err}`);
-  throw err;
 
   return {
     success: false,
