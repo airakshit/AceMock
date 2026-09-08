@@ -1,19 +1,42 @@
-import { cn } from "@/lib/utils";
 import { typography } from "@/lib/design-system";
+import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
   title: string;
   description?: string;
+  eyebrow?: string;
+  action?: React.ReactNode;
   className?: string;
 }
 
-export function PageHeader({ title, description, className }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  eyebrow,
+  action,
+  className,
+}: PageHeaderProps) {
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <h2 className={typography.display}>{title}</h2>
-      {description ? (
-        <p className={typography.sectionSubtitle}>{description}</p>
-      ) : null}
+    <div
+      className={cn(
+        "flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between pb-1",
+        className,
+      )}
+    >
+      <div className="space-y-0.5">
+        {eyebrow ? (
+          <p className={typography.eyebrow}>{eyebrow}</p>
+        ) : null}
+        <h2 className={cn(typography.pageTitle, "text-xl md:text-2xl font-semibold tracking-tight")}>
+          {title}
+        </h2>
+        {description ? (
+          <p className={cn(typography.pageSubtitle, "text-xs md:text-sm text-muted-foreground")}>
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {action ? <div className="flex items-center gap-2 pt-1 sm:pt-0">{action}</div> : null}
     </div>
   );
 }
@@ -34,17 +57,21 @@ export function SectionHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between",
+        "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between",
         className,
       )}
     >
-      <div className="space-y-1">
-        <h3 className={typography.sectionTitle}>{title}</h3>
+      <div className="space-y-0.5">
+        <h3 className={cn(typography.sectionTitle, "text-base md:text-lg font-semibold tracking-tight")}>
+          {title}
+        </h3>
         {description ? (
-          <p className={typography.sectionSubtitle}>{description}</p>
+          <p className={cn(typography.sectionSubtitle, "text-xs text-muted-foreground")}>
+            {description}
+          </p>
         ) : null}
       </div>
-      {action}
+      {action ? <div className="flex items-center gap-2 pt-1 sm:pt-0">{action}</div> : null}
     </div>
   );
 }

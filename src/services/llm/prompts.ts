@@ -349,16 +349,22 @@ and English.
 ---
 ## JSON Rules
 1. Mark isRelevant as false if the page is blank or do not have one of the stated entities.
-2. Only include the fields stated. Do not add your own fields.
 3. Do not include the null fields in the output.
 4. In case of continuation entity, infer the serialNo from the entities around it.
 5. Only include svgs if there is any diagram related to entities.
 6. Notice patterns like: 60 questions, 1x60=60 marks to populate the section related fields.
-   But do not populate on your own.
+  But do not populate on your own.
 7. If question is of english and not of grammar, mark the subject as 'comprehension'.
-8. Always give answerKey in uppercase A, B, C and D. No other extra text.
+8. When subject is not inferrable from the given entity, do not specify. Especially in
+   answer keys.
 ---
 
+---
+## Key Considerations
+1. Only include the fields stated. Do not add your own fields.
+2. Always look for incomplete text at the end of the page and continuation of the 
+   incomplete at start of the page.
+---
 
 ## LaTeX & Markdown Formatting Rules for Content Fields (CRITICAL)
  

@@ -28,7 +28,7 @@ export const ocrPage = inngest.createFunction(
     triggers: { event: "page/ocr" },
     retries: TOTAL_RETRIES,
     concurrency: {
-      limit: 3, // Enforce sequential execution across pages to respect TPM quota
+      limit: 3,
     },
   },
 

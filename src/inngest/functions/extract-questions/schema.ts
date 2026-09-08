@@ -44,7 +44,11 @@ const questionDataSchema = z
       .optional(),
 
     // Required according to your prompt
-    subject: subjectSchema,
+    subject: z
+      .string()
+      .transform((value) => value.toLowerCase().trim())
+      .pipe(subjectSchema)
+      .optional(),
 
     marks: z.coerce.number().optional(),
 

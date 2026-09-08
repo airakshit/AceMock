@@ -27,9 +27,9 @@ import { PanelLeftIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
+const SIDEBAR_WIDTH = "15rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH_ICON = "3.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
@@ -40,6 +40,8 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  isHovered: boolean
+  setIsHovered: (hovered: boolean) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -54,7 +56,7 @@ function useSidebar() {
 }
 
 function SidebarProvider({
-  defaultOpen = true,
+  defaultOpen = false,
   open: openProp,
   onOpenChange: setOpenProp,
   className,
@@ -68,6 +70,22 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+  const [isHovered, setIsHovered] = React.useState(false)
+  const leaveTimerRef = React.useRef<NodeJS.Timeout | null>(null)
+
+  const handleSetHovered = React.useCallback((hovered: boolean) => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current)
+      leaveTimerRef.current = null
+    }
+    if (hovered) {
+      setIsHovered(true)
+    } else {
+      leaveTimerRef.current = setTimeout(() => {
+        setIsHovered(false)
+      }, 70)
+    }
+  }, [])
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -109,9 +127,8 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
 
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
-  const state = open ? "expanded" : "collapsed"
+  // Expanded if either open or hovered on desktop
+  const state = open || isHovered ? "expanded" : "collapsed"
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
@@ -122,8 +139,10 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      isHovered,
+      setIsHovered: handleSetHovered,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, isHovered, handleSetHovered]
   )
 
   return (
@@ -162,7 +181,7 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, state, open, openMobile, setOpenMobile, setIsHovered } = useSidebar()
 
   if (collapsible === "none") {
     return (
@@ -214,27 +233,30 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* This is what handles the sidebar gap on desktop */}
+      {/* This handles the sidebar gap on desktop; only shifts content if permanently open */}
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "relative bg-transparent transition-[width] duration-200 ease-linear",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
-          variant === "floating" || variant === "inset"
-            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
+          open
+            ? "w-(--sidebar-width)"
+            : "w-(--sidebar-width-icon)"
         )}
       />
       <div
         data-slot="sidebar-container"
         data-side={side}
+        onMouseEnter={() => !isMobile && setIsHovered(true)}
+        onMouseLeave={() => !isMobile && setIsHovered(false)}
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
-          // Adjust the padding for floating and inset variants.
+          "fixed inset-y-0 z-30 hidden h-svh transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] data-[side=left]:left-0 data-[side=right]:right-0 md:flex overflow-hidden",
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            : state === "collapsed"
+              ? "w-(--sidebar-width-icon) border-r border-sidebar-border"
+              : "w-(--sidebar-width) border-r border-sidebar-border shadow-2xl shadow-black/15 dark:shadow-black/50",
           className
         )}
         {...props}

@@ -1,39 +1,94 @@
 /*
- * Ace Mock — extended design tokens
- * Import from globals.css. Use these CSS variables in components
- * for consistent spacing, sizing, and auth-specific layout.
+ * Ace Mock — Modern Design Tokens
+ * Extended design tokens for layout, elevation, typography, and semantic colors.
+ * Use these CSS variables in components or via the design-system library.
  */
 
 :root {
-    /* Layout */
-    --auth-card-max-width: 22rem;
+    /* Layout boundaries */
+    --auth-card-max-width: 26rem;
     --page-max-width-sm: 24rem;
-    --page-max-width-md: 32rem;
-    --page-max-width-lg: 48rem;
+    --page-max-width-md: 36rem;
+    --page-max-width-lg: 56rem;
+    --page-max-width-xl: 72rem;
+    --page-max-width-2xl: 88rem;
 
-    /* Spacing scale (auth & compact UIs) */
-    --space-auth-section: 1rem;
-    --space-auth-field: 0.75rem;
-    --space-page-x: 1rem;
-    --space-page-y: 1.5rem;
+    /* Spacing scale */
+    --space-auth-section: 1.25rem;
+    --space-auth-field: 0.875rem;
+    --space-page-x: 1.25rem;
+    --space-page-y: 1.75rem;
+    --space-card-p: 1.25rem;
 
     /* Typography scale */
-    --text-display: 1.75rem;
-    --text-title: 1.125rem;
+    --text-hero: clamp(2rem, 3.5vw, 2.75rem);
+    --text-display: clamp(1.625rem, 2.5vw, 2.125rem);
+    --text-title: 1.25rem;
+    --text-subtitle: 1.0625rem;
     --text-body: 0.9375rem;
+    --text-body-sm: 0.875rem;
     --text-caption: 0.8125rem;
-    --leading-body: 1.6;
-    --leading-heading: 1.25;
-    --tracking-body: -0.011em;
-    --tracking-heading: -0.025em;
+    --text-micro: 0.6875rem;
 
-    /* Brand accent (subtle, works in light & dark) */
-    --brand: oklch(0.55 0.18 264);
-    --brand-foreground: oklch(0.985 0 0);
-    --brand-muted: oklch(0.55 0.18 264 / 12%);
+    --leading-tight: 1.15;
+    --leading-snug: 1.35;
+    --leading-body: 1.6;
+    --leading-relaxed: 1.7;
+
+    --tracking-tighter: -0.035em;
+    --tracking-tight: -0.02em;
+    --tracking-normal: 0em;
+    --tracking-wide: 0.04em;
+    --tracking-wider: 0.08em;
+    --tracking-widest: 0.14em;
+
+    /* Brand Identity (Electric Indigo / Sapphire) */
+    --brand: oklch(0.56 0.22 264);
+    --brand-hover: oklch(0.50 0.24 264);
+    --brand-foreground: oklch(0.99 0 0);
+    --brand-muted: oklch(0.56 0.22 264 / 10%);
+    --brand-subtle: oklch(0.56 0.22 264 / 5%);
+    --brand-glow: 0 0 24px -4px oklch(0.56 0.22 264 / 25%);
+
+    /* Semantic Test Difficulty Accents */
+    --diff-easy: oklch(0.62 0.17 145);
+    --diff-easy-bg: oklch(0.62 0.17 145 / 12%);
+    --diff-easy-border: oklch(0.62 0.17 145 / 25%);
+    --diff-medium: oklch(0.68 0.18 68);
+    --diff-medium-bg: oklch(0.68 0.18 68 / 12%);
+    --diff-medium-border: oklch(0.68 0.18 68 / 25%);
+    --diff-hard: oklch(0.58 0.22 27);
+    --diff-hard-bg: oklch(0.58 0.22 27 / 12%);
+    --diff-hard-border: oklch(0.58 0.22 27 / 25%);
+
+    /* Elevation & Depth Shadows */
+    --shadow-subtle: 0 1px 2px 0 oklch(0 0 0 / 0.03);
+    --shadow-card: 0 1px 3px 0 oklch(0 0 0 / 0.04), 0 4px 12px -2px oklch(0 0 0 / 0.03);
+    --shadow-card-hover: 0 4px 6px -1px oklch(0 0 0 / 0.06), 0 12px 24px -4px oklch(0.56 0.22 264 / 0.08);
+    --shadow-popover: 0 10px 30px -5px oklch(0 0 0 / 0.1);
 }
 
 .dark {
-    --brand: oklch(0.72 0.14 264);
-    --brand-muted: oklch(0.72 0.14 264 / 15%);
+    /* Dark Theme Adjustments */
+    --brand: oklch(0.68 0.20 264);
+    --brand-hover: oklch(0.74 0.18 264);
+    --brand-foreground: oklch(0.12 0.02 264);
+    --brand-muted: oklch(0.68 0.20 264 / 16%);
+    --brand-subtle: oklch(0.68 0.20 264 / 8%);
+    --brand-glow: 0 0 28px -4px oklch(0.68 0.20 264 / 35%);
+
+    --diff-easy: oklch(0.74 0.16 145);
+    --diff-easy-bg: oklch(0.74 0.16 145 / 16%);
+    --diff-easy-border: oklch(0.74 0.16 145 / 30%);
+    --diff-medium: oklch(0.76 0.16 68);
+    --diff-medium-bg: oklch(0.76 0.16 68 / 16%);
+    --diff-medium-border: oklch(0.76 0.16 68 / 30%);
+    --diff-hard: oklch(0.68 0.20 27);
+    --diff-hard-bg: oklch(0.68 0.20 27 / 16%);
+    --diff-hard-border: oklch(0.68 0.20 27 / 30%);
+
+    --shadow-subtle: 0 1px 2px 0 oklch(0 0 0 / 0.2);
+    --shadow-card: 0 1px 3px 0 oklch(0 0 0 / 0.3), 0 4px 12px -2px oklch(0 0 0 / 0.2);
+    --shadow-card-hover: 0 4px 8px -1px oklch(0 0 0 / 0.4), 0 12px 28px -4px oklch(0.68 0.20 264 / 0.15);
+    --shadow-popover: 0 12px 36px -6px oklch(0 0 0 / 0.5);
 }

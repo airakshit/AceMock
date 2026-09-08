@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { colors, motion, typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import type { DocumentItemDTO } from "../actions/types";
 import { formatBytes, formatDate } from "../utils";
@@ -43,8 +44,8 @@ export function DocumentCard({ document }: DocumentCardProps) {
       return {
         label: "Uploaded",
         icon: CheckCircle2,
-        className:
-          "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800",
+        className: colors.status.uploaded.badge,
+        dot: colors.status.uploaded.dot,
         spin: false,
       };
     }
@@ -57,8 +58,8 @@ export function DocumentCard({ document }: DocumentCardProps) {
       return {
         label: "Uploading",
         icon: Loader2,
-        className:
-          "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800",
+        className: colors.status.uploading.badge,
+        dot: colors.status.uploading.dot,
         spin: true,
       };
     }
@@ -66,16 +67,16 @@ export function DocumentCard({ document }: DocumentCardProps) {
       return {
         label: "Failed",
         icon: AlertTriangle,
-        className:
-          "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-400 dark:border-rose-800",
+        className: colors.status.failed.badge,
+        dot: colors.status.failed.dot,
         spin: false,
       };
     }
     return {
       label: "Uploaded",
       icon: CheckCircle2,
-      className:
-        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800",
+      className: colors.status.uploaded.badge,
+      dot: colors.status.uploaded.dot,
       spin: false,
     };
   };
@@ -84,16 +85,21 @@ export function DocumentCard({ document }: DocumentCardProps) {
   const StatusIcon = statusInfo.icon;
 
   return (
-    <div className="w-full rounded-xl border bg-card text-card-foreground shadow-2xs hover:border-primary/30 transition-all duration-200 overflow-hidden">
+    <div
+      className={cn(
+        "w-full rounded-xl border border-border/80 bg-card text-card-foreground shadow-xs overflow-hidden",
+        motion.cardHover,
+      )}
+    >
       {/* Main horizontal content row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 gap-4">
         {/* Left section: Info, Title, Badges */}
-        <div className="space-y-1.5 min-w-0 flex-1">
+        <div className="space-y-2 min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {/* Status Badge with custom colors */}
+            {/* Status Badge with semantic colors */}
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors",
+                "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-xs font-medium",
                 statusInfo.className,
               )}
             >
@@ -110,7 +116,7 @@ export function DocumentCard({ document }: DocumentCardProps) {
           </div>
 
           {/* Title */}
-          <h4 className="text-base sm:text-lg font-bold text-foreground truncate tracking-tight">
+          <h4 className={cn(typography.cardTitle, "text-base sm:text-lg truncate")}>
             {document.title}
           </h4>
 
@@ -122,24 +128,24 @@ export function DocumentCard({ document }: DocumentCardProps) {
           )}
 
           {/* Files Summary */}
-          <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-muted-foreground font-mono">
+          <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs text-muted-foreground">
             {pdfCount > 0 && (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 bg-muted/60 px-2 py-0.5 rounded-md">
                 <FileText className="size-3.5 text-rose-500" />
-                {pdfCount} {pdfCount === 1 ? "PDF" : "PDFs"}
+                <span>{pdfCount} {pdfCount === 1 ? "PDF" : "PDFs"}</span>
               </span>
             )}
 
             {imageCount > 0 && (
-              <span className="inline-flex items-center gap-1">
-                <ImageIcon className="size-3.5 text-blue-500" />
-                {imageCount} {imageCount === 1 ? "Image" : "Images"}
+              <span className="inline-flex items-center gap-1 bg-muted/60 px-2 py-0.5 rounded-md">
+                <ImageIcon className="size-3.5 text-sky-500" />
+                <span>{imageCount} {imageCount === 1 ? "Image" : "Images"}</span>
               </span>
             )}
 
             {totalSize > 0 && (
-              <span className="text-muted-foreground/70">
-                Total: {formatBytes(totalSize)}
+              <span className="text-muted-foreground/80 font-mono text-[11px]">
+                {formatBytes(totalSize)}
               </span>
             )}
           </div>
@@ -147,7 +153,7 @@ export function DocumentCard({ document }: DocumentCardProps) {
 
         {/* Right section: Action toggle */}
         {document.files.length > 0 && (
-          <div className="flex items-center justify-between sm:justify-end shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
+          <div className="flex items-center justify-between sm:justify-end shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border/40">
             <Button
               type="button"
               variant="ghost"
@@ -155,11 +161,11 @@ export function DocumentCard({ document }: DocumentCardProps) {
               onClick={() => setIsFilesOpen(!isFilesOpen)}
               className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
-              <span>{isFilesOpen ? "Hide Files" : "View Files"}</span>
+              <span>{isFilesOpen ? "Hide files" : "View files"}</span>
               {isFilesOpen ? (
-                <ChevronUp className="size-4" />
+                <ChevronUp className="size-3.5" />
               ) : (
-                <ChevronDown className="size-4" />
+                <ChevronDown className="size-3.5" />
               )}
             </Button>
           </div>
@@ -168,8 +174,8 @@ export function DocumentCard({ document }: DocumentCardProps) {
 
       {/* Expandable Files List */}
       {isFilesOpen && document.files.length > 0 && (
-        <div className="border-t bg-muted/30 p-3 sm:p-4 space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
+        <div className="border-t border-border/50 bg-muted/20 p-4 space-y-2">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
             Attached Files ({document.files.length})
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -182,19 +188,19 @@ export function DocumentCard({ document }: DocumentCardProps) {
               return (
                 <div
                   key={file.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border bg-card p-2.5 text-xs transition-colors hover:bg-card/80"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card p-2.5 text-xs transition-colors hover:bg-muted/40"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="flex size-7 items-center justify-center rounded-md border bg-background shrink-0">
+                    <div className="flex size-7 items-center justify-center rounded-md border border-border/50 bg-background shrink-0">
                       <FileIcon
                         className={cn(
                           "size-3.5",
-                          isPdf ? "text-rose-500" : "text-blue-500",
+                          isPdf ? "text-rose-500" : "text-sky-500",
                         )}
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-medium text-foreground truncate max-w-45 sm:max-w-55">
+                      <p className="font-medium text-foreground truncate max-w-44 sm:max-w-56">
                         {file.filename}
                       </p>
                       <p className="text-[10px] text-muted-foreground font-mono">
@@ -206,12 +212,12 @@ export function DocumentCard({ document }: DocumentCardProps) {
                   {/* File status badge */}
                   <span
                     className={cn(
-                      "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase font-mono",
+                      "shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase border",
                       file.uploadStatus === "uploaded"
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+                        ? colors.status.uploaded.badge
                         : file.uploadStatus === "uploading"
-                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
-                          : "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400",
+                          ? colors.status.uploading.badge
+                          : colors.status.failed.badge,
                     )}
                   >
                     {file.uploadStatus}

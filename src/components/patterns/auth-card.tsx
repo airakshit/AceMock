@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { layout } from "@/lib/design-system";
-import { typography } from "@/lib/design-system";
+import { layout, typography } from "@/lib/design-system";
 
 interface AuthCardProps {
   children: React.ReactNode;
@@ -13,7 +13,7 @@ export function AuthCard({ children, className }: AuthCardProps) {
     <div
       className={cn(
         layout.stack,
-        "rounded-xl border border-border bg-card p-6 shadow-sm",
+        "rounded-xl border border-border bg-card p-6 shadow-xs sm:p-7",
         className,
       )}
     >
@@ -25,13 +25,24 @@ export function AuthCard({ children, className }: AuthCardProps) {
 interface AuthHeaderProps {
   title: string;
   description?: string;
+  showLogo?: boolean;
   className?: string;
 }
 
-export function AuthHeader({ title, description, className }: AuthHeaderProps) {
+export function AuthHeader({
+  title,
+  description,
+  showLogo = true,
+  className,
+}: AuthHeaderProps) {
   return (
     <header className={cn("space-y-1.5 text-center", className)}>
-      <h1 data-page-title className={typography.display}>
+      {showLogo && (
+        <div className="mx-auto mb-2.5 flex size-9 items-center justify-center rounded-lg bg-foreground text-background shadow-2xs">
+          <Layers className="size-4.5 text-background" />
+        </div>
+      )}
+      <h1 data-page-title className={cn(typography.pageTitle, "text-xl font-bold tracking-tight")}>
         {title}
       </h1>
       {description ? (
@@ -55,9 +66,9 @@ export function AuthSwitchLink({
   className,
 }: AuthSwitchLinkProps) {
   return (
-    <p className={cn(typography.bodyMuted, "text-center", className)}>
+    <p className={cn(typography.bodyMuted, "text-center text-xs", className)}>
       {prompt}{" "}
-      <Link href={href} className={typography.link}>
+      <Link href={href} className="font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 transition-colors">
         {linkText}
       </Link>
     </p>

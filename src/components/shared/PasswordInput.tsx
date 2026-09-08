@@ -21,10 +21,15 @@ export function PasswordInput(props: React.ComponentProps<"input">) {
         type="button"
         variant="ghost"
         size="icon"
-        className="absolute right-0 top-0 h-full"
+        className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:text-foreground transition-colors hover:bg-transparent"
         onClick={() => setShowPassword((prev) => !prev)}
+        aria-label={showPassword ? "Hide password" : "Show password"}
       >
-        {showPassword ? <EyeOff /> : <Eye />}
+        {showPassword ? (
+          <EyeOff className="size-4" />
+        ) : (
+          <Eye className="size-4" />
+        )}
       </Button>
     </div>
   );

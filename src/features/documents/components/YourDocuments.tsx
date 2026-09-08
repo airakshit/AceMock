@@ -45,13 +45,13 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 pb-1">
+        <div className="flex items-center gap-2.5">
           <h3 className={typography.sectionTitle}>Your Documents</h3>
           {documents.length > 0 && (
-            <Badge variant="secondary" className="text-xs font-mono">
+            <Badge variant="secondary" className="text-xs font-medium border border-border/50">
               {documents.length}{" "}
-              {documents.length === 1 ? "document" : "documents"}
+              {documents.length === 1 ? "file" : "files"}
             </Badge>
           )}
         </div>
@@ -62,7 +62,7 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
           size="sm"
           onClick={handleRefresh}
           disabled={isPending || isLoading}
-          className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+          className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
           title="Refresh document list"
         >
           <RefreshCw
@@ -76,27 +76,27 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center space-y-2">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-10 text-center space-y-3 bg-card/40">
+          <Loader2 className="size-6 animate-spin text-brand" />
           <p className="text-xs text-muted-foreground">
-            Loading your documents...
+            Loading your study documents...
           </p>
         </div>
       ) : documents.length === 0 ? (
         <div
           className={cn(
-            "flex flex-col items-center justify-center rounded-xl border border-dashed border-border p-8 text-center space-y-2",
+            "flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-10 text-center space-y-3 bg-card/40",
             typography.bodyMuted,
           )}
         >
-          <div className="flex size-10 items-center justify-center rounded-full border bg-muted/50">
-            <FileStack className="size-5 text-muted-foreground" />
+          <div className="flex size-12 items-center justify-center rounded-full border border-border/60 bg-muted/60 text-muted-foreground">
+            <FileStack className="size-6 text-brand" />
           </div>
-          <p className="text-sm font-medium text-foreground">
-            No documents yet
+          <p className="text-sm font-semibold text-foreground">
+            No documents uploaded yet
           </p>
-          <p className="text-xs text-muted-foreground">
-            Start by creating a document above.
+          <p className="text-xs text-muted-foreground max-w-sm">
+            Upload syllabi, past question papers, or study notes above to automatically generate targeted mock questions.
           </p>
         </div>
       ) : (
