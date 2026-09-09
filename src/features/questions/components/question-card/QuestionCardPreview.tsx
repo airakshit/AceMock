@@ -12,6 +12,31 @@ import type {
 
 const MOCK_QUESTIONS_OCR: QuestionCardType[] = [
   {
+    id: "dskafjds",
+    subject: "mathematics",
+    questionText:
+      "$\\left(\\dfrac{1 + \\cos\\dfrac{\\pi}{8} + i\\sin\\dfrac{\\pi}{8}}{1 + \\cos\\dfrac{\\pi}{8} - i\\sin\\dfrac{\\pi}{8}}\\right)^8 =$",
+    options: [
+      {
+        key: "A",
+        content: "$-1$",
+      },
+      {
+        key: "B",
+        content: "$1$",
+      },
+      {
+        key: "C",
+        content: "$i$",
+      },
+      {
+        key: "D",
+        content: "$-i$",
+      },
+    ],
+    correctOption: "A",
+  },
+  {
     id: "q_7f3a91c2",
     subject: "physics",
     questionText:
@@ -140,7 +165,7 @@ const MOCK_QUESTIONS_OCR: QuestionCardType[] = [
     id: "q_b49d63e8",
     subject: "chemistry",
     questionText:
-      "Dichromate ion is reduced using $\\\ce{Fe^{2+}}$ ion. The number of electrons involved per Cr-atom is",
+      "Dichromate ion is reduced using $\\ce{Fe^{2+}}$ ion. The number of electrons involved per Cr-atom is",
     options: [
       { key: "A", content: "1" },
       { key: "B", content: "5" },
@@ -188,10 +213,10 @@ const MOCK_QUESTIONS_OCR: QuestionCardType[] = [
     subject: "chemistry",
     questionText: "Hydrogen cannot be obtained by",
     options: [
-      { key: "A", content: "$\\\ce{Zn} + \\\ce{NaOH}$" },
-      { key: "B", content: "$\\\ce{Mg} + \\\ce{H2SO4}$" },
-      { key: "C", content: "$\\\ce{Zn} + \\\ce{HNO3}$" },
-      { key: "D", content: "$\\\ce{Mn} + \\\ce{HNO3}$" },
+      { key: "A", content: "$\\ce{Zn} + \\ce{NaOH}$" },
+      { key: "B", content: "$\\ce{Mg} + \\ce{H2SO4}$" },
+      { key: "C", content: "$\\ce{Zn} + \\\ce{HNO3}$" },
+      { key: "D", content: "$\\ce{Mn} + \\ce{HNO3}$" },
     ],
     correctOption: "C",
     explanation: "N/A",

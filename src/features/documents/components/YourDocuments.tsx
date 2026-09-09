@@ -43,6 +43,16 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
     });
   };
 
+  const handleDocumentDeleted = (deletedId: string) => {
+    setDocuments((prev) => prev.filter((d) => d.id !== deletedId));
+  };
+
+  const handleDocumentUpdated = (updatedDoc: DocumentItemDTO) => {
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)),
+    );
+  };
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-2 pb-1">
@@ -102,7 +112,12 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
       ) : (
         <div className="space-y-3">
           {documents.map((doc) => (
-            <DocumentCard key={doc.id} document={doc} />
+            <DocumentCard
+              key={doc.id}
+              document={doc}
+              onDocumentDeleted={handleDocumentDeleted}
+              onDocumentUpdated={handleDocumentUpdated}
+            />
           ))}
         </div>
       )}

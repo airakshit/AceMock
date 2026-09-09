@@ -123,6 +123,155 @@ class DocumentsService {
   async getUserDocuments(userId: string) {
     return documentsRepository.findByUserWithFiles(db, userId);
   }
+
+  async deleteDocument(userId: string, documentId: string) {
+    const existingDocument = await documentsRepository.findByIdForUser(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!existingDocument) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found or access denied.",
+      );
+    }
+
+    // 1. Delete all Supabase storage objects under the document folder
+    const documentStorageFolder = `user/${userId}/documents/${documentId}`;
+    try {
+      await supabaseStorageClient.deleteFolder(documentStorageFolder);
+    } catch (storageError) {
+      console.error(
+        `Failed to delete storage objects for document ${documentId}:`,
+        storageError,
+      );
+    }
+
+    // 2. Delete database record of document.
+    // Foreign key cascade (onDelete: "cascade") automatically deletes associated document_files and file_pages.
+    const deletedDocument = await documentsRepository.delete(
+      db,
+      documentId,
+      userId,
+    );
+
+    return {
+      documentId: deletedDocument.id,
+    };
+  }
+
+  async deleteDocumentFile(userId: string, documentId: string, fileId: string) {
+    const existingDocument = await documentsRepository.findByIdForUser(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!existingDocument) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found or access denied.",
+      );
+    }
+
+    const existingFile = await documentFilesRepository.findByIdForDocument(
+      db,
+      fileId,
+      documentId,
+    );
+
+    if (!existingFile) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "File not found or does not belong to this document.",
+      );
+    }
+
+    // 1. Delete storage folder for this file: user/${userId}/documents/${documentId}/files/${fileId}
+    const fileStorageFolder = storagePaths._getDocumentFilePath(
+      userId,
+      documentId,
+      fileId,
+    );
+    try {
+      await supabaseStorageClient.deleteFolder(fileStorageFolder);
+    } catch (storageError) {
+      console.error(
+        `Failed to delete storage folder for file ${fileId}:`,
+        storageError,
+      );
+    }
+
+    // Also ensure direct file storagePath is deleted if still present
+    if (existingFile.storagePath) {
+      try {
+        await supabaseStorageClient.deleteFiles([existingFile.storagePath]);
+      } catch (err) {
+        // Ignored if already cleaned by deleteFolder
+      }
+    }
+
+    // 2. Delete file record from DB.
+    // Foreign key cascade (onDelete: "cascade") automatically deletes associated file_pages.
+    const deletedFile = await documentFilesRepository.delete(
+      db,
+      fileId,
+      documentId,
+    );
+
+    return {
+      documentId,
+      fileId: deletedFile.id,
+    };
+  }
+
+  async updateDocument(
+    userId: string,
+    documentId: string,
+    payload: { title: string; description?: string },
+  ) {
+    const existingDocument = await documentsRepository.findByIdForUser(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!existingDocument) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found or access denied.",
+      );
+    }
+
+    const trimmedTitle = payload.title.trim();
+    if (!trimmedTitle) {
+      throw new ServerActionError(
+        "BAD_REQUEST",
+        "Document title cannot be empty.",
+      );
+    }
+
+    await documentsRepository.update(db, documentId, userId, {
+      title: trimmedTitle,
+      description: payload.description?.trim() || null,
+    });
+
+    const userDocs = await documentsRepository.findByUserWithFiles(db, userId);
+    const updatedDoc = userDocs.find((doc) => doc.id === documentId);
+
+    if (!updatedDoc) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found after update.",
+      );
+    }
+
+    return {
+      document: updatedDoc,
+    };
+  }
 }
 
 export const documentsService = new DocumentsService();

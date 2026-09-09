@@ -260,6 +260,83 @@ class SupabaseStorageClient {
 
     return data;
   }
+
+  async deleteFiles(objectPaths: string[]): Promise<void> {
+    if (!objectPaths || objectPaths.length === 0) {
+      return;
+    }
+
+    const batchSize = 100;
+    for (let i = 0; i < objectPaths.length; i += batchSize) {
+      const batch = objectPaths.slice(i, i + batchSize);
+      const { error } = await this._supabaseClient.storage
+        .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
+        .remove(batch);
+
+      if (error) {
+        console.error(
+          `Error deleting files in batch [${batch.join(", ")}]: [MESSAGE]: ${error.message}, [STATUS]: ${error.status}`,
+        );
+        throw error;
+      }
+    }
+  }
+
+  async deleteFolder(folderPath: string): Promise<void> {
+    const cleanFolder = folderPath.replace(/^\/+|\/+$/g, "");
+    if (!cleanFolder) return;
+
+    const allFiles: string[] = [];
+
+    const listRecursively = async (currentPath: string) => {
+      let offset = 0;
+      const limit = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await this._supabaseClient.storage
+          .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
+          .list(currentPath, {
+            limit,
+            offset,
+            sortBy: { column: "name", order: "asc" },
+          });
+
+        if (error) {
+          console.error(`Error listing storage path ${currentPath}:`, error);
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          break;
+        }
+
+        for (const item of data) {
+          const itemPath = currentPath
+            ? `${currentPath}/${item.name}`
+            : item.name;
+          if (item.id === null) {
+            // It's a folder in Supabase Storage
+            await listRecursively(itemPath);
+          } else {
+            allFiles.push(itemPath);
+          }
+        }
+
+        if (data.length < limit) {
+          hasMore = false;
+        } else {
+          offset += limit;
+        }
+      }
+    };
+
+    await listRecursively(cleanFolder);
+
+    if (allFiles.length > 0) {
+      await this.deleteFiles(allFiles);
+    }
+  }
 }
 
 export const supabaseStorageClient = new SupabaseStorageClient(

@@ -57,3 +57,31 @@ export interface DocumentItemDTO {
 }
 
 export type GetUserDocumentsActionResponse = DocumentItemDTO[];
+
+export interface DeleteDocumentActionPayload {
+  documentId: string;
+}
+
+export interface DeleteDocumentActionResponse {
+  documentId: string;
+}
+
+export interface DeleteDocumentFileActionPayload {
+  documentId: string;
+  fileId: string;
+}
+
+export interface DeleteDocumentFileActionResponse {
+  documentId: string;
+  fileId: string;
+}
+
+export interface UpdateDocumentActionPayload {
+  documentId: string;
+  title: string;
+  description?: string;
+}
+
+export interface UpdateDocumentActionResponse {
+  document: DocumentItemDTO;
+}

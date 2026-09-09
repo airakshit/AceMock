@@ -117,7 +117,9 @@ export const extractQuestions = inngest.createFunction(
       "Raw OCR extraction completed for all pages.",
     );
 
-    // 3. Mark document as completed
+    // Extracting questions
+    ocrResults
+
     await step.run("mark-document-completed", async () => {
       await documentsRepository.updateProcessingStatus(db, documentId, "success");
     });
