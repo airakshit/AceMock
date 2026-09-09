@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Eye,
   FileText,
   Image as ImageIcon,
   Loader2,
@@ -24,8 +25,10 @@ import type { DocumentFileDTO, DocumentItemDTO } from "../actions/types";
 import { deleteDocumentAction } from "../actions/delete-document";
 import { deleteDocumentFileAction } from "../actions/delete-document-file";
 import { updateDocumentAction } from "../actions/update-document";
+import { getDocumentFileAccessUrlAction } from "../actions/get-file-access-url";
 import { formatBytes, formatDate } from "../utils";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { FilePreviewDialog } from "./FilePreviewDialog";
 
 interface DocumentCardProps {
   document: DocumentItemDTO;
@@ -61,6 +64,13 @@ export function DocumentCard({
   const [isDeletingDoc, setIsDeletingDoc] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<DocumentFileDTO | null>(null);
   const [isDeletingFile, setIsDeletingFile] = useState(false);
+
+  // File Preview state
+  const [previewFile, setPreviewFile] = useState<DocumentFileDTO | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const pdfCount = files.filter(
     (f) =>
@@ -218,6 +228,37 @@ export function DocumentCard({
       console.error(err);
     } finally {
       setIsDeletingFile(false);
+    }
+  };
+
+  const handleViewFile = async (file: DocumentFileDTO) => {
+    setPreviewFile(file);
+    setPreviewUrl(null);
+    setPreviewError(null);
+    setIsLoadingPreview(true);
+    setIsPreviewOpen(true);
+
+    try {
+      const res = await getDocumentFileAccessUrlAction({
+        documentId: document.id,
+        fileId: file.id,
+      });
+
+      if (!res.success || !res.data) {
+        const errorMsg = res.message || "Failed to generate file preview link.";
+        setPreviewError(errorMsg);
+        toast.error(errorMsg);
+        return;
+      }
+
+      setPreviewUrl(res.data.signedUrl);
+    } catch (err) {
+      console.error("Error fetching file preview URL:", err);
+      const msg = "An unexpected error occurred while loading preview.";
+      setPreviewError(msg);
+      toast.error(msg);
+    } finally {
+      setIsLoadingPreview(false);
     }
   };
 
@@ -498,6 +539,24 @@ export function DocumentCard({
                         {file.uploadStatus}
                       </span>
 
+                      {/* View / Preview File Button */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleViewFile(file)}
+                        disabled={file.uploadStatus !== "uploaded"}
+                        className="size-7 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        title={
+                          file.uploadStatus === "uploaded"
+                            ? `Preview "${file.filename}"`
+                            : "Preview unavailable until file finishes uploading"
+                        }
+                      >
+                        <Eye className="size-3.5" />
+                        <span className="sr-only">Preview file</span>
+                      </Button>
+
                       {/* Delete File Button in Edit Mode */}
                       {isEditing && (
                         <Button
@@ -546,6 +605,20 @@ export function DocumentCard({
         isDeleting={isDeletingFile}
         onConfirm={handleDeleteFile}
       />
+
+      {/* File Preview Dialog */}
+      {previewFile && (
+        <FilePreviewDialog
+          open={isPreviewOpen}
+          onOpenChange={setIsPreviewOpen}
+          filename={previewFile.filename}
+          mimeType={previewFile.mimeType}
+          fileSize={previewFile.fileSize}
+          url={previewUrl}
+          isLoading={isLoadingPreview}
+          error={previewError}
+        />
+      )}
     </>
   );
 }

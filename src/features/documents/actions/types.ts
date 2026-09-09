@@ -85,3 +85,16 @@ export interface UpdateDocumentActionPayload {
 export interface UpdateDocumentActionResponse {
   document: DocumentItemDTO;
 }
+
+export interface GetDocumentFileAccessUrlActionPayload {
+  documentId: string;
+  fileId: string;
+}
+
+export interface GetDocumentFileAccessUrlActionResponse {
+  fileId: string;
+  filename: string;
+  mimeType: string;
+  fileSize: number;
+  signedUrl: string;
+}

@@ -255,7 +255,7 @@ class DocumentsService {
 
     await documentsRepository.update(db, documentId, userId, {
       title: trimmedTitle,
-      description: payload.description?.trim() || null,
+      description: payload.description?.trim() || undefined,
     });
 
     const userDocs = await documentsRepository.findByUserWithFiles(db, userId);
@@ -270,6 +270,52 @@ class DocumentsService {
 
     return {
       document: updatedDoc,
+    };
+  }
+
+  async getDocumentFileAccessUrl(
+    userId: string,
+    documentId: string,
+    fileId: string,
+    expiresIn = 3600,
+  ) {
+    const existingDocument = await documentsRepository.findByIdForUser(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!existingDocument) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found or access denied.",
+      );
+    }
+
+    const existingFile = await documentFilesRepository.findByIdForDocument(
+      db,
+      fileId,
+      documentId,
+    );
+
+    if (!existingFile) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "File not found or does not belong to this document.",
+      );
+    }
+
+    const signedUrl = await supabaseStorageClient.getPageAccessUrl(
+      existingFile.storagePath,
+      expiresIn,
+    );
+
+    return {
+      fileId: existingFile.id,
+      filename: existingFile.filename,
+      mimeType: existingFile.mimeType,
+      fileSize: existingFile.fileSize,
+      signedUrl,
     };
   }
 }
