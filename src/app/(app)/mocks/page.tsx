@@ -8,7 +8,7 @@ export default function MocksPage() {
         title="Mock Tests"
         description="Full-length and subject-wise practice tests."
       />
-      <div className="flex-1 overflow-auto p-4 md:p-6">
+      <div className="flex-1 p-4 md:p-6">
         <MocksView />
       </div>
     </>

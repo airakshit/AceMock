@@ -1,7 +1,24 @@
-import { chapters, questions } from "@/db/schemas";
+import { chapters, passages, questions, sections, subjects } from "@/db/schemas";
 import { desc, eq } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
 import { QuestionDifficulty, QuestionOption } from "../types";
+import { generateUUIDv7 } from "../../shared/utils";
+
+export interface CreateQuestionItem {
+  id?: string;
+  chapterId: string;
+  passageId?: string | null;
+  fileId?: string | null;
+  question: string;
+  options: QuestionOption[];
+  correctOption: string;
+  marks?: number;
+  difficulty?: QuestionDifficulty;
+  diagram_url?: string | null;
+  hint?: string | null;
+  solution?: string | null;
+  solution_diagram_url?: string | null;
+}
 
 export class QuestionsRepository {
   async findChapterBySlug(db: DbExecutor, slug: string) {
@@ -50,6 +67,155 @@ export class QuestionsRepository {
     return question;
   }
 
+  async createMany(db: DbExecutor, items: CreateQuestionItem[]) {
+    if (items.length === 0) {
+      return [];
+    }
+
+    const valuesToInsert = items.map((item) => ({
+      id: item.id || generateUUIDv7(),
+      chapterId: item.chapterId,
+      passageId: item.passageId ?? null,
+      fileId: item.fileId ?? null,
+      question: item.question,
+      options: item.options,
+      correctOption: item.correctOption,
+      marks: item.marks ?? 1,
+      difficulty: item.difficulty ?? ("medium" as QuestionDifficulty),
+      diagram_url: item.diagram_url ?? null,
+      hint: item.hint ?? null,
+      solution: item.solution ?? null,
+      solution_diagram_url: item.solution_diagram_url ?? null,
+    }));
+
+    return db.insert(questions).values(valuesToInsert).returning();
+  }
+
+  async createPassage(
+    db: DbExecutor,
+    content: string,
+  ): Promise<string> {
+    const [passage] = await db
+      .insert(passages)
+      .values({
+        id: generateUUIDv7(),
+        content,
+      })
+      .returning();
+
+    return passage.id;
+  }
+
+  async findOrCreateDefaultChapter(
+    db: DbExecutor,
+    subjectInput?: string | null,
+  ): Promise<string> {
+    const normalized = (subjectInput || "general").toLowerCase().trim();
+    let subjectSlug = "general";
+    let subjectName = "General";
+
+    if (normalized.includes("phys")) {
+      subjectSlug = "physics";
+      subjectName = "Physics";
+    } else if (normalized.includes("chem")) {
+      subjectSlug = "chemistry";
+      subjectName = "Chemistry";
+    } else if (normalized.includes("math")) {
+      subjectSlug = "mathematics";
+      subjectName = "Mathematics";
+    } else if (
+      normalized.includes("eng") ||
+      normalized.includes("gram") ||
+      normalized.includes("comp")
+    ) {
+      subjectSlug = "english";
+      subjectName = "English";
+    } else if (normalized.length > 0) {
+      subjectSlug = normalized.replace(/[^a-z0-9]+/g, "-");
+      subjectName =
+        normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    }
+
+    // 1. Ensure subject exists
+    let [subject] = await db
+      .select()
+      .from(subjects)
+      .where(eq(subjects.slug, subjectSlug))
+      .limit(1);
+
+    if (!subject) {
+      const [createdSubject] = await db
+        .insert(subjects)
+        .values({
+          id: generateUUIDv7(),
+          name: subjectName,
+          slug: subjectSlug,
+        })
+        .onConflictDoUpdate({
+          target: subjects.slug,
+          set: { name: subjectName },
+        })
+        .returning();
+      subject = createdSubject;
+    }
+
+    // 2. Ensure section exists
+    const sectionSlug = `${subjectSlug}-general`;
+    const sectionName = `${subjectName} General`;
+
+    let [section] = await db
+      .select()
+      .from(sections)
+      .where(eq(sections.slug, sectionSlug))
+      .limit(1);
+
+    if (!section) {
+      const [createdSection] = await db
+        .insert(sections)
+        .values({
+          id: generateUUIDv7(),
+          subjectId: subject.id,
+          name: sectionName,
+          slug: sectionSlug,
+        })
+        .onConflictDoUpdate({
+          target: sections.slug,
+          set: { name: sectionName },
+        })
+        .returning();
+      section = createdSection;
+    }
+
+    // 3. Ensure default chapter exists
+    const chapterSlug = `uncategorized-${subjectSlug}`;
+    const chapterName = `Uncategorized ${subjectName}`;
+
+    let [chapter] = await db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.slug, chapterSlug))
+      .limit(1);
+
+    if (!chapter) {
+      const [createdChapter] = await db
+        .insert(chapters)
+        .values({
+          id: generateUUIDv7(),
+          sectionId: section.id,
+          name: chapterName,
+          slug: chapterSlug,
+        })
+        .onConflictDoUpdate({
+          target: chapters.slug,
+          set: { name: chapterName },
+        })
+        .returning();
+      chapter = createdChapter;
+    }
+
+    return chapter.id;
+  }
+
   async findById(db: DbExecutor, id: string) {
     const [question] = await db
       .select()
@@ -58,6 +224,14 @@ export class QuestionsRepository {
       .limit(1);
 
     return question || null;
+  }
+
+  async findByFileId(db: DbExecutor, fileId: string) {
+    return db
+      .select()
+      .from(questions)
+      .where(eq(questions.fileId, fileId))
+      .orderBy(desc(questions.createdAt));
   }
 
   async findRecent(db: DbExecutor, limit: number = 20) {

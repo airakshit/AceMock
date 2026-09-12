@@ -6,8 +6,10 @@ const subjectSchema = z.enum([
   "physics",
   "chemistry",
   "maths",
+  "mathematics",
   "grammar",
   "comprehension",
+  "english",
 ]);
 
 const questionDataSchema = z

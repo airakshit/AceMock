@@ -1,5 +1,5 @@
 import { SignedUrlResponseObject } from "@/features/shared/storage-service";
-import { FileUploadStatus } from "../types";
+import { DocumentProcessingStatus, FileUploadStatus } from "../types";
 
 interface UserIdInterface {
   userId: string;
@@ -51,12 +51,30 @@ export interface DocumentItemDTO {
   userId: string;
   title: string;
   description: string | null;
+  processingStatus: DocumentProcessingStatus;
   createdAt: Date;
   updatedAt: Date;
   files: DocumentFileDTO[];
 }
 
 export type GetUserDocumentsActionResponse = DocumentItemDTO[];
+
+export interface ProcessDocumentActionPayload {
+  documentId: string;
+}
+
+export interface ProcessDocumentActionResponse {
+  document: DocumentItemDTO;
+  message: string;
+}
+
+export interface GetDocumentStatusActionPayload {
+  documentId: string;
+}
+
+export interface GetDocumentStatusActionResponse {
+  document: DocumentItemDTO;
+}
 
 export interface DeleteDocumentActionPayload {
   documentId: string;

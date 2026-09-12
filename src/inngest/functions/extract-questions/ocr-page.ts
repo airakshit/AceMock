@@ -9,6 +9,8 @@ import { db } from "@/db";
 import type { OcrPageResult } from "./ocr-types";
 import { OpenRouterLLMService, OpenRouterModels } from "@/services/llm";
 import { parseAndValidateStructuredOCR } from "./utils";
+import { OcrEmptyResponseError, OcrValidationError } from "./errors";
+import type { StructuredSchemaParseResult } from "./schema";
 
 export interface OcrPageEventData {
   userId: string;
@@ -56,6 +58,7 @@ export const ocrPage = inngest.createFunction(
         ocrStatus: "success" | "failed";
         survivedValidation: boolean;
         isRelevant: boolean;
+        parsedData?: StructuredSchemaParseResult;
       }> => {
         const openRouter = new OpenRouterLLMService(
           process.env.OPENROUTER_API_KEY!,
@@ -68,8 +71,10 @@ export const ocrPage = inngest.createFunction(
           [signedUrl],
         );
 
-        if (!rawText && attempt !== TOTAL_RETRIES) {
-          throw new Error("No response returned by LLM.");
+        if (!rawText && attempt < TOTAL_RETRIES) {
+          throw new OcrEmptyResponseError(
+            `No response returned by LLM on page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}).`,
+          );
         }
 
         const {
@@ -79,9 +84,26 @@ export const ocrPage = inngest.createFunction(
           parsedStructuredData,
         } = parseAndValidateStructuredOCR(rawText);
 
-        if (!cleanedText && attempt !== TOTAL_RETRIES) {
-          throw new Error(
-            "No valid response text could be extracted from LLM.",
+        if (!cleanedText && attempt < TOTAL_RETRIES) {
+          throw new OcrEmptyResponseError(
+            `No valid response text could be extracted from LLM on page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}).`,
+          );
+        }
+
+        // Retry on validation failure if retries are not exhausted
+        if (!survivedValidation && attempt < TOTAL_RETRIES) {
+          logger.warn(
+            {
+              pageNo,
+              pageId,
+              attempt,
+              validationErrors,
+            },
+            `Structured OCR validation failed for page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}). Retrying page OCR...`,
+          );
+          throw new OcrValidationError(
+            `Structured OCR validation failed for page ${pageNo}: ${validationErrors?.join("; ") || "Schema validation failed"}`,
+            { validationErrors, pageNo, attempt },
           );
         }
 
@@ -90,9 +112,10 @@ export const ocrPage = inngest.createFunction(
             {
               pageNo,
               pageId,
+              attempt,
               validationErrors,
             },
-            `Structured OCR validation failed for page ${pageNo}`,
+            `Structured OCR validation failed on final attempt for page ${pageNo}. Proceeding with best-effort text.`,
           );
         }
 
@@ -111,6 +134,7 @@ export const ocrPage = inngest.createFunction(
           isRelevant: isRelevant,
           ocrStatus,
           survivedValidation,
+          parsedData: parsedStructuredData,
         };
       },
     );
@@ -135,6 +159,8 @@ export const ocrPage = inngest.createFunction(
       survivedValidation: extraction.survivedValidation,
       status: extraction.ocrStatus,
       isRelevant: extraction.isRelevant,
+      parsedData: extraction.parsedData,
     };
   },
 );
+

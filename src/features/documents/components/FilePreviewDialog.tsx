@@ -103,7 +103,7 @@ export function FilePreviewDialog({
             <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
               <Loader2 className="size-8 animate-spin text-brand" />
               <p className="text-xs sm:text-sm text-muted-foreground font-medium">
-                Generating secure access link...
+                Loading...
               </p>
             </div>
           ) : error ? (

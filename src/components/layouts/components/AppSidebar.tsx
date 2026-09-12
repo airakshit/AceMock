@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 export function AppSidebar() {
   const pathname = usePathname();
   const { isMobile, setOpenMobile, setIsHovered, state } = useSidebar();
-  const isExpanded = state === "expanded";
+  const isExpanded = state === "expanded" || isMobile;
 
   // Collapse sidebar whenever the route changes
   useEffect(() => {
@@ -54,7 +54,7 @@ export function AppSidebar() {
           <div
             className={cn(
               "flex flex-col min-w-0 overflow-hidden whitespace-nowrap pl-1 transition-all duration-200 ease-out",
-              isExpanded ? "max-w-44 opacity-100" : "max-w-0 opacity-0 pointer-events-none",
+              isExpanded || isMobile ? "max-w-44 opacity-100" : "max-w-0 opacity-0 pointer-events-none",
             )}
           >
             <span className="truncate text-xs font-bold tracking-tight text-foreground uppercase">

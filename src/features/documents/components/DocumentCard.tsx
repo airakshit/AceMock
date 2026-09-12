@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertTriangle,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clock,
   Eye,
   FileText,
   Image as ImageIcon,
   Loader2,
   Pencil,
+  RefreshCw,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -26,6 +29,8 @@ import { deleteDocumentAction } from "../actions/delete-document";
 import { deleteDocumentFileAction } from "../actions/delete-document-file";
 import { updateDocumentAction } from "../actions/update-document";
 import { getDocumentFileAccessUrlAction } from "../actions/get-file-access-url";
+import { processDocumentAction } from "../actions/process-document";
+import { getDocumentStatusAction } from "../actions/get-document-status";
 import { formatBytes, formatDate } from "../utils";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { FilePreviewDialog } from "./FilePreviewDialog";
@@ -48,7 +53,12 @@ export function DocumentCard({
   const [title, setTitle] = useState(document.title);
   const [description, setDescription] = useState(document.description || "");
 
-  // Files state (local representation for immediate UI reactivity)
+  // Processing & Files state
+  const [processingStatus, setProcessingStatus] = useState(
+    document.processingStatus || "not_started",
+  );
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
   const [files, setFiles] = useState<DocumentFileDTO[]>(document.files);
 
   // Update local state when parent prop changes
@@ -56,6 +66,7 @@ export function DocumentCard({
     setTitle(document.title);
     setDescription(document.description || "");
     setFiles(document.files);
+    setProcessingStatus(document.processingStatus || "not_started");
   }, [document]);
 
   // Loading & dialog states
@@ -89,49 +100,130 @@ export function DocumentCard({
   );
 
   const getDocumentStatus = () => {
-    if (files.length === 0) {
-      return {
-        label: "Uploaded",
-        icon: CheckCircle2,
-        className: colors.status.uploaded.badge,
-        dot: colors.status.uploaded.dot,
-        spin: false,
-      };
-    }
-    const hasUploading = files.some(
-      (f) => f.uploadStatus === "uploading",
-    );
-    const hasFailed = files.some((f) => f.uploadStatus === "failed");
-
+    // 1. If any file is actively uploading
+    const hasUploading = files.some((f) => f.uploadStatus === "uploading");
     if (hasUploading) {
       return {
-        label: "Uploading",
+        label: "Uploading Files",
         icon: Loader2,
-        className: colors.status.uploading.badge,
-        dot: colors.status.uploading.dot,
+        className: "border-sky-500/30 bg-sky-500/10 text-sky-400",
+        dot: "bg-sky-400",
         spin: true,
       };
     }
-    if (hasFailed) {
+
+    // 2. Document Processing Status
+    if (processingStatus === "extracting_questions") {
       return {
-        label: "Failed",
-        icon: AlertTriangle,
-        className: colors.status.failed.badge,
-        dot: colors.status.failed.dot,
+        label: "Extracting Questions...",
+        icon: Sparkles,
+        className:
+          "border-purple-500/40 bg-purple-500/15 text-purple-300 font-medium animate-pulse",
+        dot: "bg-purple-400",
+        spin: true,
+      };
+    }
+
+    if (processingStatus === "processing") {
+      return {
+        label: "Preprocessing Pages...",
+        icon: Loader2,
+        className:
+          "border-sky-500/40 bg-sky-500/15 text-sky-300 font-medium",
+        dot: "bg-sky-400",
+        spin: true,
+      };
+    }
+
+    if (processingStatus === "success") {
+      return {
+        label: "Questions Ready",
+        icon: CheckCircle2,
+        className:
+          "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-medium",
+        dot: "bg-emerald-400",
         spin: false,
       };
     }
+
+    if (processingStatus === "failed") {
+      return {
+        label: "Processing Failed",
+        icon: AlertTriangle,
+        className:
+          "border-rose-500/30 bg-rose-500/10 text-rose-400 font-medium",
+        dot: "bg-rose-400",
+        spin: false,
+      };
+    }
+
+    const hasFailed = files.some((f) => f.uploadStatus === "failed");
+    if (hasFailed) {
+      return {
+        label: "Upload Failed",
+        icon: AlertTriangle,
+        className: "border-rose-500/30 bg-rose-500/10 text-rose-400",
+        dot: "bg-rose-400",
+        spin: false,
+      };
+    }
+
     return {
-      label: "Uploaded",
-      icon: CheckCircle2,
-      className: colors.status.uploaded.badge,
-      dot: colors.status.uploaded.dot,
+      label: "Ready to Process",
+      icon: Clock,
+      className: "border-amber-500/30 bg-amber-500/10 text-amber-400 font-medium",
+      dot: "bg-amber-400",
       spin: false,
     };
   };
 
   const statusInfo = getDocumentStatus();
   const StatusIcon = statusInfo.icon;
+
+  const handleRefreshStatus = async () => {
+    try {
+      setIsRefreshingStatus(true);
+      const res = await getDocumentStatusAction({ documentId: document.id });
+
+      if (!res.success) {
+        toast.error(res.error.message || "Failed to refresh document status");
+        return;
+      }
+
+      setProcessingStatus(res.data.document.processingStatus);
+      setFiles(res.data.document.files);
+      onDocumentUpdated?.(res.data.document);
+      toast.success("Document status refreshed");
+    } catch (err) {
+      toast.error("An unexpected error occurred while refreshing status");
+      console.error(err);
+    } finally {
+      setIsRefreshingStatus(false);
+    }
+  };
+
+  const handleTriggerProcess = async () => {
+    try {
+      setIsProcessing(true);
+      const res = await processDocumentAction({ documentId: document.id });
+
+      if (!res.success) {
+        toast.error(
+          res.error.message || "Failed to trigger question extraction",
+        );
+        return;
+      }
+
+      toast.success("Question extraction started in background!");
+      setProcessingStatus(res.data.document.processingStatus);
+      onDocumentUpdated?.(res.data.document);
+    } catch (err) {
+      toast.error("An unexpected error occurred while starting processing");
+      console.error(err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleStartEdit = () => {
     setTitle(document.title);
@@ -161,8 +253,8 @@ export function DocumentCard({
         description: description.trim() || undefined,
       });
 
-      if (!res.success || !res.data) {
-        toast.error(res.message || "Failed to update document");
+      if (!res.success) {
+        toast.error(res.error.message || "Failed to update document");
         return;
       }
 
@@ -183,7 +275,7 @@ export function DocumentCard({
       const res = await deleteDocumentAction({ documentId: document.id });
 
       if (!res.success) {
-        toast.error(res.message || "Failed to delete document");
+        toast.error(res.error.message || "Failed to delete document");
         return;
       }
 
@@ -209,7 +301,7 @@ export function DocumentCard({
       });
 
       if (!res.success) {
-        toast.error(res.message || "Failed to delete file");
+        toast.error(res.error.message || "Failed to delete file");
         return;
       }
 
@@ -244,8 +336,8 @@ export function DocumentCard({
         fileId: file.id,
       });
 
-      if (!res.success || !res.data) {
-        const errorMsg = res.message || "Failed to generate file preview link.";
+      if (!res.success) {
+        const errorMsg = res.error.message || "Failed to generate file preview link.";
         setPreviewError(errorMsg);
         toast.error(errorMsg);
         return;
@@ -277,18 +369,39 @@ export function DocumentCard({
           {/* Left section: Info, Title, Badges */}
           <div className="space-y-2.5 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Status Badge with semantic colors */}
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-xs font-medium",
-                  statusInfo.className,
-                )}
-              >
-                <StatusIcon
-                  className={cn("size-3.5", statusInfo.spin && "animate-spin")}
-                />
-                <span>{statusInfo.label}</span>
-              </span>
+              {/* Status Badge with semantic colors and document-level refresh */}
+              <div className="inline-flex items-center gap-1">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-xs font-medium transition-all shadow-2xs",
+                    statusInfo.className,
+                  )}
+                >
+                  <StatusIcon
+                    className={cn("size-3.5", statusInfo.spin && "animate-spin")}
+                  />
+                  <span>{statusInfo.label}</span>
+                </span>
+
+                {/* Document level refresh button for processing status */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshStatus}
+                  disabled={isRefreshingStatus}
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-md transition-colors"
+                  title="Refresh document processing status"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "size-3",
+                      isRefreshingStatus && "animate-spin text-brand",
+                    )}
+                  />
+                  <span className="sr-only">Refresh Status</span>
+                </Button>
+              </div>
 
               {isEditing && (
                 <span className="inline-flex items-center gap-1 rounded-md border border-brand/30 bg-brand/10 text-brand px-2 py-0.5 text-xs font-medium">
@@ -427,7 +540,63 @@ export function DocumentCard({
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
+                {/* Process / Extract Questions Button */}
+                <Button
+                  type="button"
+                  variant={
+                    processingStatus === "failed"
+                      ? "destructive"
+                      : processingStatus === "success"
+                        ? "outline"
+                        : "default"
+                  }
+                  size="sm"
+                  onClick={handleTriggerProcess}
+                  disabled={
+                    isProcessing ||
+                    processingStatus === "processing" ||
+                    processingStatus === "extracting_questions" ||
+                    files.length === 0
+                  }
+                  className={cn(
+                    "h-8 px-2.5 sm:px-3 text-xs gap-1.5 font-medium transition-all shadow-xs",
+                    processingStatus === "not_started" &&
+                    "bg-brand hover:bg-brand/90 text-primary-foreground",
+                    processingStatus === "success" &&
+                    "border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400",
+                  )}
+                  title={
+                    files.length === 0
+                      ? "Upload files first to process"
+                      : "Trigger question extraction"
+                  }
+                >
+                  {isProcessing ||
+                    processingStatus === "processing" ||
+                    processingStatus === "extracting_questions" ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : processingStatus === "success" ? (
+                    <>
+                      <Sparkles className="size-3.5 text-emerald-500" />
+                      <span>Re-process</span>
+                    </>
+                  ) : processingStatus === "failed" ? (
+                    <>
+                      <Sparkles className="size-3.5" />
+                      <span>Retry</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="size-3.5 text-amber-300" />
+                      <span>Process</span>
+                    </>
+                  )}
+                </Button>
+
                 {/* Edit Button */}
                 <Button
                   type="button"

@@ -8,7 +8,7 @@ export default function QuestionsPage() {
         title="Questions"
         description="Create and manage your question bank by subject, section, and chapter."
       />
-      <div className="flex-1 overflow-auto p-4 md:p-6">
+      <div className="flex-1 p-4 md:p-6">
         <QuestionsView />
       </div>
     </>

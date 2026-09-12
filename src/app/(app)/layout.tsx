@@ -7,8 +7,8 @@ export default function AppLayout({
   return (
     <SidebarProvider defaultOpen={false}>
       <AppSidebar />
-      <SidebarInset className="min-h-svh">
-        <div className="flex min-h-svh flex-1 flex-col">{children}</div>
+      <SidebarInset className="h-svh overflow-y-auto">
+        <div className="flex min-h-full flex-1 flex-col">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

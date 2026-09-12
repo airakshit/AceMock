@@ -47,6 +47,26 @@ export class DocumentsRepository {
     return document;
   }
 
+  async findByIdForUserWithFiles(
+    db: DbExecutor,
+    documentId: string,
+    userId: string,
+  ) {
+    const document = await this.findByIdForUser(db, documentId, userId);
+    if (!document) return null;
+
+    const files = await db
+      .select()
+      .from(documentFiles)
+      .where(eq(documentFiles.documentId, documentId))
+      .orderBy(desc(documentFiles.createdAt));
+
+    return {
+      ...document,
+      files,
+    };
+  }
+
   async findByUser(db: DbExecutor, userId: string) {
     return db
       .select()

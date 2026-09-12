@@ -9,6 +9,10 @@ import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
 import { supabaseStorageClient } from "../shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
+import { inngest } from "@/inngest/client";
+import { documentQueries } from "./repositories/document-queries";
+import { filePagesRepository } from "./repositories/file-pages.repository";
+import { EXTRACT_QUESTIONS_EVENT } from "@/inngest/functions/extract-questions/extract-questions";
 
 class DocumentsService {
   async createNewDocument(
@@ -316,6 +320,113 @@ class DocumentsService {
       mimeType: existingFile.mimeType,
       fileSize: existingFile.fileSize,
       signedUrl,
+    };
+  }
+
+  async processDocument(userId: string, documentId: string) {
+    const document = await documentsRepository.findByIdForUser(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!document) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found or access denied.",
+      );
+    }
+
+    const docWithPages = await documentQueries.getDocumentWithPages(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!docWithPages || !docWithPages.files || docWithPages.files.length === 0) {
+      throw new ServerActionError(
+        "BAD_REQUEST",
+        "Cannot process a document with no uploaded files.",
+      );
+    }
+
+    const totalPages = docWithPages.files.reduce(
+      (acc, f) => acc + (f.pages?.length || 0),
+      0,
+    );
+
+    if (totalPages === 0) {
+      // Preprocessing needed: convert files into page images, then extract questions
+      await documentsRepository.updateProcessingStatus(
+        db,
+        documentId,
+        "processing",
+      );
+
+      await inngest.send({
+        name: "document/process",
+        data: {
+          userId,
+          documentId,
+        },
+      });
+    } else {
+      // Pages already exist; reset page status if re-processing and trigger question extraction
+      for (const file of docWithPages.files) {
+        for (const page of file.pages) {
+          if (page.ocrStatus !== "ocr") {
+            await filePagesRepository.updateStatusByPageId(db, page.id, "ocr");
+          }
+        }
+      }
+
+      await documentsRepository.updateProcessingStatus(
+        db,
+        documentId,
+        "extracting_questions",
+      );
+
+      await inngest.send({
+        name: EXTRACT_QUESTIONS_EVENT,
+        data: {
+          userId,
+          documentId,
+        },
+      });
+    }
+
+    const updatedDoc = await documentsRepository.findByIdForUserWithFiles(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!updatedDoc) {
+      throw new ServerActionError("NOT_FOUND", "Document not found after trigger.");
+    }
+
+    return {
+      document: updatedDoc,
+      message: "Document processing triggered successfully.",
+    };
+  }
+
+  async getDocumentStatus(userId: string, documentId: string) {
+    const document = await documentsRepository.findByIdForUserWithFiles(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!document) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found or access denied.",
+      );
+    }
+
+    return {
+      document,
     };
   }
 }
