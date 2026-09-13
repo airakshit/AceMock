@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { QuestionsTestView } from "@/features/questions/components/QuestionsTestView";
 import { AppHeader } from "@/components/layouts/components/AppHeader";
 
@@ -14,7 +15,15 @@ export default function QuestionsTestPage() {
         description="Live testing view for questions saved in the database via the OCR and ingestion pipeline."
       />
       <div className="flex-1 p-4 md:p-6 overflow-y-auto">
-        <QuestionsTestView />
+        <Suspense
+          fallback={
+            <div className="max-w-6xl mx-auto p-8 text-center text-sm text-muted-foreground animate-pulse">
+              Loading questions test view...
+            </div>
+          }
+        >
+          <QuestionsTestView />
+        </Suspense>
       </div>
     </>
   );

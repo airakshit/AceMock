@@ -33,11 +33,31 @@ function normalizeMathAndChemistry(text: string): string {
   if (!text) return text;
   let result = text;
 
-  // 0. Convert literal "\n" escape sequences (from JSON/OCR output) into real newlines.
-  //    Protect "\\n" (an actual double-backslash followed by 'n' in the source) first.
+  // 0a. Repair LaTeX commands corrupted by JSON escape sequence parsing:
+  // - TAB (ASCII 9, \t) followed by letters: \text, \times, \theta, \tau, \to, \tan, \triangle, etc.
+  result = result.replace(/\t([a-zA-Z])/g, "\\t$1");
+  // - Form feed (ASCII 12, \f) followed by letters: \frac, \forall
+  result = result.replace(/\x0c([a-zA-Z])/g, "\\f$1");
+  // - Backspace (ASCII 8, \b) followed by letters: \beta, \bar, \binom, \mathbf, \bullet
+  result = result.replace(/\x08([a-zA-Z])/g, "\\b$1");
+  // - Carriage return (ASCII 13, \r) followed by letters: \rho, \right, \rightarrow, \rangle
+  result = result.replace(/\r([a-zA-Z])/g, "\\r$1");
+  // - Newline (ASCII 10, \n) followed by LaTeX math commands starting with \n (e.g. \neq, \nabla, \neg, \notin, \nu, \natural)
+  result = result.replace(
+    /\n(eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b/g,
+    "\\n$1"
+  );
+
+  // 0b. Repair bare 'ext{' inside or outside math that lost its leading '\t' or '\':
+  // e.g. "ext{conc } ext{H}_2" -> "\text{conc } \text{H}_2"
+  result = result.replace(/(^|[^\\])\bext\{/g, "$1\\text{");
+
+  // 0c. Convert literal "\n" escape sequences (from JSON/OCR output) into real newlines,
+  // BUT PRESERVE LaTeX commands starting with \n (like \neq, \nabla, \neg, \nu, \notin, \natural, \ne, \not, etc.)
+  const LATEX_N_MACROS = /\\n(?!(?:eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b)/g;
   const NEWLINE_PLACEHOLDER = "\u0000BSNL\u0000";
   result = result.replace(/\\\\n/g, NEWLINE_PLACEHOLDER);
-  result = result.replace(/\\n/g, "\n");
+  result = result.replace(LATEX_N_MACROS, "\n");
   result = result.replace(/\u0000BSNL\u0000/g, "\\\\n");
 
   // 1. Replace bare '^}' or '^ }' inside formulas with '\uparrow}' to prevent KaTeX parse errors
@@ -98,7 +118,11 @@ function normalizeMathAndChemistry(text: string): string {
   // 7d. Wrap bare arrows in plain text (e.g. "acidity \uparrow s" -> "acidity $\uparrow$ s")
   result = result.replace(/(^|[^\$\\])\\(uparrow|downarrow|rightarrow|leftarrow)\b/g, "$1$\\$2$");
 
-  // 7e. Convert bare chemical formulas with subscripts outside math like C_6H_{14} or NH_3 or C_6H_5NH_2 into $\ce{...}$
+  // 7e. Wrap bare \neq expressions in plain text if not already inside math
+  result = result.replace(/(^|[^\$])([a-zA-Z0-9_|()]+\s*\\neq\s*[a-zA-Z0-9_|()]+)(?=[^\$]|$)/g, "$1$$$2$$");
+  result = result.replace(/(^|[^\$\\])\\neq\b/g, "$1$\\neq$");
+
+  // 7f. Convert bare chemical formulas with subscripts outside math like C_6H_{14} or NH_3 or C_6H_5NH_2 into $\ce{...}$
   result = result.replace(
     /(^|[\s([<])([A-Z][a-z]?(?:_\d+|_\{\d+\})(?:[A-Z][a-z]?(?:_\d+|_\{\d+\}|[A-Za-z0-9])*)*)(?=[.,;:\s)\]>]|$)/g,
     (match, prefix, formula) => {
@@ -126,10 +150,15 @@ function MathRenderer({
   const html = useMemo(() => {
     try {
       // Force \frac -> \dfrac and strip any rogue inner $ in the raw LaTeX content
-      const upgraded = content
+      let upgraded = content
         .replace(/\$([^$]*)\$/g, "$1")
         .replace(/\$/g, "")
         .replace(/\\frac\b/g, "\\dfrac");
+
+      // Defense-in-depth: repair tab-corrupted commands and bare ext{
+      upgraded = upgraded
+        .replace(/\t([a-zA-Z])/g, "\\t$1")
+        .replace(/(^|[^\\])\bext\{/g, "$1\\text{");
 
       return katex.renderToString(upgraded, {
         displayMode: isDisplay,

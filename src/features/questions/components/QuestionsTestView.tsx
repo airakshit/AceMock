@@ -7,6 +7,9 @@ import {
   BookOpen,
   HelpCircle,
   Layers,
+  FileText,
+  Filter,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -22,7 +25,9 @@ import type {
 } from "./question-card/types";
 import {
   getRecentQuestionsAction,
+  getRecentDocumentsForFilterAction,
   QuestionItemDTO,
+  DocumentFilterOptionDTO,
 } from "../actions/get-questions";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +37,12 @@ export function QuestionsTestView() {
   const [isRefreshing, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // Document filter state
+  const [documentIdInput, setDocumentIdInput] = useState<string>("");
+  const [activeDocumentId, setActiveDocumentId] = useState<string>("");
+  const [activeDocumentTitle, setActiveDocumentTitle] = useState<string | null>(null);
+  const [recentDocs, setRecentDocs] = useState<DocumentFilterOptionDTO[]>([]);
+
   // Filter & Display state
   const [mode, setMode] = useState<QuestionMode>("review");
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
@@ -39,17 +50,31 @@ export function QuestionsTestView() {
   const [limit, setLimit] = useState<number>(50);
   const [answers, setAnswers] = useState<Record<string, OptionKey | null>>({});
 
-  const fetchQuestions = async (questionLimit: number = limit) => {
+  const fetchQuestions = async (
+    questionLimit: number = limit,
+    docId: string = activeDocumentId,
+  ) => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await getRecentQuestionsAction(questionLimit);
+      const res = await getRecentQuestionsAction({
+        limit: questionLimit,
+        documentId: docId || undefined,
+      });
+
       if (res.success && res.data) {
         setQuestions(res.data.questions);
+        setActiveDocumentTitle(res.data.documentTitle || null);
         if (res.data.questions.length === 0) {
-          toast.info("No questions found in the database.");
+          if (docId) {
+            toast.info(`No questions found for document ID: ${docId.slice(0, 8)}...`);
+          } else {
+            toast.info("No questions found in the database.");
+          }
         } else {
-          toast.success(`Loaded ${res.data.questions.length} questions.`);
+          toast.success(
+            `Loaded ${res.data.questions.length} questions${docId ? ` for document` : ""}.`,
+          );
         }
       } else if (!res.success) {
         const errorMsg = res.error?.message || "Failed to load questions.";
@@ -66,14 +91,72 @@ export function QuestionsTestView() {
     }
   };
 
+  // Initial load: parse URL search params and fetch recent documents
   useEffect(() => {
-    fetchQuestions(limit);
+    let initialDocId = "";
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      initialDocId = params.get("documentId")?.trim() || "";
+    }
+
+    if (initialDocId) {
+      setDocumentIdInput(initialDocId);
+      setActiveDocumentId(initialDocId);
+      fetchQuestions(limit, initialDocId);
+    } else {
+      fetchQuestions(limit, "");
+    }
+
+    // Load available recent documents with question counts for quick filtering
+    getRecentDocumentsForFilterAction().then((res) => {
+      if (res.success && res.data) {
+        setRecentDocs(res.data.documents);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit]);
 
+  const handleApplyDocumentFilter = (docIdToApply: string) => {
+    const trimmed = docIdToApply.trim();
+    setActiveDocumentId(trimmed);
+    setSelectedSubject("all");
+    setSearchQuery("");
+
+    // Sync with URL query parameter
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (trimmed) {
+        params.set("documentId", trimmed);
+      } else {
+        params.delete("documentId");
+      }
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+      window.history.replaceState(null, "", newUrl);
+    }
+
+    fetchQuestions(limit, trimmed);
+  };
+
+  const handleClearDocumentFilter = () => {
+    setDocumentIdInput("");
+    setActiveDocumentId("");
+    setActiveDocumentTitle(null);
+    setSelectedSubject("all");
+    setSearchQuery("");
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("documentId");
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+      window.history.replaceState(null, "", newUrl);
+    }
+
+    fetchQuestions(limit, "");
+  };
+
   const handleRefresh = () => {
     startTransition(async () => {
-      await fetchQuestions(limit);
+      await fetchQuestions(limit, activeDocumentId);
     });
   };
 
@@ -106,6 +189,8 @@ export function QuestionsTestView() {
         q.chapterName?.toLowerCase().includes(query) ||
         q.sectionName?.toLowerCase().includes(query) ||
         q.subjectName?.toLowerCase().includes(query) ||
+        q.documentTitle?.toLowerCase().includes(query) ||
+        q.fileName?.toLowerCase().includes(query) ||
         q.id.toLowerCase().includes(query);
 
       return matchesSubject && matchesSearch;
@@ -193,13 +278,131 @@ export function QuestionsTestView() {
           </div>
         </div>
 
+        {/* ─── Document ID Filter Bar ─── */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 p-3 rounded-xl bg-muted/35 border border-border/70">
+          <div className="flex items-center gap-2 text-xs font-semibold text-foreground shrink-0">
+            <FileText className="size-4 text-primary" />
+            <span>Filter by Document:</span>
+          </div>
+
+          <div className="relative flex-1 min-w-0">
+            <Input
+              placeholder="Paste Document ID (UUID)..."
+              value={documentIdInput}
+              onChange={(e) => setDocumentIdInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleApplyDocumentFilter(documentIdInput);
+                }
+              }}
+              className="font-mono text-xs h-8 bg-background pr-8"
+            />
+            {documentIdInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDocumentIdInput("");
+                  if (activeDocumentId) {
+                    handleClearDocumentFilter();
+                  }
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                title="Clear input"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => handleApplyDocumentFilter(documentIdInput)}
+              disabled={
+                isLoading ||
+                isRefreshing ||
+                !documentIdInput.trim() ||
+                documentIdInput.trim() === activeDocumentId
+              }
+              className="h-8 text-xs font-medium gap-1 px-3 cursor-pointer"
+            >
+              <Filter className="size-3" />
+              Load
+            </Button>
+
+            {/* Quick dropdown for recent documents */}
+            {recentDocs.length > 0 && (
+              <select
+                value={activeDocumentId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDocumentIdInput(val);
+                  handleApplyDocumentFilter(val);
+                }}
+                className="h-8 max-w-[200px] sm:max-w-[240px] bg-background border rounded-md px-2 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer truncate"
+              >
+                <option value="">Or select recent document...</option>
+                {recentDocs.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.title} ({doc.questionCount} Qs)
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {activeDocumentId && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleClearDocumentFilter}
+                className="h-8 text-xs text-muted-foreground hover:text-destructive gap-1 px-2 cursor-pointer"
+              >
+                <X className="size-3.5" />
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* ─── Active Document Filter Banner ─── */}
+        {activeDocumentId && (
+          <div className="flex items-center justify-between gap-3 px-3.5 py-2 rounded-lg bg-primary/10 border border-primary/20 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+                Document Filter
+              </Badge>
+              <span className="font-semibold text-foreground truncate">
+                {activeDocumentTitle || "Document"}
+              </span>
+              <span
+                className="font-mono text-muted-foreground text-[11px] truncate max-w-[160px] sm:max-w-none"
+                title={activeDocumentId}
+              >
+                ({activeDocumentId})
+              </span>
+              <span className="text-muted-foreground font-medium shrink-0">
+                • {questions.length} questions
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearDocumentFilter}
+              className="text-primary hover:text-primary/80 font-medium underline text-[11px] shrink-0 cursor-pointer"
+            >
+              Show all questions
+            </button>
+          </div>
+        )}
+
         {/* Filters & Search Row */}
         <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 border-t border-border/60">
           {/* Search Input */}
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
-              placeholder="Search by question text, chapter, or ID..."
+              placeholder="Search by question text, chapter, document, or ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 text-sm h-9 bg-background/80"
@@ -254,6 +457,7 @@ export function QuestionsTestView() {
               <option value={50}>50</option>
               <option value={100}>100</option>
               <option value={200}>200</option>
+              <option value={500}>500</option>
             </select>
           </div>
         </div>
@@ -269,7 +473,7 @@ export function QuestionsTestView() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => fetchQuestions(limit)}
+            onClick={() => fetchQuestions(limit, activeDocumentId)}
             className="text-xs"
           >
             Try Again
@@ -313,12 +517,35 @@ export function QuestionsTestView() {
           <div className="max-w-md mx-auto space-y-1.5">
             <h3 className="text-base font-semibold">No questions found</h3>
             <p className="text-sm text-muted-foreground">
-              {questions.length === 0
-                ? "There are currently no questions stored in the database. Go to the Documents page, upload an exam paper, and click 'Process' to extract questions."
-                : "No questions match your current search or filter criteria. Try adjusting your query."}
+              {activeDocumentId
+                ? `No questions found for document ID "${activeDocumentId}". The document may still be processing, or has no extracted questions yet.`
+                : questions.length === 0
+                  ? "There are currently no questions stored in the database. Go to the Documents page, upload an exam paper, and click 'Process' to extract questions."
+                  : "No questions match your current search or filter criteria. Try adjusting your query."}
             </p>
           </div>
-          {questions.length === 0 ? (
+          {activeDocumentId ? (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearDocumentFilter}
+                className="text-xs"
+              >
+                Clear Document Filter
+              </Button>
+              <Link
+                href="/documents"
+                className={cn(
+                  buttonVariants({ variant: "default", size: "sm" }),
+                  "text-xs inline-flex items-center gap-1.5",
+                )}
+              >
+                <Layers className="size-3.5" />
+                View in Documents
+              </Link>
+            </div>
+          ) : questions.length === 0 ? (
             <Link
               href="/documents"
               className={cn(
@@ -352,6 +579,7 @@ export function QuestionsTestView() {
             <span>
               Showing {filteredQuestions.length} of {questions.length} total
               questions
+              {activeDocumentId && " (from filtered document)"}
             </span>
             <span>
               Mode: <strong className="text-foreground capitalize">{mode}</strong>
@@ -375,8 +603,8 @@ export function QuestionsTestView() {
             return (
               <div key={q.id} className="space-y-2">
                 {/* Curriculum Context Header */}
-                <div className="flex items-center justify-between text-xs px-2 text-muted-foreground">
-                  <div className="flex items-center gap-1.5 font-medium">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs px-2 text-muted-foreground">
+                  <div className="flex items-center gap-1.5 font-medium flex-wrap">
                     <span className="text-foreground">{q.subjectName}</span>
                     {q.sectionName && (
                       <>
@@ -392,8 +620,30 @@ export function QuestionsTestView() {
                         </span>
                       </>
                     )}
+                    {q.documentTitle && (
+                      <>
+                        <span className="opacity-40">•</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (q.documentId) {
+                              setDocumentIdInput(q.documentId);
+                              handleApplyDocumentFilter(q.documentId);
+                            }
+                          }}
+                          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          title={`Click to filter by Document ID: ${q.documentId || ""}`}
+                        >
+                          <FileText className="size-3 text-muted-foreground" />
+                          <span className="truncate max-w-[180px] sm:max-w-[240px]">
+                            {q.documentTitle}
+                          </span>
+                        </button>
+                      </>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 font-mono text-[11px] opacity-75">
+
+                  <div className="flex items-center gap-2 font-mono text-[11px] opacity-75 shrink-0">
                     {q.difficulty && (
                       <span className="capitalize">{q.difficulty}</span>
                     )}

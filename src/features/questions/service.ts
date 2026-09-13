@@ -85,10 +85,11 @@ class QuestionsService {
     };
   }
 
-  async getRecentQuestions(limit: number = 50) {
+  async getRecentQuestions(limit: number = 50, documentId?: string) {
     const rawQuestions = await questionsRepository.findRecentWithCurriculum(
       db,
       limit,
+      documentId,
     );
 
     // Collect paths to sign if they are storage paths
@@ -170,8 +171,26 @@ class QuestionsService {
         solutionDiagramUrl,
         createdAt: q.createdAt ? q.createdAt.toISOString() : null,
         updatedAt: q.updatedAt ? q.updatedAt.toISOString() : null,
+        fileId: q.fileId || null,
+        fileName: q.fileName || null,
+        documentId: q.documentId || null,
+        documentTitle: q.documentTitle || null,
       };
     });
+  }
+
+  async getRecentDocumentsForFilter(limit: number = 20) {
+    const rawDocs = await questionsRepository.findRecentDocumentsWithQuestions(
+      db,
+      limit,
+    );
+
+    return rawDocs.map((d) => ({
+      id: d.id,
+      title: d.title || "Untitled Document",
+      questionCount: Number(d.questionCount || 0),
+      createdAt: d.createdAt ? d.createdAt.toISOString() : null,
+    }));
   }
 }
 

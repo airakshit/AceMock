@@ -1,5 +1,13 @@
-import { chapters, passages, questions, sections, subjects } from "@/db/schemas";
-import { desc, eq, inArray } from "drizzle-orm";
+import {
+  chapters,
+  documentFiles,
+  documents,
+  passages,
+  questions,
+  sections,
+  subjects,
+} from "@/db/schemas";
+import { asc, count, desc, eq, inArray } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
 import { QuestionDifficulty, QuestionOption } from "../types";
 import { generateUUIDv7 } from "../../shared/utils";
@@ -272,8 +280,12 @@ export class QuestionsRepository {
       .limit(limit);
   }
 
-  async findRecentWithCurriculum(db: DbExecutor, limit: number = 50) {
-    return db
+  async findRecentWithCurriculum(
+    db: DbExecutor,
+    limit: number = 50,
+    documentId?: string,
+  ) {
+    const baseQuery = db
       .select({
         id: questions.id,
         question: questions.question,
@@ -293,12 +305,41 @@ export class QuestionsRepository {
         sectionName: sections.name,
         subjectName: subjects.name,
         subjectSlug: subjects.slug,
+        fileId: questions.fileId,
+        fileName: documentFiles.filename,
+        documentId: documentFiles.documentId,
+        documentTitle: documents.title,
       })
       .from(questions)
+      .leftJoin(documentFiles, eq(questions.fileId, documentFiles.id))
+      .leftJoin(documents, eq(documentFiles.documentId, documents.id))
       .leftJoin(chapters, eq(questions.chapterId, chapters.id))
       .leftJoin(sections, eq(chapters.sectionId, sections.id))
-      .leftJoin(subjects, eq(sections.subjectId, subjects.id))
-      .orderBy(desc(questions.createdAt))
+      .leftJoin(subjects, eq(sections.subjectId, subjects.id));
+
+    if (documentId) {
+      return baseQuery
+        .where(eq(documentFiles.documentId, documentId))
+        .orderBy(asc(questions.createdAt))
+        .limit(limit);
+    }
+
+    return baseQuery.orderBy(desc(questions.createdAt)).limit(limit);
+  }
+
+  async findRecentDocumentsWithQuestions(db: DbExecutor, limit: number = 20) {
+    return db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        createdAt: documents.createdAt,
+        questionCount: count(questions.id),
+      })
+      .from(documents)
+      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
+      .leftJoin(questions, eq(questions.fileId, documentFiles.id))
+      .groupBy(documents.id, documents.title, documents.createdAt)
+      .orderBy(desc(documents.createdAt))
       .limit(limit);
   }
 
