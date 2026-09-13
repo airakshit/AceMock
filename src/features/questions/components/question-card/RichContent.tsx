@@ -4,38 +4,26 @@ import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import remarkBreaks from "remark-breaks";
-import rehypeKatex from "rehype-katex";
 import katex from "katex";
 
-// ── mhchem setup ────────────────────────────────────────────────────────────
-// mhchem mutates a global `katex` object to register the \ce{} macro. We must
-// assign globalThis.katex BEFORE importing the extension, and rehype-katex
-// must resolve to the SAME `katex` package instance (single install, no
-// duplicate versions in node_modules) so the \ce{} macro is visible to it.
+// Ensure globalThis.katex is assigned BEFORE mhchem extension is loaded
 if (typeof globalThis !== "undefined") {
   (globalThis as Record<string, unknown>).katex = katex;
 }
 import "katex/contrib/mhchem";
-import "katex/dist/katex.min.css";
 
-export interface RichContentProps {
+interface RichContentProps {
   /** Raw OCR / markdown text with embedded LaTeX ($...$, $$...$$, \ce{}) */
   text: string;
-  /** Additional classes to apply to the wrapper */
+  /** Additional Tailwind classes to apply to the wrapper */
   className?: string;
 }
 
-/* ============================================================================
- * NORMALIZATION PIPELINE
- *
- * Fixes malformed OCR/JSON-sourced text so remark-math + rehype-katex can
- * render it. Each stage is a small, pure, independently testable function.
- * Stages run in a fixed order — see `normalizeMathAndChemistry` at the end.
- * ==========================================================================*/
-
-/** LaTeX commands that take brace-delimited arguments (\frac{1}{3}, \sqrt{2}, ...).
- *  Anything on this list found OUTSIDE $...$/$$...$$ delimiters gets auto-wrapped.
- *  Extend this list as new OCR patterns show up. */
+/**
+ * LaTeX commands that take brace-delimited arguments (\frac{1}{3}, \sqrt{2}, ...).
+ * Anything on this list found OUTSIDE $...$/$$...$$ delimiters gets auto-wrapped
+ * by wrapBareLatexCommands() below. Extend this list as new OCR patterns show up.
+ */
 const BRACE_MATH_COMMANDS = [
   "dfrac", "tfrac", "cfrac", "frac",
   "sqrt", "binom", "dbinom", "tbinom",
@@ -45,114 +33,11 @@ const BRACE_MATH_COMMANDS = [
   "lim", "limsup", "liminf",
 ] as const;
 
-// ---------------------------------------------------------------------------
-// Stage 0: repair control-character corruption from JSON/OCR escape parsing.
-// A JSON string containing "\t", "\f", "\b", "\r", "\n" followed by letters
-// gets parsed into a literal TAB/FF/BS/CR/LF + letters, destroying LaTeX
-// commands like \text, \frac, \beta, \right, \neq.
-// ---------------------------------------------------------------------------
-function repairEscapeSequences(text: string): string {
-  let result = text;
-
-  result = result.replace(/\t([a-zA-Z])/g, "\\t$1");   // \text, \times, \theta, \to...
-  result = result.replace(/\x0c([a-zA-Z])/g, "\\f$1"); // \frac, \forall
-  result = result.replace(/\x08([a-zA-Z])/g, "\\b$1"); // \beta, \bar, \binom, \mathbf
-  result = result.replace(/\r([a-zA-Z])/g, "\\r$1");   // \rho, \right, \rightarrow
-
-  // Newline + LaTeX \n-macros (\neq, \nabla, \neg, \notin, \nu, ...).
-  // Everything else starting with \n after a real linebreak is left as a
-  // linebreak (handled below) rather than folded into a fake macro.
-  const N_MACRO_NAMES =
-    "eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|" +
-    "Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim";
-  result = result.replace(new RegExp(`\\n(${N_MACRO_NAMES})\\b`, "g"), "\\n$1");
-
-  // Bare "ext{" that lost its leading "\t"/"\": ext{conc} -> \text{conc}
-  result = result.replace(/(^|[^\\])\bext\{/g, "$1\\text{");
-
-  // Literal two-character "\n" (from JSON) -> real newline, EXCEPT when it's
-  // actually one of the LaTeX \n-macros above.
-  const LATEX_N_MACROS = new RegExp(`\\\\n(?!(?:${N_MACRO_NAMES})\\b)`, "g");
-  const NEWLINE_PLACEHOLDER = "\u0000BSNL\u0000";
-  result = result.replace(/\\\\n/g, NEWLINE_PLACEHOLDER); // protect escaped \\n first
-  result = result.replace(LATEX_N_MACROS, "\n");
-  result = result.replace(/\u0000BSNL\u0000/g, "\\\\n");
-
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Stage 1: repair chemistry-notation corruption (mhchem \ce{} blocks).
-// ---------------------------------------------------------------------------
-function repairChemistryNotation(text: string): string {
-  let result = text;
-
-  // Bare '^}' -> '\uparrow}' (common OCR mangling of an up-arrow before a brace)
-  result = result.replace(/\^\s*\}/g, "\\uparrow}");
-
-  // 'ce{' missing its leading backslash -> '\ce{'
-  result = result.replace(/(^|[^\\a-zA-Z0-9])ce\{/g, "$1\\ce{");
-
-  // '\ceC2H5OH+3O2->2CO2+3H2O' (missing braces) -> '\ce{C2H5OH+3O2->2CO2+3H2O}'
-  result = result.replace(
-    /\\ce(?![{\s])([A-Za-z0-9_+\-=>^]+)/g,
-    (_m, formula: string) => `\\ce{${formula}}`,
-  );
-
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Stage 2: re-insert a missing opening "$$" when a formula ends in an
-// orphaned trailing "$$", e.g. "as follows: \ce{N2H4}<\ce{N2H2}$$. So..."
-// ---------------------------------------------------------------------------
-function repairOrphanedDisplayMath(text: string): string {
-  return text.replace(
-    /(:\s*)([A-Za-z0-9_\\{}<>=+\-\s]+?\\ce\{[^}]+\}(?:[A-Za-z0-9_\\{}<>=+\-\s]*))\$\$/g,
-    (_m, prefix: string, formula: string) => `${prefix}\n\n$$${formula.trim()}$$\n\n`,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Stage 3: clean display-math blocks ($$...$$ / $$...$$$).
-// Inner "$" is illegal inside LaTeX math mode and breaks KaTeX; trailing
-// "$$$" is normalized to "$$"; \frac is upgraded to \dfrac for legibility.
-// ---------------------------------------------------------------------------
-function cleanDisplayMathBlocks(text: string): string {
-  return text.replace(/\$\$([\s\S]+?)\${2,3}/g, (_m, inner: string) => {
-    const cleaned = inner
-      .replace(/\$([^$]*)\$/g, "$1")
-      .replace(/\$/g, "")
-      .replace(/\\frac\b/g, "\\dfrac")
-      .trim();
-    return `\n\n$$${cleaned}$$\n\n`;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Stage 4: protect every already-valid math block so later text-level regex
-// passes cannot corrupt it. Restored verbatim in the final stage.
-// ---------------------------------------------------------------------------
-function protectMathBlocks(text: string): { text: string; blocks: string[] } {
-  const blocks: string[] = [];
-  const protectedText = text.replace(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g, (match) => {
-    const upgraded = match.replace(/\\frac\b/g, "\\dfrac");
-    const idx = blocks.length;
-    blocks.push(upgraded);
-    return `\u0000MATH_${idx}\u0000`;
-  });
-  return { text: protectedText, blocks };
-}
-
-function restoreMathBlocks(text: string, blocks: string[]): string {
-  return text.replace(/\u0000MATH_(\d+)\u0000/g, (_m, idx: string) => blocks[Number(idx)]);
-}
-
-// ---------------------------------------------------------------------------
-// Brace-matching helper: given str[openIdx] === '{', returns the index of the
-// matching '}' (handling nesting), or -1 if unmatched. Needed because JS
-// regex cannot match arbitrarily-nested braces on its own.
-// ---------------------------------------------------------------------------
+/**
+ * Brace-matching helper: given str[openIdx] === '{', returns the index of the
+ * matching '}' (handling nesting, e.g. \frac{1}{\sqrt{2}}), or -1 if unmatched.
+ * Needed because JS regex cannot match arbitrarily-nested braces on its own.
+ */
 function matchBraceGroup(str: string, openIdx: number): number {
   if (str[openIdx] !== "{") return -1;
   let depth = 0;
@@ -166,16 +51,20 @@ function matchBraceGroup(str: string, openIdx: number): number {
   return -1;
 }
 
-// ---------------------------------------------------------------------------
-// Stage 5 (text-level, math already protected): wrap bare LaTeX commands
-// that take brace arguments — e.g. a stray "\frac{1}{3}" typed/OCR'd outside
-// any $...$ — into "$\frac{1}{3}$" so remark-math/rehype-katex render it.
-//
-// Greedily extends the wrapped span across "glued" +,-,*,/,= operators and
-// chained commands/numbers so "\frac{1}{2}+\frac{1}{3}" becomes ONE math
-// block instead of two adjacent ones. This is a heuristic, not a full LaTeX
-// parser — good enough for typical OCR'd expressions.
-// ---------------------------------------------------------------------------
+/**
+ * Wraps bare LaTeX commands that take brace arguments — e.g. a stray
+ * "\frac{1}{3}" typed/OCR'd outside any $...$ — into "$\frac{1}{3}$" so it
+ * actually renders instead of showing up as raw backslash text.
+ *
+ * Must run AFTER math blocks are protected (placeholder-swapped out) so that
+ * every remaining "\command" found here is guaranteed to be outside real
+ * math delimiters — otherwise this would double-wrap valid $...$ content.
+ *
+ * Greedily extends the wrapped span across "glued" +,-,*,/,= operators and
+ * chained commands/numbers so "\frac{1}{2}+\frac{1}{3}" becomes ONE math
+ * block instead of two adjacent ones. This is a heuristic, not a full LaTeX
+ * parser — good enough for typical OCR'd/typed expressions.
+ */
 function wrapBareLatexCommands(text: string): string {
   const commandRe = new RegExp(`\\\\(${BRACE_MATH_COMMANDS.join("|")})\\b`, "g");
   let out = "";
@@ -254,135 +143,287 @@ function wrapBareLatexCommands(text: string): string {
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Stage 6 (text-level): wrap bare \ce{} chemistry notation.
-//
-// IMPORTANT: this uses a single regex with `*` (zero-or-more) rather than two
-// separate passes ("wrap chains" then "wrap any remaining bare \ce{}"). Two
-// passes double-wraps chained comparisons — the chain pass wraps the whole
-// "\ce{A}<\ce{B}" run in $...$, then a second bare-\ce{} pass matches each
-// \ce{} *inside* that span again and wraps it a second time, producing
-// corrupted "$$\ce{A}$<$\ce{B}$$". A single pass with `*` handles a lone
-// \ce{} and a chained run identically, in one shot, with no overlap.
-// ---------------------------------------------------------------------------
-function applyChemistryTextFixes(text: string): string {
-  return text.replace(
-    /(\\ce\{[^}]+\}(?:\s*(?:<|>|=|<=|>=|->|<=>)\s*\\ce\{[^}]+\})*)/g,
-    (m) => `$${m}$`,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Stage 7 (text-level): wrap bare symbols/formulas that OCR left un-delimited.
-// ---------------------------------------------------------------------------
-function applySymbolTextFixes(text: string): string {
+/**
+ * Normalizes OCR/text containing chemistry and math notation:
+ * 1. Converts literal "\n" (two chars) into real newlines
+ * 2. Converts invalid bare '^}' inside \ce to '\uparrow}'
+ * 3. Normalizes 'ce{' (where leading backslash was stripped or omitted) to '\ce{'
+ * 4. Fixes \ce immediately followed by formula without space/braces
+ * 5. Cleans and normalizes display math ($$...$$ or $$...$$$), stripping any illegal inner $
+ * 6. Protects valid math blocks and performs text-level fixes (wrapping bare \ce, \uparrow, chemical formulas)
+ * 7. Adds a space after commas in plain text (skips numeric thousands separators)
+ * 8. Wraps bare LaTeX commands like \frac{1}{3} that weren't inside $...$
+ * 9. Upgrades \frac to \dfrac so fractions always render with adequate size
+ */
+function normalizeMathAndChemistry(text: string): string {
+  if (!text) return text;
   let result = text;
 
-  // Strip any stray leftover "$$"
+  // 0a. Repair LaTeX commands corrupted by JSON escape sequence parsing:
+  // - TAB (ASCII 9, \t) followed by letters: \text, \times, \theta, \tau, \to, \tan, \triangle, etc.
+  result = result.replace(/\t([a-zA-Z])/g, "\\t$1");
+  // - Form feed (ASCII 12, \f) followed by letters: \frac, \forall
+  result = result.replace(/\x0c([a-zA-Z])/g, "\\f$1");
+  // - Backspace (ASCII 8, \b) followed by letters: \beta, \bar, \binom, \mathbf, \bullet
+  result = result.replace(/\x08([a-zA-Z])/g, "\\b$1");
+  // - Carriage return (ASCII 13, \r) followed by letters: \rho, \right, \rightarrow, \rangle
+  result = result.replace(/\r([a-zA-Z])/g, "\\r$1");
+  // - Newline (ASCII 10, \n) followed by LaTeX math commands starting with \n (e.g. \neq, \nabla, \neg, \notin, \nu, \natural)
+  result = result.replace(
+    /\n(eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b/g,
+    "\\n$1"
+  );
+
+  // 0b. Repair bare 'ext{' inside or outside math that lost its leading '\t' or '\':
+  // e.g. "ext{conc } ext{H}_2" -> "\text{conc } \text{H}_2"
+  result = result.replace(/(^|[^\\])\bext\{/g, "$1\\text{");
+
+  // 0c. Convert literal "\n" escape sequences (from JSON/OCR output) into real newlines,
+  // BUT PRESERVE LaTeX commands starting with \n (like \neq, \nabla, \neg, \nu, \notin, \natural, \ne, \not, etc.)
+  const LATEX_N_MACROS = /\\n(?!(?:eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b)/g;
+  const NEWLINE_PLACEHOLDER = "\u0000BSNL\u0000";
+  result = result.replace(/\\\\n/g, NEWLINE_PLACEHOLDER);
+  result = result.replace(LATEX_N_MACROS, "\n");
+  result = result.replace(/\u0000BSNL\u0000/g, "\\\\n");
+
+  // 1. Replace bare '^}' or '^ }' inside formulas with '\uparrow}' to prevent KaTeX parse errors
+  result = result.replace(/\^\s*\}/g, "\\uparrow}");
+
+  // 2. Normalize 'ce{' (where leading backslash was stripped or omitted) to '\ce{'
+  result = result.replace(/(^|[^\\a-zA-Z0-9])ce\{/g, "$1\\ce{");
+
+  // 3. Fix \ce immediately followed by letters/numbers without space or brace
+  // e.g. \ceC2H5OH+3O2->2CO2+3H2O  =>  \ce{C2H5OH+3O2->2CO2+3H2O}
+  // MUST have leading backslash \ce to avoid corrupting English words like "central" or "cell"
+  result = result.replace(/\\ce(?![{\s])([A-Za-z0-9_+\-=>^]+)/g, (_, formula) => {
+    return `\\ce{${formula}}`;
+  });
+
+  // 4. Fix missing opening $$ when there's an unmatched trailing $$ after a formula
+  // E.g. "... as follows: NH_3 <\ce{N2H4}<\ce{N2H2}<\ce{N3H}$$. So..."
+  result = result.replace(
+    /(:\s*)([A-Za-z0-9_\\{}<>=+\-\s]+?\\ce\{[^}]+\}(?:[A-Za-z0-9_\\{}<>=+\-\s]*))\$\$/g,
+    (_, prefix, formula) => `${prefix}\n\n$$${formula.trim()}$$\n\n`
+  );
+
+  // 5. Clean display math blocks: $$ ... $$ or $$ ... $$$
+  // Inside display math:
+  // - Any inner '$' (e.g. '$\ce{...}$' or '$\text{...}$') is illegal in LaTeX math mode and breaks KaTeX.
+  // - Trailing $$$ is normalized to $$
+  // - \frac is upgraded to \dfrac
+  result = result.replace(/\$\$([\s\S]+?)\${2,3}/g, (_, inner) => {
+    const cleanInner = inner
+      .replace(/\$([^$]*)\$/g, "$1")
+      .replace(/\$/g, "")
+      .replace(/\\frac\b/g, "\\dfrac")
+      .trim();
+    return `\n\n$$${cleanInner}$$\n\n`;
+  });
+
+  // 6. Protect all existing valid math blocks ($$...$$ and $...$) so text-level passes don't touch them
+  const mathBlocks: string[] = [];
+  result = result.replace(/(\$\$[\s\S]*?\$\$|\$[^\$\n]+?\$)/g, (match) => {
+    const upgraded = match.replace(/\\frac\b/g, "\\dfrac");
+    const idx = mathBlocks.length;
+    mathBlocks.push(upgraded);
+    return `\u0000MATH_${idx}\u0000`;
+  });
+
+  // 7. Text-level fixes (OUTSIDE of math delimiters):
+  // 7a. Strip any remaining stray $$
   result = result.replace(/\$\$/g, "");
 
-  // Bare arrows: "acidity \uparrow s" -> "acidity $\uparrow$ s"
-  result = result.replace(/(^|[^$\\])\\(uparrow|downarrow|rightarrow|leftarrow)\b/g, "$1$\\$2$");
+  // 7b/7c. Wrap bare \ce{...} chemistry notation — both a lone \ce{...} and a
+  // chained comparison like \ce{A} < \ce{B} < \ce{C} — in a SINGLE regex pass
+  // using `*` (zero-or-more) rather than two separate passes.
+  //
+  // NOTE (fix): the previous two-pass version — "wrap chains" then separately
+  // "wrap any remaining bare \ce{}" — double-wrapped chained comparisons: the
+  // chain pass wrapped the whole "\ce{A}<\ce{B}" run in $...$, then the bare
+  // pass matched each \ce{} *inside* that span again and wrapped it a SECOND
+  // time, producing corrupted "$$\ce{A}$<$\ce{B}$$" that KaTeX can't parse.
+  // A single pass with `*` handles a lone \ce{} and a chained run identically
+  // in one shot, with no overlap.
+  result = result.replace(
+    /(\\ce\{[^}]+\}(?:\s*(?:<|>|=|<=|>=|->|<=>)\s*\\ce\{[^}]+\})*)/g,
+    (m) => `$${m}$`
+  );
 
-  // Bare \neq expressions
-  result = result.replace(/(^|[^$])([a-zA-Z0-9_|()]+\s*\\neq\s*[a-zA-Z0-9_|()]+)(?=[^$]|$)/g, "$1$$$2$$");
-  result = result.replace(/(^|[^$\\])\\neq\b/g, "$1$\\neq$");
+  // 7d. Wrap bare arrows in plain text (e.g. "acidity \uparrow s" -> "acidity $\uparrow$ s")
+  result = result.replace(/(^|[^\$\\])\\(uparrow|downarrow|rightarrow|leftarrow)\b/g, "$1$\\$2$");
 
-  // Bare chemical formulas with subscripts, e.g. NH_3, C_6H_{14} -> $\ce{NH3}$
+  // 7e. Wrap bare \neq expressions in plain text if not already inside math
+  result = result.replace(/(^|[^\$])([a-zA-Z0-9_|()]+\s*\\neq\s*[a-zA-Z0-9_|()]+)(?=[^\$]|$)/g, "$1$$$2$$");
+  result = result.replace(/(^|[^\$\\])\\neq\b/g, "$1$\\neq$");
+
+  // 7f. Convert bare chemical formulas with subscripts outside math like C_6H_{14} or NH_3 or C_6H_5NH_2 into $\ce{...}$
   result = result.replace(
     /(^|[\s([<])([A-Z][a-z]?(?:_\d+|_\{\d+\})(?:[A-Z][a-z]?(?:_\d+|_\{\d+\}|[A-Za-z0-9])*)*)(?=[.,;:\s)\]>]|$)/g,
-    (_m, prefix: string, formula: string) => {
-      const clean = formula.replace(/_(\d+)/g, "$1").replace(/_\{(\d+)\}/g, "$1");
-      return `${prefix}$\\ce{${clean}}$`;
-    },
+    (match, prefix, formula) => {
+      const cleanFormula = formula.replace(/_(\d+)/g, "$1").replace(/_\{(\d+)\}/g, "$1");
+      return `${prefix}$\\ce{${cleanFormula}}$`;
+    }
   );
+
+  // 7g. NEW: ensure a space follows every comma in plain text, e.g.
+  // "a,b,c" -> "a, b, c". Skips commas that already have trailing whitespace
+  // (no double-spacing) and skips a comma directly between two digits
+  // ("12,000", "1,234,567", "{1,2,3}") so numeric thousands separators and
+  // digit lists are left untouched. Uses a replace callback that only peeks
+  // at each comma's immediate neighbors (not a consuming digit-pair regex),
+  // so back-to-back single-digit commas like "1,2,3" are each judged
+  // independently instead of the first match "eating" the shared digit.
+  // Runs on text only — math/chemistry content is still placeholder-protected
+  // from step 6, so a comma inside \binom{n}{k}, a coordinate pair, or a
+  // $\ce{}$ formula is never touched by this step.
+  result = result.replace(/,(?!\s)/g, (match, offset: number, str: string) => {
+    const before = str[offset - 1];
+    const after = str[offset + 1];
+    const isNumericSeparator = !!before && !!after && /\d/.test(before) && /\d/.test(after);
+    return isNumericSeparator ? "," : ", ";
+  });
+
+  // 7h. Wrap bare LaTeX commands with brace args (\frac{1}{3}, \sqrt{9}, ...)
+  // that were left outside $...$. Runs last among the text-level fixes since
+  // it doesn't interact with \ce{}/arrows/neq/commas, and by this point every
+  // remaining backslash-command in `result` is guaranteed to be outside a
+  // real math block (those were placeholder-protected in step 6).
+  result = wrapBareLatexCommands(result);
+
+  // 8. Restore protected math blocks
+  result = result.replace(/\u0000MATH_(\d+)\u0000/g, (_, idx) => mathBlocks[Number(idx)]);
+
+  // 9. Clean up excessive consecutive newlines introduced by block math formatting
+  result = result.replace(/\n{3,}/g, "\n\n").trim();
 
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// Stage 8: collapse excess blank lines introduced by earlier stages.
-// ---------------------------------------------------------------------------
-function collapseWhitespace(text: string): string {
-  return text.replace(/\n{3,}/g, "\n\n").trim();
+function MathRenderer({
+  content,
+  isDisplay,
+}: {
+  content: string;
+  isDisplay: boolean;
+}) {
+  const html = useMemo(() => {
+    try {
+      // Force \frac -> \dfrac and strip any rogue inner $ in the raw LaTeX content
+      let upgraded = content
+        .replace(/\$([^$]*)\$/g, "$1")
+        .replace(/\$/g, "")
+        .replace(/\\frac\b/g, "\\dfrac");
+
+      // Defense-in-depth: repair tab-corrupted commands and bare ext{
+      upgraded = upgraded
+        .replace(/\t([a-zA-Z])/g, "\\t$1")
+        .replace(/(^|[^\\])\bext\{/g, "$1\\text{");
+
+      return katex.renderToString(upgraded, {
+        displayMode: isDisplay,
+        throwOnError: false,
+        errorColor: "#ef4444",
+        // Security hardening (no behavior change for normal math/chemistry
+        // content): blocks \href/\includegraphics-style trust-gated commands
+        // so untrusted OCR text can't be used to inject links or resources.
+        trust: false,
+        // Reduces noisy console warnings on OCR text mixed with stray
+        // unicode/whitespace inside math mode; doesn't affect rendered output.
+        strict: false,
+      });
+    } catch {
+      return null;
+    }
+  }, [content, isDisplay]);
+
+  if (!html) {
+    return <code>{content}</code>;
+  }
+
+  return (
+    <span
+      dangerouslySetInnerHTML={{ __html: html }}
+      className={isDisplay ? "katex-display-block" : "katex-inline-block"}
+    />
+  );
 }
 
 /**
- * Full normalization pipeline. Pure function: same input -> same output.
- * Safe to unit test stage-by-stage (each helper above is independently
- * exported-shaped and testable if you re-export them from this module).
+ * Shared markdown + KaTeX + mhchem renderer.
+ *
+ * Single source of truth for rendering mixed content — used for both
+ * question text and option text. Uses the direct katex instance with mhchem
+ * loaded, avoiding third-party module isolation issues.
  */
-export function normalizeMathAndChemistry(text: string): string {
-  if (!text) return text;
-
-  let result = text;
-  result = repairEscapeSequences(result);
-  result = repairChemistryNotation(result);
-  result = repairOrphanedDisplayMath(result);
-  result = cleanDisplayMathBlocks(result);
-
-  const { text: protectedText, blocks } = protectMathBlocks(result);
-  let working = protectedText;
-  working = applyChemistryTextFixes(working);
-  working = applySymbolTextFixes(working);
-  working = wrapBareLatexCommands(working);
-
-  result = restoreMathBlocks(working, blocks);
-  result = collapseWhitespace(result);
-  return result;
-}
-
-/* ============================================================================
- * RENDERING
- * remark-math parses $...$/$$...$$ into math AST nodes; rehype-katex converts
- * those nodes directly to KaTeX HTML in the rehype phase. No custom `code`
- * component interception needed — inline vs. display math is handled
- * automatically by the plugin.
- * ==========================================================================*/
-
-// KaTeX options — single source of truth, applied once at the plugin level.
-// `trust: false` (default) and `strict: false` are set explicitly:
-//  - trust:false blocks \href/\includegraphics-style commands (XSS surface).
-//  - strict:false silences noisy warnings on OCR text mixed with unicode.
-const KATEX_OPTIONS = {
-  throwOnError: false,
-  strict: false,
-  trust: false,
-  errorColor: "#ef4444",
-} as const;
-
-// Defined once at module scope — never recreated per render.
-const REMARK_PLUGINS = [remarkMath, remarkBreaks];
-const REHYPE_PLUGINS: Array<[typeof rehypeKatex, typeof KATEX_OPTIONS]> = [
-  [rehypeKatex, KATEX_OPTIONS],
-];
-
 function RichContentBase({ text, className }: RichContentProps) {
+  const remarkPlugins = useMemo(() => [remarkMath, remarkBreaks], []);
+
   const formattedContent = useMemo(() => {
     try {
       return normalizeMathAndChemistry(text);
     } catch (err) {
-      // Fail open: render the raw text rather than crash the question view.
+      // Fail open: render the raw text rather than crash the question view
+      // on an unexpected OCR edge case.
       // eslint-disable-next-line no-console
       console.error("RichContent: normalization failed, rendering raw text", err);
       return text;
     }
   }, [text]);
 
+  const components = useMemo(
+    () => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      code({ className: codeClassName, children, node, ...props }: any) {
+        const textVal = String(children).replace(/\n$/, "");
+        const isMath =
+          codeClassName?.includes("language-math") ||
+          codeClassName?.includes("math-inline") ||
+          codeClassName?.includes("math-display") ||
+          node?.type === "inlineMath" ||
+          node?.type === "math";
+
+        if (isMath) {
+          const isDisplay =
+            codeClassName?.includes("math-display") || node?.type === "math";
+          return <MathRenderer content={textVal} isDisplay={!!isDisplay} />;
+        }
+
+        return (
+          <code className={codeClassName} {...props}>
+            {children}
+          </code>
+        );
+      },
+    }),
+    [],
+  );
+
   if (!text) {
     return null;
   }
 
   return (
-    <div className={["rich-content", className].filter(Boolean).join(" ")}>
-      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS as never}>
+    <div
+      className={[
+        "rich-content",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        components={components as any}
+      >
         {formattedContent}
       </ReactMarkdown>
     </div>
   );
 }
 
-/** Only re-render when `text` or `className` actually change. */
+/**
+ * Custom comparator: only re-render when `text` actually changes.
+ */
 export const RichContent = React.memo(RichContentBase, (prev, next) => {
   return prev.text === next.text && prev.className === next.className;
 });
