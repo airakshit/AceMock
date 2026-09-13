@@ -146,13 +146,10 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
                 "Primary identifier/number for the question or solution.",
             },
             question: {
-              type: ["string", "null"],
-              description:
-                "The actual question text formatted with LaTeX/mhchem where applicable.",
+              type: ["string", "null"]
             },
             options: {
               type: ["object", "null"],
-              description: "Four choices A, B, C, D if present.",
               properties: {
                 A: { type: ["string", "null"] },
                 B: { type: ["string", "null"] },
@@ -164,7 +161,6 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
             answerKey: {
               type: ["string", "null"],
               enum: ["A", "B", "C", "D", null],
-              description: "Correct answer key option label (A, B, C, or D).",
             },
             subject: {
               type: ["string", "null"],
@@ -176,74 +172,60 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
                 "comprehension",
                 null,
               ],
-              description: "Subject classification.",
             },
             marks: {
               type: ["number", "null"],
-              description: "Marks for this question.",
             },
             solution: {
               type: ["string", "null"],
-              description: "Step-by-step solution text if present on page.",
             },
             optionIncomplete: {
               type: ["boolean", "null"],
-              description:
-                "True if options are cut off or fewer than 4 choices appear.",
             },
             incomplete: {
               type: ["boolean", "null"],
-              description:
-                "True if question or solution is cut off at the page bottom.",
             },
             isContinuation: {
               type: ["boolean", "null"],
-              description: "True if content continues from previous page top without any serial number.",
             },
             svgQuestion: {
               type: ["string", "null"],
-              description:
-                "Inline SVG representation of question diagram if present.",
-            },
-            svgSolution: {
-              type: ["string", "null"],
-              description:
-                "Inline SVG representation of solution diagram if present.",
-            },
-            svgOptions: {
-              type: ["object", "null"],
-              description: "SVG diagrams for individual options if present.",
-              properties: {
-                A: { type: ["string", "null"] },
-                B: { type: ["string", "null"] },
-                C: { type: ["string", "null"] },
-                D: { type: ["string", "null"] },
+              svgSolution: {
+                type: ["string", "null"]
               },
-              additionalProperties: false,
+              svgOptions: {
+                type: ["object", "null"],
+                properties: {
+                  A: { type: ["string", "null"] },
+                  B: { type: ["string", "null"] },
+                  C: { type: ["string", "null"] },
+                  D: { type: ["string", "null"] },
+                },
+                additionalProperties: false,
+              },
             },
-          },
-          required: [
-            "serialNo",
+            required: [
+              "serialNo",
 
-          ],
-          anyOf: [
-            { "required": ["question"] },
-            { "required": ["options"] },
-            { "required": ["answerKey"] },
-            { "required": ["solution"] },
-            { "required": ["svgQuestion"] },
-            { "required": ["svgSolution"] },
-            { "required": ["svgOptions"] }
-          ],
-          additionalProperties: false,
+            ],
+            anyOf: [
+              { "required": ["question"] },
+              { "required": ["options"] },
+              { "required": ["answerKey"] },
+              { "required": ["solution"] },
+              { "required": ["svgQuestion"] },
+              { "required": ["svgSolution"] },
+              { "required": ["svgOptions"] }
+            ],
+            additionalProperties: false,
+          },
         },
       },
+      required: [
+        "isRelevant",
+        "data"
+      ],
+      additionalProperties: false,
     },
-    required: [
-      "isRelevant",
-      "data"
-    ],
-    additionalProperties: false,
-  },
-};
-
+  }
+}
