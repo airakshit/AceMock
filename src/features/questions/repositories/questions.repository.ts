@@ -1,5 +1,5 @@
 import { chapters, passages, questions, sections, subjects } from "@/db/schemas";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
 import { QuestionDifficulty, QuestionOption } from "../types";
 import { generateUUIDv7 } from "../../shared/utils";
@@ -91,6 +91,18 @@ export class QuestionsRepository {
     return db.insert(questions).values(valuesToInsert).returning();
   }
 
+  async deleteByFileIds(db: DbExecutor, fileIds: string[]): Promise<number> {
+    if (fileIds.length === 0) {
+      return 0;
+    }
+    const deleted = await db
+      .delete(questions)
+      .where(inArray(questions.fileId, fileIds))
+      .returning({ id: questions.id });
+
+    return deleted.length;
+  }
+
   async createPassage(
     db: DbExecutor,
     content: string,
@@ -104,6 +116,24 @@ export class QuestionsRepository {
       .returning();
 
     return passage.id;
+  }
+
+  async findOrCreatePassage(
+    db: DbExecutor,
+    content: string,
+  ): Promise<string> {
+    const trimmed = content.trim();
+    const [existing] = await db
+      .select({ id: passages.id })
+      .from(passages)
+      .where(eq(passages.content, trimmed))
+      .limit(1);
+
+    if (existing) {
+      return existing.id;
+    }
+
+    return this.createPassage(db, trimmed);
   }
 
   async findOrCreateDefaultChapter(
@@ -270,6 +300,81 @@ export class QuestionsRepository {
       .leftJoin(subjects, eq(sections.subjectId, subjects.id))
       .orderBy(desc(questions.createdAt))
       .limit(limit);
+  }
+
+  async getAllChaptersMap(db: DbExecutor) {
+    const records = await db
+      .select({
+        id: chapters.id,
+        name: chapters.name,
+        slug: chapters.slug,
+        sectionId: sections.id,
+        sectionSlug: sections.slug,
+        sectionName: sections.name,
+        subjectId: subjects.id,
+        subjectSlug: subjects.slug,
+        subjectName: subjects.name,
+      })
+      .from(chapters)
+      .leftJoin(sections, eq(chapters.sectionId, sections.id))
+      .leftJoin(subjects, eq(sections.subjectId, subjects.id));
+
+    const map = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        slug: string;
+        sectionSlug: string | null;
+        subjectSlug: string | null;
+      }
+    >();
+
+    for (const record of records) {
+      map.set(record.slug, {
+        id: record.id,
+        name: record.name,
+        slug: record.slug,
+        sectionSlug: record.sectionSlug,
+        subjectSlug: record.subjectSlug,
+      });
+    }
+
+    return map;
+  }
+
+  async updateChapterId(db: DbExecutor, questionId: string, chapterId: string) {
+    const [updated] = await db
+      .update(questions)
+      .set({ chapterId, updatedAt: new Date() })
+      .where(eq(questions.id, questionId))
+      .returning();
+
+    return updated;
+  }
+
+  async updateManyChapterIds(
+    db: DbExecutor,
+    updates: Array<{ id: string; chapterId: string }>,
+  ) {
+    if (updates.length === 0) {
+      return [];
+    }
+
+    return db.transaction(async (tx) => {
+      const results = [];
+      for (const update of updates) {
+        const [updated] = await tx
+          .update(questions)
+          .set({ chapterId: update.chapterId, updatedAt: new Date() })
+          .where(eq(questions.id, update.id))
+          .returning();
+        if (updated) {
+          results.push(updated);
+        }
+      }
+      return results;
+    });
   }
 }
 

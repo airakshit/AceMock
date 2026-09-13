@@ -1,4 +1,4 @@
-import { BaseLLMService } from "./base-llm.service";
+import { BaseLLMService, StructuredJsonOptions } from "./llm.serivce";
 
 export const OpenRouterModels = {
   /**
@@ -29,7 +29,7 @@ export const OpenRouterModels = {
     /** Qwen 2.5 72B Instruct - High capability instruction model */
     QWEN_2_5_72B: "qwen/qwen-2.5-72b-instruct:free",
     /** Google Gemini 2.0 Flash Lite */
-    GEMINI_2_FLASH_LITE: "google/gemini-2.0-flash-lite-preview:free",
+    GEMINI_2_FLASH_LITE: "google/gemini-2.0-flash-lite-preview:free"
   },
 } as const;
 
@@ -67,6 +67,7 @@ export class OpenRouterLLMService extends BaseLLMService<OpenRouterModel> {
     prompt: string,
     model?: OpenRouterModel,
     imageUrls?: string[],
+    outputJson?: StructuredJsonOptions
   ): Promise<string | null> {
     const selectedModel = model || this.model;
     const hasImages = imageUrls && imageUrls.length > 0;
@@ -102,8 +103,10 @@ export class OpenRouterLLMService extends BaseLLMService<OpenRouterModel> {
             content,
           },
         ],
+        response_format: outputJson ? { type: "json_schema", json_schema: outputJson } : undefined
       }),
     });
+
 
     if (!response.ok) {
       let errorBody: unknown;

@@ -764,7 +764,12 @@ export const CURRICULUM = {
       comprehension: {
         name: "Comprehension",
         slug: "comprehension",
-        chapters: [],
+        chapters: [
+          {
+            name: "Reading Comprehension",
+            slug: "reading-comprehension",
+          },
+        ],
       },
     },
   },

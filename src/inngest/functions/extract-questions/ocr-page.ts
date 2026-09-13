@@ -1,16 +1,13 @@
 import { inngest } from "../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import {
-  paperTextStructuredExtractionPromptV1,
-  paperTextStructuredExtractionPromptV2,
-} from "@/services/llm/prompts";
+import { structuredOutputExtractionPrompt } from "@/services/llm/prompts";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
 import { db } from "@/db";
 import type { OcrPageResult } from "./ocr-types";
 import { OpenRouterLLMService, OpenRouterModels } from "@/services/llm";
 import { parseAndValidateStructuredOCR } from "./utils";
 import { OcrEmptyResponseError, OcrValidationError } from "./errors";
-import type { StructuredSchemaParseResult } from "./schema";
+import { type StructuredSchemaParseResult, structuredOCRJsonSchema } from "./schema";
 
 export interface OcrPageEventData {
   userId: string;
@@ -48,7 +45,9 @@ export const ocrPage = inngest.createFunction(
       return await supabaseStorageClient.getPageAccessUrl(storagePath);
     });
 
-    const MODEL_TO_USE = OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW;
+    const MODEL_TO_USE =
+      (process.env.OCR_MODEL as string) ||
+      OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW;
 
 
 
@@ -68,9 +67,10 @@ export const ocrPage = inngest.createFunction(
         );
 
         const rawText = await openRouter.call(
-          paperTextStructuredExtractionPromptV2,
+          structuredOutputExtractionPrompt,
           undefined,
           [signedUrl],
+          structuredOCRJsonSchema,
         );
 
         if (!rawText && attempt < TOTAL_RETRIES) {

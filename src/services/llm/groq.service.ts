@@ -1,5 +1,5 @@
 import { Groq } from "groq-sdk";
-import { BaseLLMService } from "./base-llm.service";
+import { BaseLLMService, StructuredJsonOptions } from "./llm.serivce";
 
 enum GroqModels {
   QWEN_VISION_MODEL = "qwen/qwen3.6-27b",
@@ -19,10 +19,12 @@ class GroqLLMService extends BaseLLMService<GroqModels> {
     this._client = new Groq({ apiKey: apiKey });
   }
 
+
   async call(
     prompt: string,
     model?: GroqModels,
     imageUrls?: string[],
+    outputJson?: StructuredJsonOptions
   ): Promise<string | null> {
     const hasImages = imageUrls && imageUrls.length > 0;
 
@@ -46,6 +48,8 @@ class GroqLLMService extends BaseLLMService<GroqModels> {
           content: content,
         },
       ],
+      response_format: outputJson ? { type: "json_schema", json_schema: outputJson } : undefined
+
     });
 
     return response.choices[0].message.content;

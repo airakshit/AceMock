@@ -7,9 +7,14 @@ export interface ILLMService<TModel extends string = string> {
   ): Promise<string | null>;
 }
 
+export interface StructuredJsonOptions {
+  name: string;
+  schema: { [key: string]: unknown; };
+  strict: boolean;
+}
+
 export abstract class BaseLLMService<TModel extends string = string>
-  implements ILLMService<TModel>
-{
+  implements ILLMService<TModel> {
   protected apiKey: string;
   public model: TModel;
 
@@ -22,5 +27,6 @@ export abstract class BaseLLMService<TModel extends string = string>
     prompt: string,
     model?: TModel,
     imageUrls?: string[],
+    outputJson?: StructuredJsonOptions
   ): Promise<string | null>;
 }

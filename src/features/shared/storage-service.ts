@@ -15,6 +15,8 @@ export interface DownloadedObject {
   data: Blob;
 }
 
+const DEFAULT_FILE_ACCESS_EXPIRY_MINUTES = 30;
+
 class SupabaseStorageClient {
   private readonly _supabaseClient: ReturnType<
     typeof createSupabaseServerClient
@@ -196,7 +198,7 @@ class SupabaseStorageClient {
 
   async getPageAccessUrls(
     objectPaths: string[],
-    expiresIn = 600,
+    expiresIn = DEFAULT_FILE_ACCESS_EXPIRY_MINUTES * 60,
   ): Promise<Array<{ path: string; signedUrl: string }>> {
     if (objectPaths.length === 0) {
       return [];
@@ -209,7 +211,7 @@ class SupabaseStorageClient {
     if (error) {
       console.log(
         `Error generating signed URLs: [MESSAGE]: ${error.message}, ` +
-          `[STATUS]: ${error.status}, [CAUSE]: ${error.cause}`,
+        `[STATUS]: ${error.status}, [CAUSE]: ${error.cause}`,
       );
 
       throw error;

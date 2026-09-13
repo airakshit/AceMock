@@ -14,6 +14,7 @@ import { generateUUIDv7 } from "@/features/shared/utils";
 import { mergeOcrResults } from "./merge-ocr-results";
 import type { OcrPageResult, ResolvedQuestion } from "./ocr-types";
 import { OcrPageFailedError, QuestionPersistError } from "./errors";
+import { curriculumClassifierService } from "@/features/questions/services/curriculum-classifier.service";
 
 export interface ExtractDocumentQuestionEventData {
   userId: string;
@@ -339,7 +340,7 @@ export const extractQuestions = inngest.createFunction(
         );
 
         for (const passageContent of distinctPassages) {
-          const passageId = await questionsRepository.createPassage(
+          const passageId = await questionsRepository.findOrCreatePassage(
             db,
             passageContent,
           );
@@ -351,7 +352,7 @@ export const extractQuestions = inngest.createFunction(
     );
 
     // 7. Prepare payload and persist all questions to the database
-    const savedCount = await step.run("save-questions", async () => {
+    const saveResult = await step.run("save-questions", async () => {
       try {
         const defaultSubjectKey = "general";
         const fallbackChapterId =
@@ -384,7 +385,16 @@ export const extractQuestions = inngest.createFunction(
         });
 
         const inserted = await questionsRepository.createMany(db, payload);
-        return inserted.length;
+        return {
+          savedCount: inserted.length,
+          insertedQuestions: inserted.map((q, idx) => ({
+            id: q.id,
+            question: q.question,
+            options: q.options as Array<{ key: string; text: string }>,
+            subject: resolvedQuestions[idx]?.subject || null,
+            passageContent: resolvedQuestions[idx]?.passageContent || null,
+          })),
+        };
       } catch (err) {
         logger.error(
           { documentId, error: err },
@@ -397,7 +407,56 @@ export const extractQuestions = inngest.createFunction(
       }
     });
 
-    // 8. Mark document as successfully processed
+    // 8. Classify questions and assign curriculum chapter IDs
+    const classifiedCount = await step.run(
+      "classify-and-assign-chapters",
+      async () => {
+        if (
+          !saveResult.insertedQuestions ||
+          saveResult.insertedQuestions.length === 0
+        ) {
+          return 0;
+        }
+
+        logger.info(
+          { documentId, count: saveResult.insertedQuestions.length },
+          "Starting 2-step hierarchical curriculum classification with Groq LLM.",
+        );
+
+        try {
+          const classifications =
+            await curriculumClassifierService.classifyQuestions(
+              db,
+              saveResult.insertedQuestions,
+            );
+
+          const updates = classifications.map((c) => ({
+            id: c.id,
+            chapterId: c.chapterId,
+          }));
+
+          await questionsRepository.updateManyChapterIds(db, updates);
+
+          logger.info(
+            {
+              documentId,
+              classifiedCount: updates.length,
+            },
+            "Curriculum classification and chapter ID updates completed.",
+          );
+
+          return updates.length;
+        } catch (err) {
+          logger.error(
+            { documentId, error: err },
+            "Curriculum classification encountered an error; questions remain with subject fallback chapters.",
+          );
+          return 0;
+        }
+      },
+    );
+
+    // 9. Mark document as successfully processed
     await step.run("mark-document-completed", async () => {
       await documentsRepository.updateProcessingStatus(
         db,
@@ -409,9 +468,10 @@ export const extractQuestions = inngest.createFunction(
     logger.info(
       {
         documentId,
-        totalQuestionsSaved: savedCount,
+        totalQuestionsSaved: saveResult.savedCount,
+        totalQuestionsClassified: classifiedCount,
       },
-      "Document processing and question extraction completed successfully.",
+      "Document processing, question extraction, and classification completed successfully.",
     );
 
     return {
@@ -419,7 +479,8 @@ export const extractQuestions = inngest.createFunction(
       documentId,
       totalPages: allDocPages.length,
       successfulPages: allDocPages.length,
-      totalQuestionsSaved: savedCount,
+      totalQuestionsSaved: saveResult.savedCount,
+      totalQuestionsClassified: classifiedCount,
     };
   },
 );
