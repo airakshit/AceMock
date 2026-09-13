@@ -6,10 +6,26 @@ import { questionsRepository } from "../repositories/questions.repository";
 
 export type CurriculumSubjectKey = "physics" | "chemistry" | "mathematics" | "english";
 
+/**
+ * Raw OCR subject values (lowercase) that the LLM produces during page extraction.
+ * "grammar" and "comprehension" are English subtypes; we map them to "english".
+ */
+const OCR_SUBJECT_TO_CURRICULUM: Record<string, CurriculumSubjectKey> = {
+  physics: "physics",
+  chemistry: "chemistry",
+  maths: "mathematics",
+  math: "mathematics",
+  mathematics: "mathematics",
+  grammar: "english",
+  comprehension: "english",
+  english: "english",
+};
+
 export interface QuestionToClassify {
   id: string;
   question: string;
   options?: Array<{ key: string; text: string }>;
+  /** Raw OCR subject: "physics" | "chemistry" | "maths" | "grammar" | "comprehension" */
   subject?: string | null;
   passageContent?: string | null;
 }
@@ -32,30 +48,20 @@ export class CurriculumClassifierService {
   }
 
   /**
-   * Normalizes raw subject string from OCR into a known curriculum subject key.
+   * Maps a raw OCR subject string to a CurriculumSubjectKey.
+   * grammar → english, comprehension → english.
+   * Returns null if the subject cannot be determined.
    */
   normalizeSubject(subjectInput?: string | null): CurriculumSubjectKey | null {
     if (!subjectInput) return null;
     const lower = subjectInput.toLowerCase().trim();
-
-    if (lower.includes("phys")) return "physics";
-    if (lower.includes("chem")) return "chemistry";
-    if (lower.includes("math")) return "mathematics";
-    if (
-      lower.includes("eng") ||
-      lower.includes("gram") ||
-      lower.includes("comp") ||
-      lower.includes("passage") ||
-      lower.includes("reading")
-    ) {
-      return "english";
-    }
-
-    return null;
+    return OCR_SUBJECT_TO_CURRICULUM[lower] ?? null;
   }
 
   /**
-   * Identifies the subject for questions where subject is unknown or general.
+   * Identifies the curriculum subject for all questions.
+   * Questions with OCR-tagged subjects are resolved immediately without an LLM call.
+   * Only truly unknown questions are batched to Groq for detection.
    */
   async detectSubjects(
     questions: QuestionToClassify[],
@@ -64,12 +70,13 @@ export class CurriculumClassifierService {
     const unknownQuestions: QuestionToClassify[] = [];
 
     for (const q of questions) {
+      // Comprehension passage questions are always English
       if (q.passageContent) {
-        // Comprehension passages are part of English
         subjectMap.set(q.id, "english");
         continue;
       }
 
+      // Try to resolve from OCR-tagged subject (covers grammar, comprehension → english)
       const normalized = this.normalizeSubject(q.subject);
       if (normalized) {
         subjectMap.set(q.id, normalized);
@@ -82,36 +89,25 @@ export class CurriculumClassifierService {
       return subjectMap;
     }
 
-    // Batch identify unknown subjects via Groq
+    // Batch identify truly unknown subjects via Groq
     for (let i = 0; i < unknownQuestions.length; i += BATCH_SIZE) {
       const batch = unknownQuestions.slice(i, i + BATCH_SIZE);
       try {
-        const prompt = `You are an expert curriculum classifier for entrance exams.
-Available subjects:
-- physics
-- chemistry
-- mathematics
-- english
+        const prompt = `You are an expert curriculum classifier for engineering entrance exams (e.g. IOE, CEE).
+Available subjects: physics, chemistry, mathematics, english
 
-Classify each question into one of the 4 subjects above.
+Classify each question into exactly one of the 4 subjects.
 
 Questions:
 ${batch
-  .map(
-    (q, idx) =>
-      `${idx + 1}. [ID: ${q.id}] Question: ${q.question.slice(0, 300)}` +
-      (q.options?.length
-        ? ` Options: ${q.options.map((o) => `${o.key}: ${o.text}`).join(", ")}`
-        : ""),
-  )
-  .join("\n")}
-
-Respond in JSON adhering to this schema:
-{
-  "classifications": [
-    { "id": "question_id", "subject": "physics|chemistry|mathematics|english" }
-  ]
-}`;
+            .map(
+              (q, idx) =>
+                `${idx + 1}. [ID: ${q.id}] ${q.question.slice(0, 300)}` +
+                (q.options?.length
+                  ? ` | Options: ${q.options.map((o) => `${o.key}: ${o.text}`).join(", ")}`
+                  : ""),
+            )
+            .join("\n")}`;
 
         const raw = await this.llm.call(
           prompt,
@@ -149,7 +145,11 @@ Respond in JSON adhering to this schema:
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed?.classifications)) {
             for (const item of parsed.classifications) {
-              if (item.id && item.subject) {
+              if (
+                item.id &&
+                typeof item.subject === "string" &&
+                ["physics", "chemistry", "mathematics", "english"].includes(item.subject)
+              ) {
                 subjectMap.set(item.id, item.subject as CurriculumSubjectKey);
               }
             }
@@ -159,10 +159,20 @@ Respond in JSON adhering to this schema:
         console.error("Failed to detect subject for batch:", err);
       }
 
-      // Default fallback for any unclassified in this batch
+      // Fallback for any still-unclassified questions in this batch
       for (const q of batch) {
         if (!subjectMap.has(q.id)) {
-          subjectMap.set(q.id, "physics");
+          // Best-effort fallback using question keywords
+          const lower = (q.question + " " + (q.subject ?? "")).toLowerCase();
+          if (lower.includes("chem") || lower.includes("reaction") || lower.includes("element")) {
+            subjectMap.set(q.id, "chemistry");
+          } else if (lower.includes("math") || lower.includes("calcul") || lower.includes("integr")) {
+            subjectMap.set(q.id, "mathematics");
+          } else if (lower.includes("passage") || lower.includes("grammar")) {
+            subjectMap.set(q.id, "english");
+          } else {
+            subjectMap.set(q.id, "physics");
+          }
         }
       }
     }
@@ -171,7 +181,8 @@ Respond in JSON adhering to this schema:
   }
 
   /**
-   * Step 1: Classifies the section for a batch of questions within a known subject.
+   * Step 1: Classifies the section for questions within a specific subject.
+   * Only sections that belong to the given subject are shown to the LLM.
    */
   async classifySections(
     subject: CurriculumSubjectKey,
@@ -188,6 +199,11 @@ Respond in JSON adhering to this schema:
       slug: s.slug as string,
     }));
 
+    // Build a validation set for fast slug verification
+    const validSectionSlugs = new Set(availableSections.map((s) => s.slug));
+    const defaultSectionSlug = availableSections[0].slug;
+
+    // If only one section exists, assign directly — no LLM call needed
     if (availableSections.length === 1) {
       for (const q of questions) {
         sectionMap.set(q.id, availableSections[0].slug);
@@ -195,16 +211,17 @@ Respond in JSON adhering to this schema:
       return sectionMap;
     }
 
-    const defaultSectionSlug = availableSections[0].slug;
-
     for (let i = 0; i < questions.length; i += BATCH_SIZE) {
       const batch = questions.slice(i, i + BATCH_SIZE);
 
-      // Check for reading comprehension passage directly
+      // English comprehension questions always go to "comprehension" section directly
       const questionsToQuery: QuestionToClassify[] = [];
       for (const q of batch) {
         if (subject === "english" && q.passageContent) {
-          sectionMap.set(q.id, "comprehension");
+          const comprehensionSection = availableSections.find((s) =>
+            s.slug.includes("comprehension"),
+          );
+          sectionMap.set(q.id, comprehensionSection?.slug ?? defaultSectionSlug);
         } else {
           questionsToQuery.push(q);
         }
@@ -214,34 +231,29 @@ Respond in JSON adhering to this schema:
 
       try {
         const sectionsListText = availableSections
-          .map((s) => `- ${s.name} (slug: "${s.slug}")`)
+          .map((s) => `- "${s.slug}": ${s.name}`)
           .join("\n");
+
+        const sectionSlugEnum = availableSections.map((s) => s.slug);
 
         const prompt = `You are an expert curriculum classifier for engineering entrance exams.
 Subject: ${subjectDef.name}
 
-Available Sections:
+Available Sections (use the exact slug):
 ${sectionsListText}
 
-Classify each question into the single most appropriate Section slug from the list above.
+Classify each question into one of the section slugs above.
 
 Questions:
 ${questionsToQuery
-  .map(
-    (q, idx) =>
-      `${idx + 1}. [ID: ${q.id}] Question: ${q.question.slice(0, 300)}` +
-      (q.options?.length
-        ? ` Options: ${q.options.map((o) => `${o.key}: ${o.text}`).join(", ")}`
-        : ""),
-  )
-  .join("\n")}
-
-Respond with JSON adhering to this schema:
-{
-  "classifications": [
-    { "id": "question_id", "sectionSlug": "slug_of_section" }
-  ]
-}`;
+            .map(
+              (q, idx) =>
+                `${idx + 1}. [ID: ${q.id}] ${q.question.slice(0, 300)}` +
+                (q.options?.length
+                  ? ` | Options: ${q.options.map((o) => `${o.key}: ${o.text}`).join(", ")}`
+                  : ""),
+            )
+            .join("\n")}`;
 
         const raw = await this.llm.call(
           prompt,
@@ -258,7 +270,10 @@ Respond with JSON adhering to this schema:
                     type: "object",
                     properties: {
                       id: { type: "string" },
-                      sectionSlug: { type: "string" },
+                      sectionSlug: {
+                        type: "string",
+                        enum: sectionSlugEnum,
+                      },
                     },
                     required: ["id", "sectionSlug"],
                     additionalProperties: false,
@@ -276,11 +291,9 @@ Respond with JSON adhering to this schema:
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed?.classifications)) {
             for (const item of parsed.classifications) {
-              const matched = availableSections.find(
-                (s) => s.slug === item.sectionSlug,
-              );
-              if (matched) {
-                sectionMap.set(item.id, matched.slug);
+              // Strict validation: only accept slugs actually in this subject's sections
+              if (item.id && typeof item.sectionSlug === "string" && validSectionSlugs.has(item.sectionSlug)) {
+                sectionMap.set(item.id, item.sectionSlug);
               }
             }
           }
@@ -301,7 +314,8 @@ Respond with JSON adhering to this schema:
   }
 
   /**
-   * Step 2: Classifies the chapter for a batch of questions within a known section.
+   * Step 2: Classifies the chapter for questions within a specific section.
+   * Only chapters that belong to the given section are shown to the LLM.
    */
   async classifyChapters(
     subject: CurriculumSubjectKey,
@@ -322,12 +336,15 @@ Respond with JSON adhering to this schema:
       return chapterMap;
     }
 
-    const availableChapters = sectionDef.chapters.map((c: any) => ({
-      name: c.name as string,
-      slug: c.slug as string,
-    }));
+    const availableChapters: Array<{ name: string; slug: string }> = sectionDef.chapters.map(
+      (c: any) => ({ name: c.name as string, slug: c.slug as string }),
+    );
 
-    // If only 1 chapter exists in this section, map directly without an LLM call
+    // Build a validation set for fast slug verification
+    const validChapterSlugs = new Set(availableChapters.map((c) => c.slug));
+    const defaultChapterSlug = availableChapters[0].slug;
+
+    // If only 1 chapter exists, map directly without an LLM call
     if (availableChapters.length === 1) {
       for (const q of questions) {
         chapterMap.set(q.id, availableChapters[0].slug);
@@ -335,42 +352,35 @@ Respond with JSON adhering to this schema:
       return chapterMap;
     }
 
-    const defaultChapterSlug = availableChapters[0].slug;
+    const chapterSlugEnum = availableChapters.map((c) => c.slug);
 
     for (let i = 0; i < questions.length; i += BATCH_SIZE) {
       const batch = questions.slice(i, i + BATCH_SIZE);
 
       try {
         const chaptersListText = availableChapters
-          .map((c: any) => `- ${c.name} (slug: "${c.slug}")`)
+          .map((c) => `- "${c.slug}": ${c.name}`)
           .join("\n");
 
         const prompt = `You are an expert curriculum classifier for engineering entrance exams.
 Subject: ${subjectDef.name}
 Section: ${sectionDef.name}
 
-Available Chapters:
+Available Chapters (use the exact slug):
 ${chaptersListText}
 
-Classify each question into the single most appropriate Chapter slug from the list above.
+Classify each question into one of the chapter slugs above.
 
 Questions:
 ${batch
-  .map(
-    (q, idx) =>
-      `${idx + 1}. [ID: ${q.id}] Question: ${q.question.slice(0, 300)}` +
-      (q.options?.length
-        ? ` Options: ${q.options.map((o) => `${o.key}: ${o.text}`).join(", ")}`
-        : ""),
-  )
-  .join("\n")}
-
-Respond with JSON adhering to this schema:
-{
-  "classifications": [
-    { "id": "question_id", "chapterSlug": "slug_of_chapter" }
-  ]
-}`;
+            .map(
+              (q, idx) =>
+                `${idx + 1}. [ID: ${q.id}] ${q.question.slice(0, 300)}` +
+                (q.options?.length
+                  ? ` | Options: ${q.options.map((o) => `${o.key}: ${o.text}`).join(", ")}`
+                  : ""),
+            )
+            .join("\n")}`;
 
         const raw = await this.llm.call(
           prompt,
@@ -387,7 +397,10 @@ Respond with JSON adhering to this schema:
                     type: "object",
                     properties: {
                       id: { type: "string" },
-                      chapterSlug: { type: "string" },
+                      chapterSlug: {
+                        type: "string",
+                        enum: chapterSlugEnum,
+                      },
                     },
                     required: ["id", "chapterSlug"],
                     additionalProperties: false,
@@ -405,11 +418,9 @@ Respond with JSON adhering to this schema:
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed?.classifications)) {
             for (const item of parsed.classifications) {
-              const matched = availableChapters.find(
-                (c: any) => c.slug === item.chapterSlug,
-              );
-              if (matched) {
-                chapterMap.set(item.id, matched.slug);
+              // Strict validation: only accept slugs actually in this section
+              if (item.id && typeof item.chapterSlug === "string" && validChapterSlugs.has(item.chapterSlug)) {
+                chapterMap.set(item.id, item.chapterSlug);
               }
             }
           }
@@ -434,10 +445,11 @@ Respond with JSON adhering to this schema:
 
   /**
    * Main incremental classification orchestrator:
-   * 1. Detects/normalizes subject.
-   * 2. Step 1: Classifies Section.
-   * 3. Step 2: Classifies Chapter within Section.
-   * 4. Resolves database chapterId from slug.
+   * 1. Normalizes OCR subjects → curriculum subjects (grammar/comprehension → english).
+   * 2. Groups questions by curriculum subject.
+   * 3. For each subject: classifies section from ONLY that subject's sections.
+   * 4. For each section: classifies chapter from ONLY that section's chapters.
+   * 5. Resolves database chapterId from slug.
    */
   async classifyQuestions(
     db: DbExecutor,
@@ -445,16 +457,17 @@ Respond with JSON adhering to this schema:
   ): Promise<ClassifiedQuestionResult[]> {
     if (questions.length === 0) return [];
 
-    // 1. Fetch DB chapters cache for O(1) slug resolution
+    // 1. Fetch DB chapters cache for O(1) slug → UUID resolution
     const dbChaptersMap = await questionsRepository.getAllChaptersMap(db);
 
-    // 2. Identify subjects for all questions
+    // 2. Detect/normalize subjects for all questions
     const subjectMap = await this.detectSubjects(questions);
 
-    // Group questions by subject
+    // 3. Group questions by curriculum subject
     const subjectGroups = new Map<CurriculumSubjectKey, QuestionToClassify[]>();
     for (const q of questions) {
-      const subj = subjectMap.get(q.id) || "physics";
+      const subj = subjectMap.get(q.id);
+      if (!subj) continue; // should not happen; detectSubjects always assigns
       if (!subjectGroups.has(subj)) {
         subjectGroups.set(subj, []);
       }
@@ -463,22 +476,23 @@ Respond with JSON adhering to this schema:
 
     const results: ClassifiedQuestionResult[] = [];
 
-    // 3. For each subject, run 2-step classification
+    // 4. For each subject group, run 2-step classification
     for (const [subject, subjectQuestions] of subjectGroups.entries()) {
-      // Step 1: Section classification
+      // Step 1: Classify section (only sections of this subject are in scope)
       const sectionMap = await this.classifySections(subject, subjectQuestions);
 
       // Group questions by classified section
       const sectionGroups = new Map<string, QuestionToClassify[]>();
       for (const q of subjectQuestions) {
-        const secSlug = sectionMap.get(q.id) || "general";
+        const secSlug = sectionMap.get(q.id);
+        if (!secSlug) continue; // classifySections always assigns via fallback
         if (!sectionGroups.has(secSlug)) {
           sectionGroups.set(secSlug, []);
         }
         sectionGroups.get(secSlug)!.push(q);
       }
 
-      // Step 2: Chapter classification per section
+      // Step 2: Classify chapter (only chapters of this section are in scope)
       for (const [sectionSlug, secQuestions] of sectionGroups.entries()) {
         const chapterMap = await this.classifyChapters(
           subject,
@@ -494,8 +508,11 @@ Respond with JSON adhering to this schema:
             resolvedChapterId = dbChaptersMap.get(chapterSlug)!.id;
           }
 
-          // Fallback: lookup default chapter for subject if not found
+          // Fallback: find default chapter for this subject if slug not in DB
           if (!resolvedChapterId) {
+            console.warn(
+              `Chapter slug "${chapterSlug}" not found in DB for subject ${subject}/${sectionSlug}. Using subject default.`,
+            );
             resolvedChapterId =
               await questionsRepository.findOrCreateDefaultChapter(db, subject);
           }
@@ -503,7 +520,7 @@ Respond with JSON adhering to this schema:
           results.push({
             id: q.id,
             chapterId: resolvedChapterId,
-            chapterSlug: chapterSlug || `uncategorized-${subject}`,
+            chapterSlug: chapterSlug ?? `fallback-${subject}`,
             sectionSlug,
             subjectSlug: subject,
           });

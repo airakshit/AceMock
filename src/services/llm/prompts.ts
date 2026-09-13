@@ -45,11 +45,13 @@ The frontend uses ReactMarkdown + remarkMath + KaTeX + mhchem. You MUST strictly
    - Limits: \`$\\lim_{x \\to 0} \\frac{\\sin x}{x}$\`
 
 6. **Chemical Formulas & Reactions (MANDATORY mhchem syntax)**:
-   - The frontend supports KaTeX \`\\ce{...}\` (mhchem). ALWAYS format chemical compounds and reactions using \`$\\ce{...}$\`:
-   - Formulas: \`$\\ce{H2O}$\`, \`$\\ce{H2SO4}$\`, \`$\\ce{C2H5OH}$\`
+   - The frontend supports KaTeX \`\\ce{...}\` (mhchem). ALWAYS format chemical compounds and reactions using \`$\\ce{...}$\` for inline, or inside \`$$...$$\` for display:
+   - Formulas: \`$\\ce{H2O}$\`, \`$\\ce{H2SO4}$\`, \`$\\ce{C2H5OH}$\`, \`$\\ce{C6H14}$\`, \`$\\ce{NH3}$\` (never bare text like \`H2O\` or \`C_6H_{14}\`).
    - Ions & charges: \`$\\ce{SO4^2-}$\`, \`$\\ce{Ca^2+}$\`, \`$\\ce{Fe^3+}$\`
    - Chemical equations: \`$\\ce{2H2 + O2 -> 2H2O}$\`, \`$\\ce{N2 + 3H2 <=> 2NH3}$\`
-   - Precipitate and gas arrows: use \`\\uparrow\` for gas, e.g. \`$\\ce{Zn + 2HCl -> ZnCl2 + H2 ^}$\` or \`$\\uparrow$\`
+   - Inequalities and reaction chains: \`$\\ce{NH3 < N2H4 < N2H2 < N3H}$\` (wrap whole chain in single delimiter).
+   - **NO NESTED DOLLARS**: When inside \`$$...$$\`, write \`\\ce{...}\` directly without extra \`$\`. Write \`$$\\text{...} \\ce{H2O}$$\`, NEVER \`$$\\text{...} $\\ce{H2O}$$$\`.
+   - Precipitate and gas arrows: use \`\\uparrow\` for gas, e.g. \`$\\ce{Zn + 2HCl -> ZnCl2 + H2 ^}$\` or \`$\\uparrow$\` (never bare \`\\uparrow\` in text).
 
 7. **Physical Units & Words inside Math**:
    - Plain words or units inside math MUST use \`\\text{...}\`:
@@ -61,152 +63,8 @@ The frontend uses ReactMarkdown + remarkMath + KaTeX + mhchem. You MUST strictly
 Return ONLY the transcribed text. Do NOT add preamble, conversational remarks, or metadata.
 `;
 
-export const paperTextStructuredExtractionPromptV1 = `
-You are an expert OCR and exam parsing engine.
-Extract all questions and solutions from the text/image and return a strict and parsable JSON object.
 
----
-## Input Data
-You will recieve different pages that might contain questions with options, solutions or just answer keys.
-Each page is a part of a question set. You will receive questions related to Physics, Chemistry, Maths
-and English. The questions will be indexed by serial numbers which can be used accross pages to represent
-question, answer key or solution.
-
-**Entities**: Questions, Solutions and Options are stated as entities.
----
-
----
-
-## JSON Fields Rule
-
-### Page level fields. (Rules: 1-2)
-
-Fields: sectionLabel, sectionStart, sectionEnd, eachMarks, paragraph
-These are only five fields to include for page level data. Others are not allowed.
-
-1. If questions are grouped by section with details like marks, section name, start and end if they are available. Put it under the following keys.
-   sectionLabel: "I",
-   sectionStart: 1     // It is the question from which the section starts
-   sectionEnd: 60      // It is the question number where section ends. Specify it if explicitly specified. Do no rely on last question of the page.
-   eachMarks: 2            // It is the marks for each question under the section.
-   Recognize patterns like, 1x60=60 which means, section has 60 questions with one mark each.
-2. If the page contains the english paragraph keep it in 'paragraph' key.
-
-
-### For 'data': [] property of JSON. (Rules: 3-9)
-This will be array with the follwing fields.
-
-3. The 'serialNo': key is a key that contains the number. This number might represent the question, solution or a answer key. 
-   It is the primary key. Never forget this in data of any type.
-4. subject: "Physics" | "Chemistry" | "Maths" | "Grammar" | "Comprehension"  
-   - Always Required
-   - If the question is of english, and is not grammar type, mark 'subject' as 'Comprehension'. Because 
-    passage might be in another page.
-5. Keep the options key and the answer key always A, B, C or D. Map numbers or roman labels to ABCD too.
-   Always keep A, B, C, and D uppercase.
-7. If the page contains the answer key table return, {"serialNo": 1, "answerKey": "B"} objects in data[]
-
-**Rules for digrams**
-6. If the question contain the diagram generate the <svg></svg> code in a string so that no parsing error occurs.
-   Since diagram can be in any of the entities put them in:
-   i. {..., "svgQuestion": "<svg></svg>"}
-   ii. {..., "svgSolution": "<svg></svg>"}
-   iii. {..., "svgOptions": {"A": "<svg></svg>", "B": "<svg></svg>", "C", "<svg></svg>", "D": "<svg></svg>"}}
-
-**Rules for partial entity content .**
-8. incomplete: boolean, optionIncomplete: true
-   If question and solution are incomplete mark 'incomplete': true 
-   If options do not have 4 options, put 'optionIncomplete': true
-
-9. 'isContinuation': boolean
-   If the data feels like continuation of data from previous page mark this field true.
-   The continuation will not likely have serialNo. So infer it with respect to succeding entity serialNo.
-
-In case of incomplete or continuation, also include the partial entity(question/solution/options) under respective field.
-
-
-Keep only the json fields which has meaningful data. Do not keep null. Never miss the required fields.
-And most importantly, never construct your own json fields.
----
-
-
----
- 
-## LaTeX & Markdown Formatting Rules for Content Fields (CRITICAL)
- 
-Content fields (\`question\`, options, \`solution\`) render via ReactMarkdown + remark-math + KaTeX + mhchem.
-Only \`$...$\` (inline) and \`$$...$$\` (display) math delimiters work. No \\(...\\) or \\[...\\].
- 
-1. **Math**: wrap every symbol/formula in \`$...$\` or \`$$...$$\`. No spaces inside dollars: \`$x$\` not \`$ x $\`.
-2. **Chemistry**: always use \`$\\\\ce{...}$\` — never bare text like \`H2O\`. mhchem auto-subscripts numbers, so write \`\\\\ce{H2SO4}\`, not \`\\\\ce{H_2SO_4}\`.
-   Charges: \`\\\\ce{Fe^{3+}}\` (brace multi-char charges). Arrows: \`->\`, \`<=>\` (plain ASCII hyphen only, never a Unicode minus \`−\`).
-3. **Braces are mandatory**: every command needs \`{ }\` right after it — \`\\\\ce{H2O}\` not \`\\\\ceH2O\`, \`\\\\frac{1}{2}\` not \`\\\\frac12\`.
-4. **Units/vectors/greek**: \`\\\\text{ m/s}\` for units inside math, \`\\\\vec{F}\` for vectors, \`\\\\alpha \\\\theta \\\\Delta\` etc. for greek letters.
-5. **ASCII only**: convert all Unicode math glyphs (−, ×, ÷, ², ₂, °, curly quotes) to their LaTeX/ASCII form (\`-\`, \`\\\\times\`, \`\\\\div\`, \`^2\`, \`_2\`, \`\\\\circ\`, \`'\`/\`"\`). OCR often outputs Unicode look-alikes that silently break parsing.
-6. **JSON escaping**: every LaTeX backslash must be doubled in the JSON string (\`\\\\frac\`, \`\\\\ce\`) so \`JSON.parse()\` restores a single backslash. Never use 4 backslashes.
- 
-Before output, check: every \\\\ce{} has \`{}\` and is inside \`$...$\`; no Unicode minus/dash anywhere; backslashes are all doubled; \`$\`/\`$$\` pairs match; output is valid parsable JSON only.
-
-Ensure that the json you produce is parsable using JSON.prase() of JavaScript.
----
-
-
-## Example JSON Schema
-
-Return ONLY valid JSON matching this exact structure:
-{
-  "sectionLabel": "Section-I",
-  "sectionStart": 1,
-  "sectionEnds": 60,
-  "marks": 1,
-  "data": [
-    {
-      "serialNo": 1,
-      "question": "A body of mass $m$ is thrown vertically upward with velocity $v$. Find the maximum height.",
-      "options": {
-        "A": "$\\\\dfrac{v^2}{2g}$",
-        "B": "$\\\\dfrac{v^2}{4g}$",
-        "C": "$\\\\dfrac{v^2}{8g}$",
-        "D": "$\\\\dfrac{3v^2}{4g}$"
-       },
-       "answerKey": "B",
-       "subject": "Physics",
-       "marks": "1",
-       "solution": "Using $v^2 = u^2 - 2gh$, setting $v = 0$: $$h = \\\\frac{v^2}{2g}$$"
-    },
-    {
-      "serialNo": 2,
-      "question": "The balanced equation for combustion of $\\\\ce{C2H5OH}$ is:",
-      "options": {
-        "A": "$\\\\ce{C2H5OH + 3O2 -> 2CO2 + 3H2O}$",
-        "B": "$\\\\ce{C2H5OH + 2O2 -> 2CO2 + 2H2O}$",
-        "C": "$\\\\ce{C2H5OH + O2 -> CO2 + H2O}$",
-        "D": "$\\\\ce{2C2H5OH + 5O2 -> 4CO2 + 6H2O}$"
-       },
-       "answerKey": "A",
-       "subject": "Chemistry"
-    },
-    {
-      "serialNo": 3,
-      "question": "If $f(x) = \\\\int_0^x \\\\frac{\\\\sin t}{t}\\\\,dt$, then $\\\\lim_{x \\\\to 0} \\\\dfrac{f(x)}{x}$ equals:",
-      "options": {
-        "A": "$0$",
-        "B": "$1$",
-        "C": "$\\\\dfrac{1}{2}$",
-        "D": "Does not exist"
-       },
-       "answerKey": "B",
-       "subject": "Maths",
-       "solution": "By L'Hôpital's rule: $$\\\\lim_{x \\\\to 0} \\\\frac{f(x)}{x} = \\\\lim_{x \\\\to 0} \\\\frac{\\\\sin x}{x} = 1$$"
-    }
-  ]
-}
-
-**Never creatre your own json fields. No matter what.**
-**Always return parsable JSON. No any formatting or extra text. Just JSON.**
-`;
-
-export const paperTextStructuredExtractionPromptV2 = `
+export const paperTextStructuredExtractionPrompt = `
 You are an expert OCR and exam parsing engine.
 Extract all questions and solutions from the text/image and return a strict and parsable JSON object.
 
@@ -371,17 +229,19 @@ and English.
 Content fields (\`question\`, options, \`solution\`) render via ReactMarkdown + remark-math + KaTeX + mhchem.
 Only \`$...$\` (inline) and \`$$...$$\` (display) math delimiters work. No \\(...\\) or \\[...\\].
  
-1. **Math**: wrap every symbol/formula in \`$...$\` or \`$$...$$\`. No spaces inside dollars: \`$x$\` not \`$ x $\`.
-2. **Chemistry**: always use \`$\\\\ce{...}$\` — never bare text like \`H2O\`. mhchem auto-subscripts numbers, so write \`\\\\ce{H2SO4}\`, not \`\\\\ce{H_2SO_4}\`.
+1. **Math Delimiters**: wrap every symbol/formula in \`$...$\` or \`$$...$$\`. No spaces inside dollars: \`$x$\` not \`$ x $\`. Never produce triple dollars \`$$$\`.
+2. **NO NESTED DOLLARS**: When inside \`$$...$$\`, NEVER wrap expressions in inner \`$\` or \`$\\\\ce{...}$\`. Write \`$$\\\\text{The balanced equation is } \\\\ce{IO3^- + 5I^- -> 3I2}$$\` (NEVER put \`$\` inside \`$$\`).
+3. **Chemistry**: always use \`$\\\\ce{...}$\` — never bare text like \`H2O\` or \`C_6H_{14}\`. mhchem auto-subscripts numbers, so write \`\\\\ce{H2SO4}\`, not \`\\\\ce{H_2SO_4}\`.
    Charges: \`\\\\ce{Fe^{3+}}\` (brace multi-char charges). Arrows: \`->\`, \`<=>\` (plain ASCII hyphen only, never a Unicode minus \`−\`).
-3. **Braces are mandatory**: every command needs \`{ }\` right after it — \`\\\\ce{H2O}\` not \`\\\\ceH2O\`, \`\\\\frac{1}{2}\` not \`\\\\frac12\`.
-4. **Units/vectors/greek**: \`\\\\text{ m/s}\` for units inside math, \`\\\\vec{F}\` for vectors, \`\\\\alpha \\\\theta \\\\Delta\` etc. for greek letters.
-5. **ASCII only**: convert all Unicode math glyphs (−, ×, ÷, ², ₂, °, curly quotes) to their LaTeX/ASCII form (\`-\`, \`\\\\times\`, \`\\\\div\`, \`^2\`, \`_2\`, \`\\\\circ\`, \`'\`/\`"\`). OCR often outputs Unicode look-alikes that silently break parsing.
-6. **JSON escaping**: every LaTeX backslash must be doubled in the JSON string (\`\\\\frac\`, \`\\\\ce\`) so \`JSON.parse()\` restores a single backslash. Never use 4 backslashes.
+   Reaction chains & inequalities: wrap the entire chain in a single delimiter: \`$\\\\ce{NH3 < N2H4 < N2H2 < N3H}$\`. Never leave dangling \`$$\`.
+4. **Braces are mandatory**: every command needs \`{ }\` right after it — \`\\\\ce{H2O}\` not \`\\\\ceH2O\`, \`\\\\frac{1}{2}\` not \`\\\\frac12\`.
+5. **Units/vectors/greek/symbols**: \`\\\\text{ m/s}\` for units inside math, \`\\\\vec{F}\` for vectors, \`\\\\alpha \\\\theta \\\\Delta\` for greek letters. Never leave bare LaTeX commands like \`\\\\uparrow\` in plain text — wrap in \`$\\\\uparrow$\`.
+6. **ASCII only**: convert all Unicode math glyphs (−, ×, ÷, ², ₂, °, curly quotes, →) to their LaTeX/ASCII form (\`-\`, \`\\\\times\`, \`\\\\div\`, \`^2\`, \`_2\`, \`\\\\circ\`, \`'\`/\`"\`, \`\\\\rightarrow\`).
+7. **JSON escaping**: every LaTeX backslash must be doubled in the JSON string (\`\\\\frac\`, \`\\\\ce\`) so \`JSON.parse()\` restores a single backslash. Never use 4 backslashes.
  
-Before output, check: every \\\\ce{} has \`{}\` and is inside \`$...$\`; no Unicode minus/dash anywhere; backslashes are all doubled; \`$\`/\`$$\` pairs match; output is valid parsable JSON only.
+Before output, check: no \`$\` inside \`$$...$$\`; every \\\\ce{} has \`{}\`; no Unicode minus/dash anywhere; backslashes are all doubled; \`$\`/\`$$\` pairs match; output is valid parsable JSON only.
 
-Ensure that the json you produce is parsable using JSON.prase() of JavaScript.
+Ensure that the json you produce is parsable using JSON.parse() of JavaScript.
 ---
 
 
@@ -555,12 +415,36 @@ Each object inside \`data\` represents ONE individual question or solution item:
 Content fields (question, options, solution) render via ReactMarkdown + remark-math + KaTeX + mhchem.
 Only \`$...$\` (inline) and \`$$...$$\` (display) math delimiters work. No \\\\(...\\\\) or \\\\[...\\\\].
 
-1. **Math**: wrap every symbol/formula in \`$...$\` or \`$$...$$\`. No spaces inside dollars: \`$x$\` not \`$ x $\`.
-2. **Chemistry**: always use \`$\\\\ce{...}$\` — never bare text like H2O. mhchem auto-subscripts numbers, so write \`\\\\ce{H2SO4}\`, not \`\\\\ce{H_2SO_4}\`.
-   Charges: \`\\\\ce{Fe^{3+}}\` (brace multi-char charges). Arrows: \`->\`, \`<=>\` (plain ASCII hyphen only, never Unicode minus).
-3. **Braces**: every command needs \`{ }\` right after — \`\\\\ce{H2O}\`, \`\\\\frac{1}{2}\`.
-4. **Units/vectors/greek**: \`\\\\text{ m/s}\` for units inside math, \`\\\\vec{F}\` for vectors, \`\\\\alpha \\\\theta \\\\Delta\` for greek letters.
-5. **ASCII only**: convert all Unicode math glyphs (−, ×, ÷, ², ₂, °) to LaTeX form (\`-\`, \`\\\\times\`, \`\\\\div\`, \`^2\`, \`_2\`, \`\\\\circ\`).
+1. **Math Delimiters**:
+   - Inline math: \`$formula$\` (e.g. \`$x = 5$\`, no spaces immediately inside \`$\`).
+   - Display math: \`$$formula$$\` on its own line for standalone equations.
+   - NEVER use \\\\(...\\\\) or \\\\[...\\\\], and NEVER produce triple dollars \`$$$\`.
+
+2. **NO NESTED DOLLAR SIGNS (CRITICAL)**:
+   - When inside a display math block \`$$...$$\`, NEVER wrap expressions in inner \`$\` or \`$\\\\ce{...}$\`. You are ALREADY in math mode!
+   - ❌ WRONG: \`$$\\\\text{The balanced equation is } $\\\\ce{IO3^- + 5I^- -> 3I2}$$$\`
+   - ✅ CORRECT: \`$$\\\\text{The balanced equation is } \\\\ce{IO3^- + 5I^- -> 3I2}$$\`
+   - ❌ WRONG: \`$$\\\\text{So, } 10^{-7} \\\\text{ N } $\\\\ce{H+}$ \\\\text{ from } $\\\\ce{H2O}$$$\`
+   - ✅ CORRECT: \`$$\\\\text{So, } 10^{-7} \\\\text{ N } \\\\ce{H+} \\\\text{ from } \\\\ce{H2O}$$\`
+
+3. **Chemistry (MANDATORY mhchem \\\\ce{...})**:
+   - For inline formulas in sentences: ALWAYS wrap in \`$\\\\ce{...}$\`, e.g. \`$\\\\ce{H2O}$\`, \`$\\\\ce{C6H14}$\`, \`$\\\\ce{NH3}$\`, \`$\\\\ce{C6H5NH2}$\`.
+   - NEVER output bare text like H2O or raw underscores like \`C_6H_{14}\` or \`NH_3\` in text — always use \`$\\\\ce{C6H14}$\`, \`$\\\\ce{NH3}$\`.
+   - mhchem auto-subscripts numbers: write \`\\\\ce{H2SO4}\`, NEVER \`\\\\ce{H_2SO_4}\`.
+   - For chemical reactions / inequality chains: wrap the ENTIRE chain in a single delimiter:
+     - Inline: \`$\\\\ce{NH3 < N2H4 < N2H2 < N3H}$\`
+     - Display: \`$$\\\\ce{2H2 + O2 -> 2H2O}$$\`
+   - Never leave unclosed or dangling \`$$\` (e.g. NEVER write \`< \\\\ce{N2H4} $$\` without an opening \`$$\`).
+   - Charges: \`\\\\ce{Fe^{3+}}\`, \`\\\\ce{SO4^{2-}}\`, \`\\\\ce{H+}\`.
+   - Reaction arrows: ASCII \`->\` or \`<=>\` (never Unicode \`→\` or \`−\`).
+
+4. **LaTeX Commands & Symbols in Plain Text**:
+   - NEVER place LaTeX math commands (like \`\\\\uparrow\`, \`\\\\downarrow\`, \`\\\\rightarrow\`, \`\\\\alpha\`, \`\\\\Delta\`) bare in plain text. ALWAYS enclose them in \`$\`: \`$\\\\uparrow$\`, \`$\\\\rightarrow$\`, \`$\\\\alpha$\`.
+   - Words and units inside math MUST use \`\\\\text{...}\`: e.g. \`$v = 20\\\\text{ m/s}$\`.
+
+5. **Braces & ASCII Only**:
+   - Braces are mandatory on commands: \`\\\\frac{1}{2}\`, \`\\\\ce{H2O}\`.
+   - Convert all Unicode math glyphs (−, ×, ÷, ², ₂, °, →) to ASCII/LaTeX form (\`-\`, \`\\\\times\`, \`\\\\div\`, \`^2\`, \`_2\`, \`\\\\circ\`, \`\\\\rightarrow\`).
 
 ---
 ## JSON OUTPUT EXAMPLES
