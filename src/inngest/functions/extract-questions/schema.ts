@@ -106,48 +106,31 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
     properties: {
       isRelevant: {
         type: ["boolean", "null"],
-        description:
-          "False if page is blank, contains only instructions/headers, or has no exam entities.",
       },
       sectionLabel: {
         type: ["string", "null"],
-        description:
-          "PAGE-LEVEL (Root only): Section name/header if explicitly printed (e.g. 'SECTION A - PHYSICS').",
       },
       sectionStart: {
         type: ["number", "null"],
-        description: "PAGE-LEVEL (Root only): Starting question number of the section if indicated.",
       },
       sectionEnd: {
         type: ["number", "null"],
-        description: "PAGE-LEVEL (Root only): Ending question number of the section if indicated.",
       },
       eachMarks: {
         type: ["number", "null"],
-        description: "PAGE-LEVEL (Root only): Default marks per question in this section (e.g. 1).",
       },
       paragraph: {
         type: ["string", "null"],
-        description:
-          "PAGE-LEVEL (Root only): Full text of comprehension reading passage if present on page. Must be at root, never inside data items.",
+        description: "ROOT ONLY: Comprehension passage text. NEVER place inside a data[] item.",
       },
       data: {
         type: "array",
-        description:
-          "PAGE-LEVEL (Root only): List of extracted questions, solutions, or answer keys. Never put paragraph or section metadata inside items here.",
+        description: "Questions/solutions/answer-keys list. NEVER embed paragraph or section fields inside items.",
         items: {
           type: "object",
-          description:
-            "ITEM-LEVEL: A single question, solution, or answer key item.",
           properties: {
-            serialNo: {
-              type: "number",
-              description:
-                "Primary identifier/number for the question or solution.",
-            },
-            question: {
-              type: ["string", "null"]
-            },
+            serialNo: { type: "number" },
+            question: { type: ["string", "null"] },
             options: {
               type: ["object", "null"],
               properties: {
@@ -164,68 +147,46 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
             },
             subject: {
               type: ["string", "null"],
-              enum: [
-                "physics",
-                "chemistry",
-                "maths",
-                "grammar",
-                "comprehension",
-                null,
-              ],
+              enum: ["physics", "chemistry", "maths", "grammar", "comprehension", null],
             },
-            marks: {
-              type: ["number", "null"],
-            },
-            solution: {
-              type: ["string", "null"],
-            },
-            optionIncomplete: {
-              type: ["boolean", "null"],
-            },
-            incomplete: {
-              type: ["boolean", "null"],
-            },
-            isContinuation: {
-              type: ["boolean", "null"],
-            },
-            svgQuestion: {
-              type: ["string", "null"],
-              svgSolution: {
-                type: ["string", "null"]
+            marks: { type: ["number", "null"] },
+            solution: { type: ["string", "null"] },
+            optionIncomplete: { type: ["boolean", "null"] },
+            incomplete: { type: ["boolean", "null"] },
+            isContinuation: { type: ["boolean", "null"] },
+            svgQuestion: { type: ["string", "null"] },
+            svgSolution: { type: ["string", "null"] },
+            svgOptions: {
+              type: ["object", "null"],
+              properties: {
+                A: { type: ["string", "null"] },
+                B: { type: ["string", "null"] },
+                C: { type: ["string", "null"] },
+                D: { type: ["string", "null"] },
               },
-              svgOptions: {
-                type: ["object", "null"],
-                properties: {
-                  A: { type: ["string", "null"] },
-                  B: { type: ["string", "null"] },
-                  C: { type: ["string", "null"] },
-                  D: { type: ["string", "null"] },
-                },
-                additionalProperties: false,
-              },
+              additionalProperties: false,
             },
-            required: [
-              "serialNo",
-
-            ],
-            anyOf: [
-              { "required": ["question"] },
-              { "required": ["options"] },
-              { "required": ["answerKey"] },
-              { "required": ["solution"] },
-              { "required": ["svgQuestion"] },
-              { "required": ["svgSolution"] },
-              { "required": ["svgOptions"] }
-            ],
-            additionalProperties: false,
           },
+          required: [
+            "serialNo",
+          ],
+          anyOf: [
+            { "required": ["question"] },
+            { "required": ["options"] },
+            { "required": ["answerKey"] },
+            { "required": ["solution"] },
+            { "required": ["svgQuestion"] },
+            { "required": ["svgSolution"] },
+            { "required": ["svgOptions"] }
+          ],
+          additionalProperties: false,
         },
       },
-      required: [
-        "isRelevant",
-        "data"
-      ],
-      additionalProperties: false,
     },
-  }
-}
+    required: [
+      "isRelevant",
+      "data"
+    ],
+    additionalProperties: false,
+  },
+};
