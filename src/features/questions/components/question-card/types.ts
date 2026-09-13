@@ -2,7 +2,7 @@
 // These are separate from the DB-layer QuestionDTO in ../types.ts.
 // The parent is responsible for mapping from QuestionDTO → QuestionCardType.
 
-export type QuestionSubject = "physics" | "chemistry" | "mathematics";
+export type QuestionSubject = "physics" | "chemistry" | "mathematics" | "english" | "general" | (string & {});
 export type QuestionMode = "exam" | "review";
 export type OptionKey = "A" | "B" | "C" | "D";
 

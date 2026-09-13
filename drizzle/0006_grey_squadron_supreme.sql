@@ -1,0 +1,1 @@
+ALTER TYPE "public"."document_processing_status_enum" ADD VALUE 'merging_questions' BEFORE 'completed';

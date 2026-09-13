@@ -3,14 +3,9 @@ import { user } from "@/db/schemas/auth";
 
 export const documentsTable = "documents";
 
-// export const documentQuestionTypeEnum = pgEnum("document_question_type_enum", [
-//   "",
-//   "mcq",
-// ]);
-
 export const documentProcessingStatusEnum = pgEnum(
   "document_processing_status_enum",
-  ["not_started", "processing", "extracting_questions", "success", "failed"],
+  ["pending", "processing_files", "extracting_questions", "merging_questions", "completed", "failed"],
 );
 
 export const documents = pgTable("documents", {
@@ -22,7 +17,7 @@ export const documents = pgTable("documents", {
   description: text("description"),
   processingStatus: documentProcessingStatusEnum("processing_status")
     .notNull()
-    .default("not_started"),
+    .default("pending"),
   createdAt: timestamp("created_at", {
     withTimezone: true,
   })

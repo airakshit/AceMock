@@ -29,6 +29,7 @@ export class DocumentQueries {
     const rows = await db
       .select({
         documentId: documents.id,
+        processingStatus: documents.processingStatus,
         fileId: documentFiles.id,
         fileName: documentFiles.filename,
         page: filePages,
@@ -62,6 +63,7 @@ export class DocumentQueries {
 
     const result: FullDocumentResult = {
       documentId,
+      processingStatus: rows[0]?.processingStatus || "pending",
       files: [...filesMap.values()],
     };
     return result;

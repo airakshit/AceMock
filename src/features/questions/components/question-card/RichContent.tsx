@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
+import remarkBreaks from "remark-breaks";
 import katex from "katex";
 
 // Ensure globalThis.katex is assigned BEFORE mhchem extension is loaded
@@ -20,14 +21,23 @@ interface RichContentProps {
 
 /**
  * Normalizes OCR/text containing chemistry and math notation:
- * 1. Converts invalid bare '^}' inside \ce to '\uparrow}'
- * 2. Normalizes 'ce{' (where leading backslash was stripped or omitted) to '\ce{'
- * 3. Fixes \ce or ce immediately followed by formula without space/braces (e.g. \ceC2H5OH... -> \ce{C2H5OH...})
- * 4. Auto-wraps \ce{...} in $...$ if not already inside math delimiters
+ * 1. Converts literal "\n" (two chars) into real newlines
+ * 2. Converts invalid bare '^}' inside \ce to '\uparrow}'
+ * 3. Normalizes 'ce{' (where leading backslash was stripped or omitted) to '\ce{'
+ * 4. Fixes \ce or ce immediately followed by formula without space/braces
+ * 5. Auto-wraps \ce{...} in $...$ if not already inside math delimiters
+ * 6. Replaces \frac with \dfrac so fractions always render in display style
  */
 function normalizeMathAndChemistry(text: string): string {
   if (!text) return text;
   let result = text;
+
+  // 0. Convert literal "\n" escape sequences (from JSON/OCR output) into real newlines.
+  //    Protect "\\n" (an actual double-backslash followed by 'n' in the source) first.
+  const NEWLINE_PLACEHOLDER = "\u0000BSNL\u0000";
+  result = result.replace(/\\\\n/g, NEWLINE_PLACEHOLDER);
+  result = result.replace(/\\n/g, "\n");
+  result = result.replace(/\u0000BSNL\u0000/g, "\\\\n");
 
   // 1. Replace bare '^}' or '^ }' inside formulas with '\uparrow}' to prevent KaTeX superscript parse errors
   result = result.replace(/\^\s*\}/g, "\\uparrow}");
@@ -46,6 +56,15 @@ function normalizeMathAndChemistry(text: string): string {
     return `${prefix}$${cePart}$`;
   });
 
+  // 5. Replace \frac with \dfrac everywhere in math so fractions render full-size.
+  //    This is the key fix: \dfrac forces "display" fraction style which prevents
+  //    KaTeX from aggressively shrinking nested numerators/denominators.
+  //    We only replace inside math delimiters to avoid mangling plain text.
+  result = result.replace(/(\$\$?)([\s\S]*?)(\$\$?)/g, (match, open, inner, close) => {
+    const replaced = inner.replace(/\\frac\b/g, "\\dfrac");
+    return `${open}${replaced}${close}`;
+  });
+
   return result;
 }
 
@@ -58,7 +77,11 @@ function MathRenderer({
 }) {
   const html = useMemo(() => {
     try {
-      return katex.renderToString(content, {
+      // Force \frac -> \dfrac in the raw LaTeX content as well
+      // (catches cases where remarkMath strips delimiters before we see them)
+      const upgraded = content.replace(/\\frac\b/g, "\\dfrac");
+
+      return katex.renderToString(upgraded, {
         displayMode: isDisplay,
         throwOnError: false,
         errorColor: "#ef4444",
@@ -75,7 +98,7 @@ function MathRenderer({
   return (
     <span
       dangerouslySetInnerHTML={{ __html: html }}
-      className={isDisplay ? "katex-display my-2 block overflow-x-auto" : "katex-inline"}
+      className={isDisplay ? "katex-display-block" : "katex-inline-block"}
     />
   );
 }
@@ -88,7 +111,7 @@ function MathRenderer({
  * loaded, avoiding third-party module isolation issues.
  */
 function RichContentBase({ text, className }: RichContentProps) {
-  const remarkPlugins = useMemo(() => [remarkMath], []);
+  const remarkPlugins = useMemo(() => [remarkMath, remarkBreaks], []);
 
   const formattedContent = useMemo(() => normalizeMathAndChemistry(text), [text]);
 
@@ -127,10 +150,7 @@ function RichContentBase({ text, className }: RichContentProps) {
   return (
     <div
       className={[
-        "prose prose-sm dark:prose-invert max-w-none",
-        "[&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden",
-        "[&_.katex-display]:py-1 [&_.katex-display]:px-0.5",
-        "[&_p]:my-0",
+        "rich-content",
         className,
       ]
         .filter(Boolean)
@@ -138,7 +158,6 @@ function RichContentBase({ text, className }: RichContentProps) {
     >
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         components={components as any}
       >
         {formattedContent}

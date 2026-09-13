@@ -51,7 +51,7 @@ export const extractQuestions = inngest.createFunction(
     const eventData = event.data as ExtractDocumentQuestionEventData;
     const { documentId, userId } = eventData;
 
-    // 1. Fetch document pages metadata
+    // 1. Fetch document files and pages metadata from the database
     const docData: JsonifyObject<FullDocumentResult> = await step.run(
       "fetch-document-pages",
       async () => {
@@ -80,95 +80,171 @@ export const extractQuestions = inngest.createFunction(
       };
     }
 
-    await step.run("mark-documents-as-extracting-questions", async () => {
-      await documentsRepository.updateProcessingStatus(
-        db,
-        documentId,
-        "extracting_questions",
-      );
-    });
-
-    // Collect all pages across all files for fan-out
-    const pagesToProcess: Array<{
+    // Collect all pages across all files for this document
+    const allDocPages: Array<{
       fileId: string;
       fileName: string;
       pageId: string;
       pageNo: number;
+      ocrStatus: string;
+      ocrText: string | null;
+      survivedValidation: boolean;
+      isRelevant: boolean;
       storagePath: string;
     }> = [];
 
     docData.files.forEach((file) => {
       file.pages.forEach((page) => {
-        if (page.ocrStatus !== "success") {
-          const pageStoragePath = storagePaths.getDocumentFilePageSourceUrl(
-            userId,
-            documentId,
-            file.fileId,
-            file.fileName,
-            "webp",
-            page.pageNo,
-          );
-          pagesToProcess.push({
-            fileId: file.fileId,
-            fileName: file.fileName,
-            pageId: page.id,
-            pageNo: page.pageNo,
-            storagePath: pageStoragePath,
-          });
-        }
+        const pageStoragePath = storagePaths.getDocumentFilePageSourceUrl(
+          userId,
+          documentId,
+          file.fileId,
+          file.fileName,
+          "webp",
+          page.pageNo,
+        );
+        allDocPages.push({
+          fileId: file.fileId,
+          fileName: file.fileName,
+          pageId: page.id,
+          pageNo: page.pageNo,
+          ocrStatus: page.ocrStatus,
+          ocrText: page.ocrText,
+          survivedValidation: page.survivedValidation,
+          isRelevant: page.isRelevant,
+          storagePath: pageStoragePath,
+        });
       });
     });
 
-    if (pagesToProcess.length === 0) {
-      // Check if all pages already succeeded previously
-      logger.info({ documentId }, "No pending pages found to OCR.");
-      await step.run("mark-document-completed-no-pending-pages", async () => {
+    if (allDocPages.length === 0) {
+      await step.run("mark-document-failed-no-pages", async () => {
         await documentsRepository.updateProcessingStatus(
           db,
           documentId,
-          "success",
+          "failed",
         );
       });
 
       return {
-        success: true,
-        message: "No pages found to OCR.",
+        success: false,
+        message: "No pages found for document.",
         documentId,
         results: [],
       };
     }
 
-    // 2. Fan-Out & Fan-In: OCR every page to raw text & structured data
-    const ocrResults: OcrPageResult[] = (await Promise.all(
-      pagesToProcess.map((item) =>
-        step.invoke(`ocr-page-${item.pageId}`, {
-          function: ocrPage,
-          data: {
-            userId,
-            documentId,
-            fileId: item.fileId,
-            fileName: item.fileName,
-            pageId: item.pageId,
-            pageNo: item.pageNo,
-            storagePath: item.storagePath,
-          },
-        }),
-      ),
-    )) as OcrPageResult[];
+    // 2. Step-Level Retry Detection & Page Filtering
+    // If the document is already in merging_questions or all pages are completed, skip OCR step completely
+    const isAlreadyInMerging = docData.processingStatus === "merging_questions";
 
-    const successfulPages = ocrResults.filter((r) => r.status === "success");
+    const pagesToProcess = allDocPages.filter((page) => {
+      const isAlreadyCompleted =
+        page.ocrStatus === "completed" &&
+        page.ocrText !== null &&
+        page.ocrText.trim().length > 0 &&
+        page.survivedValidation !== false;
 
-    logger.info(
-      {
-        documentId,
-        totalPages: pagesToProcess.length,
-        successfulPages: successfulPages.length,
-      },
-      "Raw OCR extraction completed for all pages.",
+      return !isAlreadyCompleted;
+    });
+
+    const newResultsMap = new Map<string, OcrPageResult>();
+
+    if (isAlreadyInMerging && pagesToProcess.length === 0) {
+      logger.info(
+        { documentId, totalDocPages: allDocPages.length },
+        "Document is already in merging_questions state with all pages completed. Skipping OCR and resuming directly from merging step.",
+      );
+    } else if (pagesToProcess.length > 0) {
+      logger.info(
+        {
+          documentId,
+          totalDocPages: allDocPages.length,
+          pagesToProcess: pagesToProcess.length,
+          alreadyCompleted: allDocPages.length - pagesToProcess.length,
+        },
+        "Processing pending/failed pages for OCR.",
+      );
+
+      await step.run("mark-documents-as-extracting-questions", async () => {
+        await documentsRepository.updateProcessingStatus(
+          db,
+          documentId,
+          "extracting_questions",
+        );
+      });
+
+      // Fan-Out & Fan-In: OCR only the remaining pages
+      const ocrResults: OcrPageResult[] = (await Promise.all(
+        pagesToProcess.map((item) =>
+          step.invoke(`ocr-page-${item.pageId}`, {
+            function: ocrPage,
+            data: {
+              userId,
+              documentId,
+              fileId: item.fileId,
+              fileName: item.fileName,
+              pageId: item.pageId,
+              pageNo: item.pageNo,
+              storagePath: item.storagePath,
+            },
+          }),
+        ),
+      )) as OcrPageResult[];
+
+      ocrResults.forEach((res) => {
+        newResultsMap.set(res.pageId, res);
+      });
+    } else {
+      logger.info(
+        { documentId, totalDocPages: allDocPages.length },
+        "All pages already completed OCR. Proceeding directly to merge.",
+      );
+    }
+
+    // 3. Assemble the full set of OCR results across ALL pages of the document
+    const allOcrResults: OcrPageResult[] = allDocPages.map((page) => {
+      const newlyProcessed = newResultsMap.get(page.pageId);
+      if (newlyProcessed) {
+        return newlyProcessed;
+      }
+
+      return {
+        pageNo: page.pageNo,
+        pageId: page.pageId,
+        fileId: page.fileId,
+        rawText: page.ocrText,
+        status: (page.ocrStatus === "completed" ? "completed" : "failed") as
+          | "completed"
+          | "failed",
+        survivedValidation: page.survivedValidation,
+        isRelevant: page.isRelevant,
+      };
+    });
+
+    // 4. Validate that ALL pages across the entire document succeeded
+    const failedPages = allOcrResults.filter(
+      (r) =>
+        r.status !== "completed" ||
+        !r.rawText ||
+        r.rawText.trim().length === 0,
     );
 
-    if (successfulPages.length === 0) {
-      await step.run("mark-document-failed-all-pages-failed", async () => {
+    if (failedPages.length > 0) {
+      logger.warn(
+        {
+          documentId,
+          totalDocPages: allDocPages.length,
+          failedCount: failedPages.length,
+          failedPages: failedPages.map((p) => ({
+            pageId: p.pageId,
+            pageNo: p.pageNo,
+          })),
+        },
+        "Not all pages succeeded OCR. Marking document as failed and halting before merging.",
+      );
+
+      await step.run("mark-document-failed-incomplete-pages", async () => {
         await documentsRepository.updateProcessingStatus(
           db,
           documentId,
@@ -177,26 +253,35 @@ export const extractQuestions = inngest.createFunction(
       });
 
       throw new OcrPageFailedError(
-        pagesToProcess[0]?.pageId ?? "unknown",
-        pagesToProcess[0]?.pageNo ?? 1,
-        "All pages failed OCR processing.",
+        failedPages[0].pageId,
+        failedPages[0].pageNo,
+        `${failedPages.length} out of ${allDocPages.length} pages failed OCR. Merging aborted.`,
       );
     }
 
-    // 3. Merge extracted data across pages (resolves questions, solutions, answer keys, split entities)
+    // 5. All pages are successful! Ensure status is merging_questions and perform merging
+    await step.run("mark-document-merging-questions", async () => {
+      await documentsRepository.updateProcessingStatus(
+        db,
+        documentId,
+        "merging_questions",
+      );
+    });
+
     const resolvedQuestions: ResolvedQuestion[] = await step.run(
       "merge-ocr-questions",
       async () => {
-        return mergeOcrResults(ocrResults);
+        return mergeOcrResults(allOcrResults);
       },
     );
 
     logger.info(
       {
         documentId,
+        totalDocPages: allDocPages.length,
         totalResolvedQuestions: resolvedQuestions.length,
       },
-      "Questions merged and resolved successfully.",
+      "All pages merged and questions resolved successfully.",
     );
 
     if (resolvedQuestions.length === 0) {
@@ -209,20 +294,20 @@ export const extractQuestions = inngest.createFunction(
         await documentsRepository.updateProcessingStatus(
           db,
           documentId,
-          "success",
+          "completed",
         );
       });
 
       return {
         success: true,
         documentId,
-        totalPages: pagesToProcess.length,
+        totalPages: allDocPages.length,
         totalQuestionsSaved: 0,
         message: "No questions found in document.",
       };
     }
 
-    // 4. Resolve chapters per subject and persist passages
+    // 6. Resolve chapters per subject and persist passages
     const { chapterMap, passageMap } = await step.run(
       "resolve-chapters-and-passages",
       async () => {
@@ -265,7 +350,7 @@ export const extractQuestions = inngest.createFunction(
       },
     );
 
-    // 5. Prepare payload and persist all questions to the database
+    // 7. Prepare payload and persist all questions to the database
     const savedCount = await step.run("save-questions", async () => {
       try {
         const defaultSubjectKey = "general";
@@ -312,12 +397,12 @@ export const extractQuestions = inngest.createFunction(
       }
     });
 
-    // 6. Mark document as successfully processed
+    // 8. Mark document as successfully processed
     await step.run("mark-document-completed", async () => {
       await documentsRepository.updateProcessingStatus(
         db,
         documentId,
-        "success",
+        "completed",
       );
     });
 
@@ -332,8 +417,8 @@ export const extractQuestions = inngest.createFunction(
     return {
       success: true,
       documentId,
-      totalPages: pagesToProcess.length,
-      successfulPages: successfulPages.length,
+      totalPages: allDocPages.length,
+      successfulPages: allDocPages.length,
       totalQuestionsSaved: savedCount,
     };
   },

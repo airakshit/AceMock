@@ -25,7 +25,7 @@ export interface OcrPageResult {
   rawText: string | null;
 
   /** OCR execution status */
-  status: "success" | "failed";
+  status: "completed" | "failed";
 
   /** Whether the OCR text successfully conformed to structuredOCRExtractionSchema */
   survivedValidation: boolean;

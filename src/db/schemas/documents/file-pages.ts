@@ -11,10 +11,10 @@ import { documentFiles } from "./document-files";
 import { OpenRouterModels } from "@/services/llm";
 
 export const filePageOCRStatusEnum = pgEnum("file_pages_ocr_status_enum", [
-  "not_started",
-  "ocr",
-  "success",
-  "failed",
+  "pending",
+  "running",
+  "completed",
+  "failed"
 ]);
 
 export const filePages = pgTable("file_pages", {
@@ -28,7 +28,7 @@ export const filePages = pgTable("file_pages", {
 
   ocrStatus: filePageOCRStatusEnum("ocr_status")
     .notNull()
-    .default("not_started"),
+    .default("pending"),
 
   ocrText: text("ocr_text"),
 

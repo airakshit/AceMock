@@ -6,24 +6,15 @@ export const OpenRouterModels = {
    * Recommended for document question extraction and OCR pipelines.
    */
   FREE_VISION: {
-    /** Qwen 2.5 VL 72B - State-of-the-art visual document OCR, mathematics & diagram comprehension */
-    QWEN_2_5_VL_72B: "qwen/qwen-2.5-vl-72b-instruct:free",
-    /** Google Gemini 2.0 Flash Experimental - Fast, high-accuracy vision and layout parsing */
-    GEMINI_2_FLASH_EXP: "google/gemini-2.0-flash-exp:free",
-    /** Google Gemini 2.0 Flash Thinking Experimental - Reasoning-enhanced vision */
-    GEMINI_2_FLASH_THINKING_EXP: "google/gemini-2.0-flash-thinking-exp:free",
-    /** Meta Llama 3.2 11B Vision - Lightweight open-weights vision */
-    LLAMA_3_2_11B_VISION: "meta-llama/llama-3.2-11b-vision-instruct:free",
-    /** Meta Llama 3.2 90B Vision - Heavy open-weights vision */
-    LLAMA_3_2_90B_VISION: "meta-llama/llama-3.2-90b-vision-instruct:free",
-    /** Mistral Pixtral 12B - Multimodal vision model from Mistral */
-    PIXTRAL_12B: "mistralai/pixtral-12b:free",
-
+    INCLUSION_AI_LING_3_FLASH_V1: "inclusionai/ling-3.0-flash-vl:free",
     DOTS_3_NOTE_PREVIEW: "dots-studio/dots-3-note-preview:free",
-    NVIDIA_NEMOTRON_3_NANO_OMNI: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+
     THINKING_MACHINES_INKLING_SMALL: "thinkingmachines/inkling-small:free",
+    THINKING_MACHINES_INKLING: "thinkingmachines/inkling:free",
 
     MINIMAX_M3: "minimax/minimax-m3:free",
+
+    NEX_AGI_NEX_2_5_PRO: "nex-agi/nex-n2.5-pro:free"
 
   },
 
@@ -64,7 +55,7 @@ export class OpenRouterLLMService extends BaseLLMService<OpenRouterModel> {
 
   constructor(
     apiKey: string,
-    defaultModel: OpenRouterModel = OpenRouterModels.FREE_VISION.QWEN_2_5_VL_72B,
+    defaultModel: OpenRouterModel = OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW,
     options?: OpenRouterServiceOptions,
   ) {
     super(apiKey, defaultModel);

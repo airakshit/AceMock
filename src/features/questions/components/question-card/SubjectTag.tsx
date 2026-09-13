@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { QuestionSubject } from "./types";
 
 const SUBJECT_STYLES: Record<
-  QuestionSubject,
+  string,
   { label: string; bg: string; text: string }
 > = {
   physics: {
@@ -22,6 +22,16 @@ const SUBJECT_STYLES: Record<
     bg: "bg-purple-500/10 dark:bg-purple-400/15",
     text: "text-purple-700 dark:text-purple-400",
   },
+  english: {
+    label: "English",
+    bg: "bg-amber-500/10 dark:bg-amber-400/15",
+    text: "text-amber-700 dark:text-amber-400",
+  },
+  general: {
+    label: "General",
+    bg: "bg-zinc-500/10 dark:bg-zinc-400/15",
+    text: "text-zinc-700 dark:text-zinc-400",
+  },
 };
 
 interface SubjectTagProps {
@@ -30,7 +40,13 @@ interface SubjectTagProps {
 }
 
 export function SubjectTag({ subject, className }: SubjectTagProps) {
-  const style = SUBJECT_STYLES[subject];
+  const normalizedKey = (subject || "general").toLowerCase();
+  const style = SUBJECT_STYLES[normalizedKey] || {
+    label: subject ? subject.charAt(0).toUpperCase() + subject.slice(1) : "General",
+    bg: "bg-zinc-500/10 dark:bg-zinc-400/15",
+    text: "text-zinc-700 dark:text-zinc-400",
+  };
+
   return (
     <span
       className={cn(

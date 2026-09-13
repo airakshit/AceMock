@@ -38,9 +38,9 @@ export const ocrPage = inngest.createFunction(
     const data = event.data as OcrPageEventData;
     const { fileId, pageId, pageNo, storagePath } = data;
 
-    // 0. Update file page status to "ocr"
+    // 0. Update file page status to "running"
     await step.run("update-file-ocr-status", async () => {
-      await filePagesRepository.updateStatusByPageId(db, pageId, "ocr");
+      await filePagesRepository.updateStatusByPageId(db, pageId, "running");
     });
 
     // 1. Generate a signed URL for the page image in Supabase storage
@@ -48,14 +48,16 @@ export const ocrPage = inngest.createFunction(
       return await supabaseStorageClient.getPageAccessUrl(storagePath);
     });
 
-    const MODEL_TO_USE = OpenRouterModels.FREE_VISION.MINIMAX_M3;
+    const MODEL_TO_USE = OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW;
+
+
 
     // 2. Send image to LLM for raw OCR text transcription & validation
     const extraction = await step.run(
       "llm-ocr-extraction",
       async (): Promise<{
         rawText: string | null;
-        ocrStatus: "success" | "failed";
+        ocrStatus: "completed" | "failed";
         survivedValidation: boolean;
         isRelevant: boolean;
         parsedData?: StructuredSchemaParseResult;
@@ -119,8 +121,8 @@ export const ocrPage = inngest.createFunction(
           );
         }
 
-        const ocrStatus: "success" | "failed" = cleanedText
-          ? "success"
+        const ocrStatus: "completed" | "failed" = cleanedText
+          ? "completed"
           : "failed";
 
         let isRelevant: boolean = true;

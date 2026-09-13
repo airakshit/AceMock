@@ -360,7 +360,7 @@ class DocumentsService {
       await documentsRepository.updateProcessingStatus(
         db,
         documentId,
-        "processing",
+        "processing_files",
       );
 
       await inngest.send({
@@ -371,15 +371,7 @@ class DocumentsService {
         },
       });
     } else {
-      // Pages already exist; reset page status if re-processing and trigger question extraction
-      for (const file of docWithPages.files) {
-        for (const page of file.pages) {
-          if (page.ocrStatus !== "ocr") {
-            await filePagesRepository.updateStatusByPageId(db, page.id, "ocr");
-          }
-        }
-      }
-
+      // Pages already exist; trigger question extraction (which will process only pending/failed pages)
       await documentsRepository.updateProcessingStatus(
         db,
         documentId,

@@ -64,7 +64,7 @@ export function mergeOcrResults(
 
     for (const page of sortedPages) {
       // Skip failed or non-relevant pages
-      if (page.status !== "success" || page.isRelevant === false) {
+      if (page.status !== "completed" || page.isRelevant === false) {
         continue;
       }
 

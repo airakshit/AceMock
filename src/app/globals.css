@@ -196,3 +196,92 @@
     background: oklch(var(--muted-foreground) / 35%);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * RichContent — shared math/text renderer styles
+ *
+ * The .rich-content wrapper is the single root for all rendered question text,
+ * options, and explanations. Styling here ensures consistent typography and
+ * KaTeX math rendering across the entire question card system.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Base typography ── */
+.rich-content {
+  font-size: 1rem;
+  line-height: 1.7;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Paragraph spacing */
+.rich-content p {
+  margin-top: 0.35em;
+  margin-bottom: 0.35em;
+}
+.rich-content p:first-child { margin-top: 0; }
+.rich-content p:last-child  { margin-bottom: 0; }
+
+/* List spacing */
+.rich-content ul,
+.rich-content ol {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+  padding-left: 1.5em;
+}
+
+/* ── KaTeX inline math ── */
+.rich-content .katex-inline-block {
+  display: inline;
+  vertical-align: baseline;
+}
+.rich-content .katex-inline-block .katex {
+  font-size: 1.15em;
+}
+
+/* ── KaTeX display (block) math ── */
+.rich-content .katex-display-block {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+  text-align: center;
+}
+.rich-content .katex-display-block .katex {
+  font-size: 1.35em;
+}
+
+/* ── KaTeX global overrides ──
+   \dfrac is used in preprocessing, but some residual \frac may slip through.
+   These overrides raise the floor on KaTeX's internal sizing resets. */
+
+/* Raise sizing reset floors so nested fractions stay readable */
+.rich-content .katex .sizing.reset-size6.size3 {
+  font-size: 0.7em !important;
+}
+.rich-content .katex .sizing.reset-size6.size4 {
+  font-size: 0.76em !important;
+}
+.rich-content .katex .sizing.reset-size6.size5 {
+  font-size: 0.85em !important;
+}
+
+/* Tight fractions in superscripts/subscripts */
+.rich-content .katex .mtight {
+  font-size: 0.85em !important;
+}
+
+/* Nested fractions — prevent compound shrinking */
+.rich-content .katex .mfrac .mfrac {
+  font-size: 0.95em !important;
+}
+
+/* Fraction bar breathing room */
+.rich-content .katex .mfrac > .vlist-t2 > .vlist-r > .vlist > span {
+  padding-top: 0.04em;
+  padding-bottom: 0.04em;
+}
+
+/* Superscript/subscript sizing floor */
+.rich-content .katex .msupsub {
+  font-size: max(0.8em, inherit);
+}

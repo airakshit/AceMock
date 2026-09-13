@@ -11,6 +11,7 @@ import {
   Eye,
   FileText,
   Image as ImageIcon,
+  Layers,
   Loader2,
   Pencil,
   RefreshCw,
@@ -55,7 +56,7 @@ export function DocumentCard({
 
   // Processing & Files state
   const [processingStatus, setProcessingStatus] = useState(
-    document.processingStatus || "not_started",
+    document.processingStatus || "pending",
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
@@ -66,7 +67,7 @@ export function DocumentCard({
     setTitle(document.title);
     setDescription(document.description || "");
     setFiles(document.files);
-    setProcessingStatus(document.processingStatus || "not_started");
+    setProcessingStatus(document.processingStatus || "pending");
   }, [document]);
 
   // Loading & dialog states
@@ -112,7 +113,29 @@ export function DocumentCard({
       };
     }
 
-    // 2. Document Processing Status
+    const hasUploadFailed = files.some((f) => f.uploadStatus === "failed");
+    if (hasUploadFailed) {
+      return {
+        label: "Upload Failed",
+        icon: AlertTriangle,
+        className: "border-rose-500/30 bg-rose-500/10 text-rose-400",
+        dot: "bg-rose-400",
+        spin: false,
+      };
+    }
+
+    // 2. Document Processing Statuses
+    if (processingStatus === "processing_files") {
+      return {
+        label: "Processing Files...",
+        icon: Loader2,
+        className:
+          "border-sky-500/40 bg-sky-500/15 text-sky-300 font-medium",
+        dot: "bg-sky-400",
+        spin: true,
+      };
+    }
+
     if (processingStatus === "extracting_questions") {
       return {
         label: "Extracting Questions...",
@@ -124,20 +147,20 @@ export function DocumentCard({
       };
     }
 
-    if (processingStatus === "processing") {
+    if (processingStatus === "merging_questions") {
       return {
-        label: "Preprocessing Pages...",
-        icon: Loader2,
+        label: "Merging Questions...",
+        icon: Layers,
         className:
-          "border-sky-500/40 bg-sky-500/15 text-sky-300 font-medium",
-        dot: "bg-sky-400",
+          "border-indigo-500/40 bg-indigo-500/15 text-indigo-300 font-medium animate-pulse",
+        dot: "bg-indigo-400",
         spin: true,
       };
     }
 
-    if (processingStatus === "success") {
+    if (processingStatus === "completed") {
       return {
-        label: "Questions Ready",
+        label: "Completed",
         icon: CheckCircle2,
         className:
           "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-medium",
@@ -157,19 +180,8 @@ export function DocumentCard({
       };
     }
 
-    const hasFailed = files.some((f) => f.uploadStatus === "failed");
-    if (hasFailed) {
-      return {
-        label: "Upload Failed",
-        icon: AlertTriangle,
-        className: "border-rose-500/30 bg-rose-500/10 text-rose-400",
-        dot: "bg-rose-400",
-        spin: false,
-      };
-    }
-
     return {
-      label: "Ready to Process",
+      label: "Pending",
       icon: Clock,
       className: "border-amber-500/30 bg-amber-500/10 text-amber-400 font-medium",
       dot: "bg-amber-400",
@@ -547,7 +559,7 @@ export function DocumentCard({
                   variant={
                     processingStatus === "failed"
                       ? "destructive"
-                      : processingStatus === "success"
+                      : processingStatus === "completed"
                         ? "outline"
                         : "default"
                   }
@@ -555,15 +567,16 @@ export function DocumentCard({
                   onClick={handleTriggerProcess}
                   disabled={
                     isProcessing ||
-                    processingStatus === "processing" ||
+                    processingStatus === "processing_files" ||
                     processingStatus === "extracting_questions" ||
+                    processingStatus === "merging_questions" ||
                     files.length === 0
                   }
                   className={cn(
                     "h-8 px-2.5 sm:px-3 text-xs gap-1.5 font-medium transition-all shadow-xs",
-                    processingStatus === "not_started" &&
+                    processingStatus === "pending" &&
                     "bg-brand hover:bg-brand/90 text-primary-foreground",
-                    processingStatus === "success" &&
+                    processingStatus === "completed" &&
                     "border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400",
                   )}
                   title={
@@ -573,13 +586,22 @@ export function DocumentCard({
                   }
                 >
                   {isProcessing ||
-                    processingStatus === "processing" ||
-                    processingStatus === "extracting_questions" ? (
+                  processingStatus === "processing_files" ||
+                  processingStatus === "extracting_questions" ||
+                  processingStatus === "merging_questions" ? (
                     <>
                       <Loader2 className="size-3.5 animate-spin" />
-                      <span>Processing...</span>
+                      <span>
+                        {processingStatus === "processing_files"
+                          ? "Processing..."
+                          : processingStatus === "extracting_questions"
+                            ? "Extracting..."
+                            : processingStatus === "merging_questions"
+                              ? "Merging..."
+                              : "Working..."}
+                      </span>
                     </>
-                  ) : processingStatus === "success" ? (
+                  ) : processingStatus === "completed" ? (
                     <>
                       <Sparkles className="size-3.5 text-emerald-500" />
                       <span>Re-process</span>

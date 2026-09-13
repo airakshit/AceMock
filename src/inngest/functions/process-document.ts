@@ -26,19 +26,19 @@ export const processDocument = inngest.createFunction(
 
     let start = performance.now();
 
-    await step.run(`mark-document-as-processing`, async () => {
+    await step.run(`mark-document-as-processing-files`, async () => {
       await documentsRepository.updateProcessingStatus(
         db,
         documentId,
-        "processing",
+        "processing_files",
       );
-    })
+    });
 
-    const docFiles = await step.run(`mark-files-as-processing`, async () => {
+    const docFiles = await step.run(`mark-files-as-running`, async () => {
       return await documentFilesRepository.updateStatusByDocumentId(
         db,
         documentId,
-        "processing",
+        "running",
       );
     });
 
@@ -153,11 +153,11 @@ export const processDocument = inngest.createFunction(
       ),
     );
 
-    await step.run(`mark-files-as-success`, async () => {
+    await step.run(`mark-files-as-completed`, async () => {
       return await documentFilesRepository.updateStatusByDocumentId(
         db,
         documentId,
-        "success",
+        "completed",
       );
     });
 

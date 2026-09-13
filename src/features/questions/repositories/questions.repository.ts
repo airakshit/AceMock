@@ -241,6 +241,36 @@ export class QuestionsRepository {
       .orderBy(desc(questions.createdAt))
       .limit(limit);
   }
+
+  async findRecentWithCurriculum(db: DbExecutor, limit: number = 50) {
+    return db
+      .select({
+        id: questions.id,
+        question: questions.question,
+        options: questions.options,
+        correctOption: questions.correctOption,
+        marks: questions.marks,
+        difficulty: questions.difficulty,
+        diagram_url: questions.diagram_url,
+        hint: questions.hint,
+        solution: questions.solution,
+        solution_diagram_url: questions.solution_diagram_url,
+        createdAt: questions.createdAt,
+        updatedAt: questions.updatedAt,
+        chapterId: chapters.id,
+        chapterName: chapters.name,
+        chapterSlug: chapters.slug,
+        sectionName: sections.name,
+        subjectName: subjects.name,
+        subjectSlug: subjects.slug,
+      })
+      .from(questions)
+      .leftJoin(chapters, eq(questions.chapterId, chapters.id))
+      .leftJoin(sections, eq(chapters.sectionId, sections.id))
+      .leftJoin(subjects, eq(sections.subjectId, subjects.id))
+      .orderBy(desc(questions.createdAt))
+      .limit(limit);
+  }
 }
 
 export const questionsRepository = new QuestionsRepository();
