@@ -315,7 +315,7 @@ Extract all questions, solutions, answer keys, and options from the provided pag
 You will receive a single page image from a multi-page question paper.
 Pages can contain: questions with options, step-by-step solutions, answer key tables, or section headers.
 Subjects include: Physics, Chemistry, Maths, and English (Grammar or Comprehension).
-Entities: Question, Solution, Options, AnswerKeys
+Entities: Question, Solution, Options, AnswerKeys (These are referred as entities/entity.)
 
 ---
 ## JSON Structure Hierarchy (CRITICAL: Distinguish Page-Level vs Item-Level Fields)
@@ -324,27 +324,27 @@ The JSON output has TWO distinct levels:
 
 ### 1. PAGE-LEVEL FIELDS (Root of JSON Object)
 Information that applies to the entire page or a section of questions:
-- \`isRelevant\` (boolean): Set to false if page is blank, instructions only, or has no questions/solutions.
-- \`paragraph\` (string | optional): Full text of any English reading comprehension passage on this page. MUST be placed at root. NEVER place \`paragraph\` inside \`data\` items!
-- \`sectionLabel\` (string | optional): Section name/header for the page (e.g. "SECTION-A", "Physics").
-- \`sectionStart\` (number | optional): First question serial number in this section (e.g. 1).
-- \`sectionEnd\` (number | optional): Last question serial number in this section (e.g. 60). Note: field is \`sectionEnd\`, NOT \`sectionEnds\`.
-- \`eachMarks\` (number | optional): Default marks for each question in this section (e.g. 1 for "1×60=60"). Note: root field is \`eachMarks\`, NOT \`marks\`.
-- \`data\` (array): The list of individual questions/solutions extracted from this page.
+- \`isRelevant\` 
+- \`paragraph\` 
+- \`sectionLabel\` 
+- \`sectionStart\` 
+- \`sectionEnd\` .
+- \`eachMarks\` 
+- \`data\`
 
 ### 2. ITEM-LEVEL FIELDS (Inside each item in \`data[]\` ONLY)
-Each object inside \`data\` represents ONE individual question or solution item:
-- \`serialNo\` (number, REQUIRED): Question or solution number printed on page (e.g. 1, 2, 3).
-- \`question\` (string): The question text with LaTeX/mhchem math formatting.
-- \`options\` (object with A, B, C, D): Multiple-choice options.
-- \`answerKey\` (string: "A" | "B" | "C" | "D"): Correct answer option label.
-- \`subject\` (string: "physics" | "chemistry" | "maths" | "grammar" | "comprehension").
-- \`marks\` (number): Marks for this specific question (only if printed specifically next to this question).
-- \`solution\` (string): Step-by-step solution text if present on page.
-- \`incomplete\` (boolean): True if question or solution is cut off at the bottom of the page.
-- \`optionIncomplete\` (boolean): True if options are cut off or incomplete.
-- \`isContinuation\` (boolean): True if question/solution/options start at page top without a serial number.
-- \`svgQuestion\`, \`svgSolution\`, \`svgOptions\`: SVG representations of diagrams if present.
+Each object inside \`data\` represents ONE individual question/solution/answerKey item:
+- \`serialNo\` 
+- \`question\`
+- \`options\` 
+- \`answerKey\` 
+- \`subject\`
+- \`marks\`
+- \`solution\` 
+- \`incomplete\` 
+- \`optionIncomplete\` 
+- \`isContinuation\`
+- \`svgQuestion\`, \`svgSolution\`, \`svgOptions\`
 
 ⚠️ **STRICT HIERARCHY RULE**:
 - \`paragraph\`, \`sectionLabel\`, \`sectionStart\`, \`sectionEnd\`, \`eachMarks\`, \`isRelevant\` MUST NEVER appear inside objects in the \`data\` array. They are strictly PAGE-LEVEL fields at the root of the JSON object.
@@ -370,15 +370,8 @@ Each object inside \`data\` represents ONE individual question or solution item:
 - ALWAYS read the left column completely from top to bottom FIRST, then move to the right column and read from top to bottom.
 - NEVER read horizontally across vertical column boundaries, as this scrambles sentences, formulas, and serial numbers.
 
-### Option Extraction & Question Cleanliness (CRITICAL)
-- Clean Separation: All options must be placed strictly inside the \`options\` object (\`A\`, \`B\`, \`C\`, \`D\`).
-- NEVER leave option labels or text embedded inside the \`question\` string.
-- If an exam line has: "1. What is speed? (A) d/t (B) w/t (C) f/t (D) m/a", the \`question\` must be ONLY "What is speed?", and \`options\` must contain A: "d/t", B: "w/t", C: "f/t", D: "m/a".
-- Strip leading prefixes like "(A)", "A.", "1." from the option values themselves.
-
 ### Serial Numbers
-- Every extracted item in \`data\` MUST have a \`serialNo\`. This is the question/solution number as printed in the document.
-- For answer key tables, each entry is a separate item: e.g. \`serialNo\`: 1, \`answerKey\`: "B".
+- Every extracted item in \`data\` MUST have a \`serialNo\`. This is the entity number as printed in the document.
 
 ### Subject Classification
 - Classify each entity by subject when determinable from context: "physics", "chemistry", "maths", "grammar", "comprehension".
@@ -387,17 +380,9 @@ Each object inside \`data\` represents ONE individual question or solution item:
 
 ### Options
 - Map all option labels (numeric, roman, lettered) to A, B, C, D.
-- Always use uppercase A, B, C, D.
 
 ### Diagrams
 - If a question, solution, or option contains a diagram/figure/graph, generate an accurate <svg>...</svg> representation in the corresponding svg field (\`svgQuestion\`, \`svgSolution\`, or \`svgOptions\`).
-
-### Page Boundary Handling (CRITICAL)
-- If a question or solution is cut off at the bottom of the page, set \`incomplete\` to true.
-- If options are incomplete, set \`optionIncomplete\` to true.
-- If any question, solution or options appears at the top of the page without a serial number, set \`isContinuation\` to true.
-- For continuation entities, infer \`serialNo\` from surrounding entities on the same page.
-- Include the partial text in the appropriate field even if incomplete.
 
 ### Data Array
 - All extracted entities (questions, solutions, answer keys) MUST be placed inside the \`data\` array.
@@ -409,7 +394,16 @@ Each object inside \`data\` represents ONE individual question or solution item:
 ### Null & Omitted Fields
 - Do not include null fields in your output. Just omit fields that are not applicable.
 
+### Page Boundary Handling (CRITICAL)
+- If a question or solution is cut off at the bottom of the page, set \`incomplete\` to true.
+- If options are incomplete, set \`optionIncomplete\` to true.
+- If any entity appears at the top of the page without any serial number straight to it, Mark isContinuation as true.
+- Include the partial text in the appropriate entity field even if incomplete.
+Eg:
+In a page, {serialNo: 5, solution: "If a, b, c are in A.P, ", incomplete: true}
+In another page, {serialNo: 5, solution: "then b equals average of a and c.", isContinuation: true}
 ---
+
 ## LaTeX & Content Formatting Rules (CRITICAL)
 
 Content fields (question, options, solution) render via ReactMarkdown + remark-math + KaTeX + mhchem.
@@ -420,14 +414,7 @@ Only \`$...$\` (inline) and \`$$...$$\` (display) math delimiters work. No \\\\(
    - Display math: \`$$formula$$\` on its own line for standalone equations.
    - NEVER use \\\\(...\\\\) or \\\\[...\\\\], and NEVER produce triple dollars \`$$$\`.
 
-2. **NO NESTED DOLLAR SIGNS (CRITICAL)**:
-   - When inside a display math block \`$$...$$\`, NEVER wrap expressions in inner \`$\` or \`$\\\\ce{...}$\`. You are ALREADY in math mode!
-   - ❌ WRONG: \`$$\\\\text{The balanced equation is } $\\\\ce{IO3^- + 5I^- -> 3I2}$$$\`
-   - ✅ CORRECT: \`$$\\\\text{The balanced equation is } \\\\ce{IO3^- + 5I^- -> 3I2}$$\`
-   - ❌ WRONG: \`$$\\\\text{So, } 10^{-7} \\\\text{ N } $\\\\ce{H+}$ \\\\text{ from } $\\\\ce{H2O}$$$\`
-   - ✅ CORRECT: \`$$\\\\text{So, } 10^{-7} \\\\text{ N } \\\\ce{H+} \\\\text{ from } \\\\ce{H2O}$$\`
-
-3. **Chemistry (MANDATORY mhchem \\\\ce{...})**:
+2. **Chemistry (MANDATORY mhchem \\\\ce{...})**:
    - For inline formulas in sentences: ALWAYS wrap in \`$\\\\ce{...}$\`, e.g. \`$\\\\ce{H2O}$\`, \`$\\\\ce{C6H14}$\`, \`$\\\\ce{NH3}$\`, \`$\\\\ce{C6H5NH2}$\`.
    - NEVER output bare text like H2O or raw underscores like \`C_6H_{14}\` or \`NH_3\` in text — always use \`$\\\\ce{C6H14}$\`, \`$\\\\ce{NH3}$\`.
    - mhchem auto-subscripts numbers: write \`\\\\ce{H2SO4}\`, NEVER \`\\\\ce{H_2SO_4}\`.
@@ -438,13 +425,18 @@ Only \`$...$\` (inline) and \`$$...$$\` (display) math delimiters work. No \\\\(
    - Charges: \`\\\\ce{Fe^{3+}}\`, \`\\\\ce{SO4^{2-}}\`, \`\\\\ce{H+}\`.
    - Reaction arrows: ASCII \`->\` or \`<=>\` (never Unicode \`→\` or \`−\`).
 
-4. **LaTeX Commands & Symbols in Plain Text**:
-   - NEVER place LaTeX math commands (like \`\\\\uparrow\`, \`\\\\downarrow\`, \`\\\\rightarrow\`, \`\\\\alpha\`, \`\\\\Delta\`) bare in plain text. ALWAYS enclose them in \`$\`: \`$\\\\uparrow$\`, \`$\\\\rightarrow$\`, \`$\\\\alpha$\`.
-   - Words and units inside math MUST use \`\\\\text{...}\`: e.g. \`$v = 20\\\\text{ m/s}$\`.
+3. **LaTeX Commands & Symbols in Plain Text**:
+   - NEVER place LaTeX math commands (like \`\\\\uparrow\`, \`\\\\downarrow\`, \`\\\\rightarrow\`, \`\\\\alpha\`, \`\\\\Delta\`, \`\\\\neq\`) bare in plain text. ALWAYS enclose them in \`$\`: \`$\\uparrow$\`, \`$\\rightarrow$\`, \`$\\alpha$\`, \`$x \\neq 0$\`.
+   - Words and units inside math MUST use \`\\\\text{...}\`: e.g. \`$v = 20\\text{ m/s}$\`.
+   - For chemical reactions with reagents or descriptors (like "conc.", "dilute"): use \`$\\ce{conc. H2SO4 + HCOOH}$\` or \`$\\text{conc. } \\ce{H2SO4 + HCOOH}$\`.
 
-5. **Braces & ASCII Only**:
+4. **Braces & ASCII Only**:
    - Braces are mandatory on commands: \`\\\\frac{1}{2}\`, \`\\\\ce{H2O}\`.
    - Convert all Unicode math glyphs (−, ×, ÷, ², ₂, °, →) to ASCII/LaTeX form (\`-\`, \`\\\\times\`, \`\\\\div\`, \`^2\`, \`_2\`, \`\\\\circ\`, \`\\\\rightarrow\`).
+
+5. **JSON Escaping (CRITICAL)**:
+   - In your JSON strings, ALWAYS output double backslashes for all LaTeX commands: e.g. \`"\\\\neq"\`, \`"\\\\text{...}"\`, \`"\\\\frac{...}{...}"\`, \`"\\\\times"\`, \`"\\\\ce{...}"\`.
+   - NEVER output single unescaped backslashes (like \`\\text\` or \`\\neq\`) because JSON decoders interpret \`\\t\` as a TAB character and \`\\n\` as a newline, corrupting formulas into \`ext\` or \`eq\`.
 
 ---
 ## JSON OUTPUT EXAMPLES
