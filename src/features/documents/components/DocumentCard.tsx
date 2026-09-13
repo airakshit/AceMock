@@ -25,6 +25,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { colors, motion, typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { DocumentFileDTO, DocumentItemDTO } from "../actions/types";
 import { deleteDocumentAction } from "../actions/delete-document";
 import { deleteDocumentFileAction } from "../actions/delete-document-file";
@@ -469,14 +474,28 @@ export function DocumentCard({
             ) : (
               <>
                 {/* Title */}
-                <h4
-                  className={cn(
-                    typography.cardTitle,
-                    "text-base sm:text-lg truncate",
-                  )}
-                >
-                  {document.title}
-                </h4>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <h4
+                        className={cn(
+                          typography.cardTitle,
+                          "text-base sm:text-lg truncate cursor-default",
+                        )}
+                        title={document.title}
+                      />
+                    }
+                  >
+                    {document.title}
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    align="start"
+                    className="max-w-sm break-words text-xs font-medium"
+                  >
+                    {document.title}
+                  </TooltipContent>
+                </Tooltip>
 
                 {/* Description */}
                 {document.description && (
@@ -706,9 +725,25 @@ export function DocumentCard({
                         />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate max-w-36 sm:max-w-48">
-                          {file.filename}
-                        </p>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <p
+                                className="font-medium text-foreground truncate max-w-36 sm:max-w-48 cursor-default"
+                                title={file.filename}
+                              />
+                            }
+                          >
+                            {file.filename}
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            align="start"
+                            className="max-w-xs sm:max-w-sm break-all text-xs font-medium"
+                          >
+                            {file.filename}
+                          </TooltipContent>
+                        </Tooltip>
                         <p className="text-[10px] text-muted-foreground font-mono">
                           {formatBytes(file.fileSize)}
                         </p>

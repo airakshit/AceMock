@@ -17,6 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DocumentFileItem } from "../schemas";
 import type { FileProgressState } from "../uploads/upload.types";
@@ -308,9 +313,25 @@ export function FileDropzone({
 
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-xs font-medium text-foreground">
-                      {item.file.name}
-                    </p>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <p
+                            className="truncate text-xs font-medium text-foreground cursor-default"
+                            title={item.file.name}
+                          />
+                        }
+                      >
+                        {item.file.name}
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        align="start"
+                        className="max-w-xs sm:max-w-sm break-all text-xs font-medium"
+                      >
+                        {item.file.name}
+                      </TooltipContent>
+                    </Tooltip>
 
                     {/* Status Badge */}
                     {status === "preparing" && (

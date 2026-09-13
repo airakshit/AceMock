@@ -4,6 +4,11 @@ import { CheckCircle2, CircleAlert, Loader2 } from "lucide-react";
 import type Uppy from "@uppy/core";
 import { useUppyState } from "@uppy/react";
 import type { DocumentUploadMeta } from "../uploads/upload.types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DocumentUploadStatusProps {
   uppy: Uppy<DocumentUploadMeta>;
@@ -80,7 +85,25 @@ export function DocumentUploadStatus({ uppy }: DocumentUploadStatusProps) {
               )}
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs">{file.name}</p>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <p
+                        className="truncate text-xs cursor-default"
+                        title={file.name}
+                      />
+                    }
+                  >
+                    {file.name}
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    align="start"
+                    className="max-w-xs sm:max-w-sm break-all text-xs font-medium"
+                  >
+                    {file.name}
+                  </TooltipContent>
+                </Tooltip>
 
                 {!complete && !error && (
                   <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">

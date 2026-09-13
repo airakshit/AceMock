@@ -11,6 +11,11 @@ import {
 import type Uppy from "@uppy/core";
 import { useUppyState } from "@uppy/react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { DocumentUploadMeta } from "../uploads/upload.types";
 import { formatBytes } from "../utils";
 
@@ -58,7 +63,25 @@ export function FileUploadItem({
     <div className="space-y-2 rounded-md border bg-background p-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{uppyFile.name}</p>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <p
+                  className="truncate text-sm font-medium cursor-default"
+                  title={uppyFile.name}
+                />
+              }
+            >
+              {uppyFile.name}
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              align="start"
+              className="max-w-xs sm:max-w-sm break-all text-xs font-medium"
+            >
+              {uppyFile.name}
+            </TooltipContent>
+          </Tooltip>
 
           <p className="text-xs text-muted-foreground font-mono">
             {formatBytes(fileSize)}
