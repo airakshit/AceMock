@@ -75,6 +75,24 @@ function nullsToUndefined<T>(obj: T): T {
  * 2. Deletes page-level fields from `data` items so item validation succeeds.
  * 3. Normalizes root aliases (e.g. `sectionEnds` -> `sectionEnd`, root `marks` -> `eachMarks`).
  */
+/**
+ * Recursively repairs LaTeX strings where single backslashes in JSON output
+ * were parsed as JSON escape sequences (e.g. \t -> tab, \f -> form feed, \b -> backspace).
+ */
+function sanitizeLatexString(val: unknown): unknown {
+  if (typeof val !== "string") return val;
+  return val
+    .replace(/\t([a-zA-Z])/g, "\\t$1")
+    .replace(/\x0c([a-zA-Z])/g, "\\f$1")
+    .replace(/\x08([a-zA-Z])/g, "\\b$1")
+    .replace(/\r([a-zA-Z])/g, "\\r$1")
+    .replace(
+      /\n(eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b/g,
+      "\\n$1"
+    )
+    .replace(/(^|[^\\])\bext\{/g, "$1\\text{");
+}
+
 function normalizeStructuredOCR(raw: unknown): unknown {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
   const root = { ...(raw as Record<string, unknown>) };
@@ -88,6 +106,9 @@ function normalizeStructuredOCR(raw: unknown): unknown {
     root.eachMarks = root.marks;
     delete root.marks;
   }
+  if (typeof root.paragraph === "string") {
+    root.paragraph = sanitizeLatexString(root.paragraph) as string;
+  }
 
   // If items in data array contain page-level fields, lift to root and strip from item
   if (Array.isArray(root.data)) {
@@ -96,7 +117,7 @@ function normalizeStructuredOCR(raw: unknown): unknown {
       const cleanItem = { ...(item as Record<string, unknown>) };
 
       if (typeof cleanItem.paragraph === "string" && !root.paragraph) {
-        root.paragraph = cleanItem.paragraph;
+        root.paragraph = sanitizeLatexString(cleanItem.paragraph) as string;
       }
       delete cleanItem.paragraph;
 
@@ -124,6 +145,24 @@ function normalizeStructuredOCR(raw: unknown): unknown {
         root.eachMarks = cleanItem.eachMarks;
       }
       delete cleanItem.eachMarks;
+
+      // Sanitize LaTeX strings in item content
+      if (typeof cleanItem.question === "string") {
+        cleanItem.question = sanitizeLatexString(cleanItem.question);
+      }
+      if (typeof cleanItem.solution === "string") {
+        cleanItem.solution = sanitizeLatexString(cleanItem.solution);
+      }
+      if (typeof cleanItem.hint === "string") {
+        cleanItem.hint = sanitizeLatexString(cleanItem.hint);
+      }
+      if (cleanItem.options && typeof cleanItem.options === "object" && !Array.isArray(cleanItem.options)) {
+        const cleanOptions: Record<string, unknown> = {};
+        for (const [optKey, optVal] of Object.entries(cleanItem.options as Record<string, unknown>)) {
+          cleanOptions[optKey] = sanitizeLatexString(optVal);
+        }
+        cleanItem.options = cleanOptions;
+      }
 
       return cleanItem;
     });
