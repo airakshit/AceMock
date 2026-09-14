@@ -11,6 +11,7 @@ import {
 import { chapters } from "./chapters";
 import { passages } from "./passages";
 import { documentFiles } from "../documents";
+import { sections } from "./sections";
 
 export const questionDifficutlyEnum = pgEnum("question_difficulty_enum", [
   "easy",
@@ -22,11 +23,10 @@ export const questions = pgTable("questions", {
   id: uuid("id").primaryKey(),
   question: text("question").notNull(),
 
-  chapterId: uuid("chapter_id")
-    .references(() => chapters.id, {
-      onDelete: "restrict",
-    })
-    .notNull(),
+  chapterId: uuid("chapter_id").references(() => chapters.id, {
+    onDelete: "set null",
+  }),
+
   passageId: uuid("passage_id").references(() => passages.id, {
     onDelete: "restrict",
   }),
