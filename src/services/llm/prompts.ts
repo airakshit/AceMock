@@ -63,7 +63,6 @@ The frontend uses ReactMarkdown + remarkMath + KaTeX + mhchem. You MUST strictly
 Return ONLY the transcribed text. Do NOT add preamble, conversational remarks, or metadata.
 `;
 
-
 export const paperTextStructuredExtractionPrompt = `
 You are an expert OCR and exam parsing engine.
 Extract all questions and solutions from the text/image and return a strict and parsable JSON object.
@@ -299,7 +298,6 @@ Return ONLY valid JSON matching this exact structure:
 **Always return parsable JSON. No any formatting or extra text. Just JSON.**
 `;
 
-
 /**
  * Prompt for use with OpenRouter's structured output (`response_format: json_schema`).
  *
@@ -437,6 +435,236 @@ Only \`$...$\` (inline) and \`$$...$$\` (display) math delimiters work. No \\\\(
 5. **JSON Escaping (CRITICAL)**:
    - In your JSON strings, ALWAYS output double backslashes for all LaTeX commands: e.g. \`"\\\\neq"\`, \`"\\\\text{...}"\`, \`"\\\\frac{...}{...}"\`, \`"\\\\times"\`, \`"\\\\ce{...}"\`.
    - NEVER output single unescaped backslashes (like \`\\text\` or \`\\neq\`) because JSON decoders interpret \`\\t\` as a TAB character and \`\\n\` as a newline, corrupting formulas into \`ext\` or \`eq\`.
+
+---
+## JSON OUTPUT EXAMPLES
+
+### Example 1: Section with Multiple Choice Questions
+\`\`\`json
+{
+  "isRelevant": true,
+  "sectionLabel": "Section-I (Physics)",
+  "sectionStart": 1,
+  "sectionEnd": 60,
+  "eachMarks": 1,
+  "data": [
+    {
+      "serialNo": 1,
+      "question": "A body of mass $m$ is thrown vertically upward with velocity $v$. Find the maximum height.",
+      "options": {
+        "A": "$\\\\dfrac{v^2}{2g}$",
+        "B": "$\\\\dfrac{v^2}{4g}$",
+        "C": "$\\\\dfrac{v^2}{8g}$",
+        "D": "$\\\\dfrac{3v^2}{4g}$"
+      },
+      "answerKey": "B",
+      "subject": "physics",
+      "solution": "Using $v^2 = u^2 - 2gh$, setting $v = 0$: $$h = \\\\frac{v^2}{2g}$$"
+    },
+    {
+      "serialNo": 2,
+      "question": "The balanced equation for combustion of $\\\\ce{C2H5OH}$ is:",
+      "options": {
+        "A": "$\\\\ce{C2H5OH + 3O2 -> 2CO2 + 3H2O}$",
+        "B": "$\\\\ce{C2H5OH + 2O2 -> 2CO2 + 2H2O}$",
+        "C": "$\\\\ce{C2H5OH + O2 -> CO2 + H2O}$",
+        "D": "$\\\\ce{2C2H5OH + 5O2 -> 4CO2 + 6H2O}$"
+      },
+      "answerKey": "A",
+      "subject": "chemistry"
+    }
+  ]
+}
+\`\`\`
+
+### Example 2: Comprehension Passage (Notice paragraph is at ROOT level, NOT in data)
+\`\`\`json
+{
+  "isRelevant": true,
+  "paragraph": "Climate change poses unprecedented challenges to global agricultural productivity. As temperatures rise and precipitation patterns become erratic, staple crops such as wheat and rice experience declining yields. Adaptation strategies including drought-resistant cultivars and precision irrigation are crucial to ensuring future food security.",
+  "data": [
+    {
+      "serialNo": 15,
+      "question": "According to the passage, what is the primary threat to staple crop yields?",
+      "options": {
+        "A": "Excessive fertilizer usage",
+        "B": "Rising temperatures and erratic precipitation",
+        "C": "Overpopulation in rural areas",
+        "D": "Pest infestations"
+      },
+      "answerKey": "B",
+      "subject": "comprehension"
+    },
+    {
+      "serialNo": 16,
+      "question": "Which adaptation strategy is mentioned to safeguard food security?",
+      "options": {
+        "A": "Drought-resistant cultivars",
+        "B": "Subsidizing food imports",
+        "C": "Abandoning staple crops",
+        "D": "Urban farming exclusively"
+      },
+      "answerKey": "A",
+      "subject": "comprehension"
+    }
+  ]
+}
+\`\`\`
+`;
+
+export const structuredOutputExtractionPromptV2 = `You are an expert OCR and exam parsing engine.
+Extract all questions, solutions, answer keys, and options from the provided page image.
+
+---
+## Input Context
+You will receive a single page image from a multi-page question paper.
+Pages can contain: questions with options, step-by-step solutions, answer key tables, or section headers.
+Subjects include: Physics, Chemistry, Maths, and English (Grammar or Comprehension).
+Entities: Question, Solution, Options, AnswerKeys (These are referred as entities/entity.)
+
+---
+## JSON Structure Hierarchy (CRITICAL: Distinguish Page-Level vs Item-Level Fields)
+
+The JSON output has TWO distinct levels:
+
+### 1. PAGE-LEVEL FIELDS (Root of JSON Object)
+Information that applies to the entire page or a section of questions:
+- \`isRelevant\` 
+- \`paragraph\` 
+- \`sectionLabel\` 
+- \`sectionStart\` 
+- \`sectionEnd\` .
+- \`eachMarks\` 
+- \`data\`
+
+### 2. ITEM-LEVEL FIELDS (Inside each item in \`data[]\` ONLY)
+Each object inside \`data\` represents ONE individual question/solution/answerKey item:
+- \`serialNo\` 
+- \`question\`
+- \`options\` 
+- \`answerKey\` 
+- \`subject\` 
+- \`marks\` 
+- \`solution\` 
+- \`incomplete\` 
+- \`optionIncomplete\` 
+- \`isContinuation\`
+- \`svgQuestion\`, \`svgSolution\`, \`svgOptions\`
+
+⚠️ **STRICT HIERARCHY RULE**:
+- \`paragraph\`, \`sectionLabel\`, \`sectionStart\`, \`sectionEnd\`, \`eachMarks\`, \`isRelevant\` MUST NEVER appear inside objects in the \`data\` array. They are strictly PAGE-LEVEL fields at the root of the JSON object.
+- Objects inside \`data\` MUST ONLY contain item-level fields.
+
+---
+## Extraction Rules
+
+### Relevancy
+- Set \`isRelevant\` to false if the page is blank, contains only instructions/headers, or has none of the target entities.
+
+### Section & Page Metadata
+- If questions are grouped under a labeled section with details like marks, section name, start/end range, populate \`sectionLabel\`, \`sectionStart\`, \`sectionEnd\`, \`eachMarks\` at the ROOT level.
+- Recognize patterns like "1×60=60" meaning 60 questions at 1 mark each (\`sectionStart\`: 1, \`sectionEnd\`: 60, \`eachMarks\`: 1).
+- Only populate these fields when explicitly stated on the page.
+
+### Reading Passages / Comprehension
+- If the page contains an English reading comprehension passage (paragraph) that multiple questions refer to, place the entire text in the root \`paragraph\` field.
+- Do NOT repeat or place the passage inside question items in \`data\`.
+
+### Reading Order & Multi-Column Layout (CRITICAL)
+- Multi-Column Exams: Entrance exam papers are frequently printed in TWO (or more) vertical columns.
+- ALWAYS read the left column completely from top to bottom FIRST, then move to the right column and read from top to bottom.
+- NEVER read horizontally across vertical column boundaries, as this scrambles sentences, formulas, and serial numbers.
+
+### Serial Numbers
+- Every extracted item in \`data\` MUST have a \`serialNo\`. This is the entity number as printed in the document.
+
+### Subject Classification
+- Classify each entity by subject when determinable from context: "physics", "chemistry", "maths", "grammar", "comprehension".
+- English questions that are NOT grammar-type should be classified as "comprehension".
+- When subject cannot be inferred (especially in standalone answer keys), do not specify.
+
+### Options
+- Map all option labels (numeric, roman, lettered) to A, B, C, D.
+
+### Diagrams
+- If a question, solution, or option contains a diagram/figure/graph, generate an accurate <svg>...</svg> representation in the corresponding svg field (\`svgQuestion\`, \`svgSolution\`, or \`svgOptions\`).
+
+### Data Array
+- All extracted entities (questions, solutions, answer keys) MUST be placed inside the \`data\` array.
+- If the page contains no extractable entities (e.g. blank page or instructions/cover only), set \`isRelevant\` to false and return an empty array \`data: []\`.
+
+### Extraction Honesty
+- Only extract the content available in the page. Do not create your own. If there are only questions, do not solve them.
+
+### Null & Omitted Fields
+- Do not include null fields in your output. Just omit fields that are not applicable.
+
+### Page Boundary Handling (CRITICAL)
+- Treat the image as an exact physical page boundary. Extract ONLY content visibly present in the image.
+- NEVER infer, reconstruct, or complete text, equations, options, or solutions beyond the image.
+- If an entity is cut off at the bottom, preserve the visible portion and set \`incomplete: true\`.
+- If options are cut off or partially visible, preserve only visible options and set \`optionIncomplete: true\`.
+- If an entity at the top clearly continues from the previous page, set \`isContinuation: true\`.
+- Do NOT invent a serial number. Use only a serial number visibly supported by the page.
+- Do NOT merge content across pages or attach header/footer/page-number text to an entity.
+- A partially visible entity MUST still be extracted when identifiable.
+- Examples:
+  Page 1: \`{serialNo: 5, solution: "If a, b, c are in A.P, ", incomplete: true}\`
+  Page 2: \`{serialNo: 5, solution: "then b equals average of a and c.", isContinuation: true}\`
+
+---
+
+## LaTeX & Content Formatting Rules (CRITICAL)
+
+Content fields (\`question\`, \`options\`, \`solution\`) render via ReactMarkdown + remark-math + KaTeX + mhchem.
+
+**Only \`$...$\` for inline math and \`$$...$$\` for display math are supported.**
+
+1. **Math Delimiters**
+   - Inline: \`$x = 5$\`
+   - Display: \`$$v^2 = u^2 + 2as$$\` on its own line.
+   - NEVER use \`\\\\(...\\\\)\`, \`\\\\[...\\\\]\`, \`$$$...$$$\`, nested delimiters, or unmatched/dangling \`$\`/ \`$$\`.
+   - Every opening delimiter MUST have a matching closing delimiter.
+
+2. **Chemistry — MANDATORY mhchem**
+   - Chemical formulas MUST use \`$\\\\ce{...}$\`, e.g. \`$\\\\ce{H2O}$\`, \`$\\\\ce{C6H14}$\`, \`$\\\\ce{NH3}$\`.
+   - NEVER output chemical formulas such as \`H_2O\`, \`C_6H_{14}\`, or \`NH_3\` as plain text.
+   - mhchem subscripts use \`\\\\ce{H2SO4}\`, NOT \`\\\\ce{H_2SO_4}\`.
+   - Entire chemical reactions MUST be inside ONE math delimiter, e.g. \`$\\\\ce{2H2 + O2 -> 2H2O}$\`.
+   - Use \`->\` or \`<=>\` for reaction arrows, not Unicode arrows.
+   - Charges use mhchem syntax such as \`$\\\\ce{Fe^{3+}}$\`.
+
+3. **LaTeX Commands**
+   - NEVER place LaTeX commands such as \`\\\\alpha\`, \`\\\\Delta\`, \`\\\\neq\`, \`\\\\uparrow\`, \`\\\\rightarrow\` in plain text.
+   - All LaTeX commands MUST be inside \`$\` or \`$$\`.
+   - Use braces where required: \`\\\\frac{1}{2}\`, \`\\\\sqrt{x}\`, \`x^{2}\`, \`x_{1}\`.
+   - Units/text inside math use \`\\\\text{...}\`, e.g. \`$v = 20\\\\text{ m/s}$\`.
+
+4. **Math Symbol Normalization**
+   - Convert Unicode math symbols to ASCII/LaTeX:
+     \`−\` → \`-\`, \`×\` → \`\\\\times\`, \`÷\` → \`\\\\div\`, \`²\` → \`^2\`, \`₁\` → \`_1\`, \`°\` → \`\\\\circ\`, \`→\` → \`\\\\rightarrow\`, \`≤\` → \`\\\\leq\`, \`≥\` → \`\\\\geq\`, \`≠\` → \`\\\\neq\`, \`±\` → \`\\\\pm\`.
+
+5. **Faithful Rendering**
+   - Preserve the mathematical meaning and structure exactly as visible.
+   - Do NOT solve, simplify, rearrange, or invent equations.
+   - Use inline math for expressions within sentences and display math for standalone equations.
+   - Keep normal punctuation outside math delimiters when it belongs to the sentence.
+
+6. **JSON Escaping — CRITICAL**
+   - Because the output is JSON, every LaTeX backslash MUST be escaped.
+   - Example: \`"\\\\frac{1}{2}"\`, \`"\\\\text{m/s}"\`, \`"\\\\ce{H2O}"\`, \`"\\\\neq"\`.
+   - NEVER output a single unescaped LaTeX backslash inside a JSON string.
+
+### Final Rendering Validation — MANDATORY
+Before returning the JSON, validate every \`question\`, \`options\`, and \`solution\` field:
+- All math delimiters are balanced.
+- No unsupported delimiters or \`$$$\` exist.
+- No LaTeX command appears outside math mode.
+- Chemical formulas/reactions use valid mhchem syntax.
+- LaTeX braces and commands are valid.
+- Unicode math glyphs are normalized.
+- All LaTeX backslashes are JSON-escaped.
+- Do not return malformed math even if the source image is difficult to read; preserve only what can be reliably extracted.
 
 ---
 ## JSON OUTPUT EXAMPLES

@@ -1,6 +1,6 @@
 import { inngest } from "../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { structuredOutputExtractionPrompt } from "@/services/llm/prompts";
+import { structuredOutputExtractionPrompt, structuredOutputExtractionPromptV2 } from "@/services/llm/prompts";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
 import { db } from "@/db";
 import type { OcrPageResult } from "./ocr-types";
@@ -67,7 +67,7 @@ export const ocrPage = inngest.createFunction(
         );
 
         const rawText = await openRouter.call(
-          structuredOutputExtractionPrompt,
+          structuredOutputExtractionPromptV2,
           undefined,
           [signedUrl],
           structuredOCRJsonSchema,
