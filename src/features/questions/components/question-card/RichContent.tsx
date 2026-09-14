@@ -25,12 +25,32 @@ interface RichContentProps {
  * by wrapBareLatexCommands() below. Extend this list as new OCR patterns show up.
  */
 const BRACE_MATH_COMMANDS = [
-  "dfrac", "tfrac", "cfrac", "frac",
-  "sqrt", "binom", "dbinom", "tbinom",
-  "overline", "underline", "widehat", "widetilde",
-  "vec", "hat", "bar", "dot", "ddot",
-  "sum", "prod", "int", "oint", "iint", "iiint",
-  "lim", "limsup", "liminf",
+  "dfrac",
+  "tfrac",
+  "cfrac",
+  "frac",
+  "sqrt",
+  "binom",
+  "dbinom",
+  "tbinom",
+  "overline",
+  "underline",
+  "widehat",
+  "widetilde",
+  "vec",
+  "hat",
+  "bar",
+  "dot",
+  "ddot",
+  "sum",
+  "prod",
+  "int",
+  "oint",
+  "iint",
+  "iiint",
+  "lim",
+  "limsup",
+  "liminf",
 ] as const;
 
 /**
@@ -66,7 +86,10 @@ function matchBraceGroup(str: string, openIdx: number): number {
  * parser — good enough for typical OCR'd/typed expressions.
  */
 function wrapBareLatexCommands(text: string): string {
-  const commandRe = new RegExp(`\\\\(${BRACE_MATH_COMMANDS.join("|")})\\b`, "g");
+  const commandRe = new RegExp(
+    `\\\\(${BRACE_MATH_COMMANDS.join("|")})\\b`,
+    "g",
+  );
   let out = "";
   let cursor = 0;
   let match: RegExpExecArray | null;
@@ -114,7 +137,9 @@ function wrapBareLatexCommands(text: string): string {
       const after = end + glue[0].length;
       const rest = text.slice(after);
 
-      const nextCmd = new RegExp(`^\\\\(${BRACE_MATH_COMMANDS.join("|")})\\b`).exec(rest);
+      const nextCmd = new RegExp(
+        `^\\\\(${BRACE_MATH_COMMANDS.join("|")})\\b`,
+      ).exec(rest);
       const nextNum = /^[0-9]+(\.[0-9]+)?/.exec(rest);
 
       if (nextCmd) {
@@ -149,6 +174,7 @@ function wrapBareLatexCommands(text: string): string {
  * 2. Converts invalid bare '^}' inside \ce to '\uparrow}'
  * 3. Normalizes 'ce{' (where leading backslash was stripped or omitted) to '\ce{'
  * 4. Fixes \ce immediately followed by formula without space/braces
+ * 4b. Repairs display-math blocks with mismatched delimiter lengths (e.g. "$$...$")
  * 5. Cleans and normalizes display math ($$...$$ or $$...$$$), stripping any illegal inner $
  * 6. Protects valid math blocks and performs text-level fixes (wrapping bare \ce, \uparrow, chemical formulas)
  * 7. Adds a space after commas in plain text (skips numeric thousands separators)
@@ -171,7 +197,7 @@ function normalizeMathAndChemistry(text: string): string {
   // - Newline (ASCII 10, \n) followed by LaTeX math commands starting with \n (e.g. \neq, \nabla, \neg, \notin, \nu, \natural)
   result = result.replace(
     /\n(eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b/g,
-    "\\n$1"
+    "\\n$1",
   );
 
   // 0b. Repair bare 'ext{' inside or outside math that lost its leading '\t' or '\':
@@ -180,7 +206,8 @@ function normalizeMathAndChemistry(text: string): string {
 
   // 0c. Convert literal "\n" escape sequences (from JSON/OCR output) into real newlines,
   // BUT PRESERVE LaTeX commands starting with \n (like \neq, \nabla, \neg, \nu, \notin, \natural, \ne, \not, etc.)
-  const LATEX_N_MACROS = /\\n(?!(?:eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b)/g;
+  const LATEX_N_MACROS =
+    /\\n(?!(?:eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b)/g;
   const NEWLINE_PLACEHOLDER = "\u0000BSNL\u0000";
   result = result.replace(/\\\\n/g, NEWLINE_PLACEHOLDER);
   result = result.replace(LATEX_N_MACROS, "\n");
@@ -195,15 +222,43 @@ function normalizeMathAndChemistry(text: string): string {
   // 3. Fix \ce immediately followed by letters/numbers without space or brace
   // e.g. \ceC2H5OH+3O2->2CO2+3H2O  =>  \ce{C2H5OH+3O2->2CO2+3H2O}
   // MUST have leading backslash \ce to avoid corrupting English words like "central" or "cell"
-  result = result.replace(/\\ce(?![{\s])([A-Za-z0-9_+\-=>^]+)/g, (_, formula) => {
-    return `\\ce{${formula}}`;
-  });
+  result = result.replace(
+    /\\ce(?![{\s])([A-Za-z0-9_+\-=>^]+)/g,
+    (_, formula) => {
+      return `\\ce{${formula}}`;
+    },
+  );
 
   // 4. Fix missing opening $$ when there's an unmatched trailing $$ after a formula
   // E.g. "... as follows: NH_3 <\ce{N2H4}<\ce{N2H2}<\ce{N3H}$$. So..."
   result = result.replace(
     /(:\s*)([A-Za-z0-9_\\{}<>=+\-\s]+?\\ce\{[^}]+\}(?:[A-Za-z0-9_\\{}<>=+\-\s]*))\$\$/g,
-    (_, prefix, formula) => `${prefix}\n\n$$${formula.trim()}$$\n\n`
+    (_, prefix, formula) => `${prefix}\n\n$$${formula.trim()}$$\n\n`,
+  );
+
+  // 4b. NEW: repair a display-math block whose delimiters don't match in
+  // length — e.g. opens with "$$" but only a single "$" closes it (a dropped
+  // closing dollar sign), or the mirror case (opens "$", closes "$$").
+  //
+  // Why this matters: math delimiters work like backtick code-spans — the
+  // closing run must be the SAME LENGTH as the opening run. A "$$...$" block
+  // doesn't just render with a stray character; remark-math can't match the
+  // delimiters at all and gives up on treating it as math entirely, so the
+  // whole thing (backslashes and all) shows up as literal text on screen.
+  //
+  // Guard against false positives: only touch a span if its content contains
+  // a backslash (a LaTeX command). Plain prose that happens to mention a
+  // dollar amount twice on one line ("costs $5 ... fee is $$10") never
+  // contains a "\", so it's left completely alone. The content group also
+  // excludes further "$"/newline so this never reaches across into a
+  // separate, unrelated math span later in the same text.
+  result = result.replace(
+    /\$\$([^$\n]*\\[^$\n]*)\$(?!\$)/g,
+    (_, inner) => `$$${inner}$$`,
+  );
+  result = result.replace(
+    /(^|[^$])\$([^$\n]*\\[^$\n]*)\$\$/g,
+    (_, before, inner) => `${before}$$${inner}$$`,
   );
 
   // 5. Clean display math blocks: $$ ... $$ or $$ ... $$$
@@ -246,23 +301,31 @@ function normalizeMathAndChemistry(text: string): string {
   // in one shot, with no overlap.
   result = result.replace(
     /(\\ce\{[^}]+\}(?:\s*(?:<|>|=|<=|>=|->|<=>)\s*\\ce\{[^}]+\})*)/g,
-    (m) => `$${m}$`
+    (m) => `$${m}$`,
   );
 
   // 7d. Wrap bare arrows in plain text (e.g. "acidity \uparrow s" -> "acidity $\uparrow$ s")
-  result = result.replace(/(^|[^\$\\])\\(uparrow|downarrow|rightarrow|leftarrow)\b/g, "$1$\\$2$");
+  result = result.replace(
+    /(^|[^\$\\])\\(uparrow|downarrow|rightarrow|leftarrow)\b/g,
+    "$1$\\$2$",
+  );
 
   // 7e. Wrap bare \neq expressions in plain text if not already inside math
-  result = result.replace(/(^|[^\$])([a-zA-Z0-9_|()]+\s*\\neq\s*[a-zA-Z0-9_|()]+)(?=[^\$]|$)/g, "$1$$$2$$");
+  result = result.replace(
+    /(^|[^\$])([a-zA-Z0-9_|()]+\s*\\neq\s*[a-zA-Z0-9_|()]+)(?=[^\$]|$)/g,
+    "$1$$$2$$",
+  );
   result = result.replace(/(^|[^\$\\])\\neq\b/g, "$1$\\neq$");
 
   // 7f. Convert bare chemical formulas with subscripts outside math like C_6H_{14} or NH_3 or C_6H_5NH_2 into $\ce{...}$
   result = result.replace(
     /(^|[\s([<])([A-Z][a-z]?(?:_\d+|_\{\d+\})(?:[A-Z][a-z]?(?:_\d+|_\{\d+\}|[A-Za-z0-9])*)*)(?=[.,;:\s)\]>]|$)/g,
     (match, prefix, formula) => {
-      const cleanFormula = formula.replace(/_(\d+)/g, "$1").replace(/_\{(\d+)\}/g, "$1");
+      const cleanFormula = formula
+        .replace(/_(\d+)/g, "$1")
+        .replace(/_\{(\d+)\}/g, "$1");
       return `${prefix}$\\ce{${cleanFormula}}$`;
-    }
+    },
   );
 
   // 7g. NEW: ensure a space follows every comma in plain text, e.g.
@@ -279,7 +342,8 @@ function normalizeMathAndChemistry(text: string): string {
   result = result.replace(/,(?!\s)/g, (match, offset: number, str: string) => {
     const before = str[offset - 1];
     const after = str[offset + 1];
-    const isNumericSeparator = !!before && !!after && /\d/.test(before) && /\d/.test(after);
+    const isNumericSeparator =
+      !!before && !!after && /\d/.test(before) && /\d/.test(after);
     return isNumericSeparator ? "," : ", ";
   });
 
@@ -291,7 +355,10 @@ function normalizeMathAndChemistry(text: string): string {
   result = wrapBareLatexCommands(result);
 
   // 8. Restore protected math blocks
-  result = result.replace(/\u0000MATH_(\d+)\u0000/g, (_, idx) => mathBlocks[Number(idx)]);
+  result = result.replace(
+    /\u0000MATH_(\d+)\u0000/g,
+    (_, idx) => mathBlocks[Number(idx)],
+  );
 
   // 9. Clean up excessive consecutive newlines introduced by block math formatting
   result = result.replace(/\n{3,}/g, "\n\n").trim();
@@ -365,7 +432,10 @@ function RichContentBase({ text, className }: RichContentProps) {
       // Fail open: render the raw text rather than crash the question view
       // on an unexpected OCR edge case.
       // eslint-disable-next-line no-console
-      console.error("RichContent: normalization failed, rendering raw text", err);
+      console.error(
+        "RichContent: normalization failed, rendering raw text",
+        err,
+      );
       return text;
     }
   }, [text]);
@@ -403,14 +473,7 @@ function RichContentBase({ text, className }: RichContentProps) {
   }
 
   return (
-    <div
-      className={[
-        "rich-content",
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
+    <div className={["rich-content", className].filter(Boolean).join(" ")}>
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         components={components as any}
