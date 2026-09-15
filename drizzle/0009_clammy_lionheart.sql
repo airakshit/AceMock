@@ -1,0 +1,1 @@
+ALTER TABLE "file_pages" ALTER COLUMN "ocr_model" DROP NOT NULL;
