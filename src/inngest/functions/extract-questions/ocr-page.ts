@@ -1,13 +1,25 @@
 import { inngest } from "../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { structuredOutputExtractionPrompt, structuredOutputExtractionPromptV2 } from "@/services/llm/prompts";
+import {
+  structuredOutputExtractionPrompt,
+  structuredOutputExtractionPromptV2,
+  structuredOutputExtractionPromptV3,
+} from "@/services/llm/prompts";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
 import { db } from "@/db";
 import type { OcrPageResult } from "./ocr-types";
-import { OpenRouterLLMService, OpenRouterModels } from "@/services/llm";
+import {
+  OpenRouterLLMService,
+  OpenRouterModels,
+} from "@/services/llm/openrouter.service";
+import { GeminiLLMService, GeminiModels } from "@/services/llm/gemini.service";
 import { parseAndValidateStructuredOCR } from "./utils";
 import { OcrEmptyResponseError, OcrValidationError } from "./errors";
-import { type StructuredSchemaParseResult, structuredOCRJsonSchema } from "./schema";
+import {
+  type StructuredSchemaParseResult,
+  structuredOCRJsonSchema,
+} from "./schema";
+import { env } from "@/config/env/server";
 
 export interface OcrPageEventData {
   userId: string;
@@ -27,7 +39,7 @@ export const ocrPage = inngest.createFunction(
     triggers: { event: "page/ocr" },
     retries: TOTAL_RETRIES,
     concurrency: {
-      limit: 3,
+      limit: 2,
     },
   },
 
@@ -45,13 +57,11 @@ export const ocrPage = inngest.createFunction(
       return await supabaseStorageClient.getPageAccessUrl(storagePath);
     });
 
-    const MODEL_TO_USE =
-      (process.env.OCR_MODEL as string) ||
-      OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW;
+    const llmService = new GeminiLLMService(
+      env.GEMINI_API_KEY,
+      "gemma-4-26b-a4b-it",
+    );
 
-
-
-    // 2. Send image to LLM for raw OCR text transcription & validation
     const extraction = await step.run(
       "llm-ocr-extraction",
       async (): Promise<{
@@ -61,13 +71,8 @@ export const ocrPage = inngest.createFunction(
         isRelevant: boolean;
         parsedData?: StructuredSchemaParseResult;
       }> => {
-        const openRouter = new OpenRouterLLMService(
-          process.env.OPENROUTER_API_KEY!,
-          MODEL_TO_USE,
-        );
-
-        const rawText = await openRouter.call(
-          structuredOutputExtractionPromptV2,
+        const rawText = await llmService.call(
+          structuredOutputExtractionPromptV3,
           undefined,
           [signedUrl],
           structuredOCRJsonSchema,
@@ -147,7 +152,7 @@ export const ocrPage = inngest.createFunction(
         pageNo,
         ocrText: extraction.rawText ?? undefined,
         ocrStatus: extraction.ocrStatus,
-        ocrModel: MODEL_TO_USE,
+        ocrModel: llmService.model,
         survivedValidation: extraction.survivedValidation,
         isRelevant: extraction.isRelevant,
       });
@@ -165,4 +170,3 @@ export const ocrPage = inngest.createFunction(
     };
   },
 );
-

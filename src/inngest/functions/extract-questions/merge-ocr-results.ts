@@ -220,7 +220,9 @@ export function cleanQuestionText(question: string, serialNo?: number): string {
     );
     cleaned = cleaned.replace(serialRegex, "").trim();
   } else {
-    cleaned = cleaned.replace(/^(Q\.?\s*\d+[\.\:\)]|\d+[\.\:\)])\s*/i, "").trim();
+    cleaned = cleaned
+      .replace(/^(Q\.?\s*\d+[\.\:\)]|\d+[\.\:\)])\s*/i, "")
+      .trim();
   }
 
   return cleaned;
@@ -403,13 +405,17 @@ export function mergeOcrResults(
           const optionsMap: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
           if (item.options) {
             for (const key of OPTION_KEYS) {
-              if (item.options[key] !== undefined && item.options[key] !== null) {
+              if (
+                item.options[key] !== undefined &&
+                item.options[key] !== null
+              ) {
                 optionsMap[key] = cleanOptionText(item.options[key]!);
               }
             }
           }
 
-          const svgOptionsMap: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
+          const svgOptionsMap: Partial<Record<"A" | "B" | "C" | "D", string>> =
+            {};
           if (item.svgOptions) {
             for (const key of OPTION_KEYS) {
               if (item.svgOptions[key]) {

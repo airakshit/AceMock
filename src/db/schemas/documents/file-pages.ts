@@ -8,13 +8,12 @@ import {
   boolean,
 } from "drizzle-orm/pg-core";
 import { documentFiles } from "./document-files";
-import { OpenRouterModels } from "@/services/llm";
 
 export const filePageOCRStatusEnum = pgEnum("file_pages_ocr_status_enum", [
   "pending",
   "running",
   "completed",
-  "failed"
+  "failed",
 ]);
 
 export const filePages = pgTable("file_pages", {
@@ -26,17 +25,13 @@ export const filePages = pgTable("file_pages", {
 
   pageNo: integer("page_no").notNull().default(0),
 
-  ocrStatus: filePageOCRStatusEnum("ocr_status")
-    .notNull()
-    .default("pending"),
+  ocrStatus: filePageOCRStatusEnum("ocr_status").notNull().default("pending"),
 
   ocrText: text("ocr_text"),
 
   survivedValidation: boolean("survived_validation").notNull().default(true),
   isRelevant: boolean("is_relevant").notNull().default(true),
-  ocrModel: text("ocr_model")
-    .notNull()
-    .default(OpenRouterModels.FREE_VISION.DOTS_3_NOTE_PREVIEW),
+  ocrModel: text("ocr_model").notNull(),
 
   createdAt: timestamp("created_at", {
     withTimezone: true,

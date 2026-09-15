@@ -14,7 +14,6 @@ import { generateUUIDv7 } from "@/features/shared/utils";
 import { mergeOcrResults } from "./merge-ocr-results";
 import type { OcrPageResult, ResolvedQuestion } from "./ocr-types";
 import { OcrPageFailedError, QuestionPersistError } from "./errors";
-import { curriculumClassifierService } from "@/features/questions/services/curriculum-classifier.service";
 
 export interface ExtractDocumentQuestionEventData {
   userId: string;
@@ -28,8 +27,9 @@ export const extractQuestions = inngest.createFunction(
     id: "extract-questions-from-document",
     triggers: { event: EXTRACT_QUESTIONS_EVENT },
     onFailure: async ({ event, step, logger }) => {
-      const eventData = (event.data as any)?.event
-        ?.data as ExtractDocumentQuestionEventData | undefined;
+      const eventData = (event.data as any)?.event?.data as
+        | ExtractDocumentQuestionEventData
+        | undefined;
       const documentId = eventData?.documentId;
 
       if (documentId) {
@@ -226,9 +226,7 @@ export const extractQuestions = inngest.createFunction(
     // 4. Validate that ALL pages across the entire document succeeded
     const failedPages = allOcrResults.filter(
       (r) =>
-        r.status !== "completed" ||
-        !r.rawText ||
-        r.rawText.trim().length === 0,
+        r.status !== "completed" || !r.rawText || r.rawText.trim().length === 0,
     );
 
     if (failedPages.length > 0) {
@@ -309,67 +307,36 @@ export const extractQuestions = inngest.createFunction(
     }
 
     // 6. Resolve chapters per subject and persist passages
-    const { chapterMap, passageMap } = await step.run(
-      "resolve-chapters-and-passages",
-      async () => {
-        const chapterMap: Record<string, string> = {};
-        const passageMap: Record<string, string> = {};
+    const passageMap = await step.run("create-passages", async () => {
+      const passageMap: Record<string, string> = {};
 
-        // Find or create default chapters for each unique subject
-        const distinctSubjects = Array.from(
-          new Set(
-            resolvedQuestions.map((q) =>
-              (q.subject || "general").toLowerCase().trim(),
-            ),
-          ),
-        );
+      const distinctPassages = Array.from(
+        new Set(
+          resolvedQuestions
+            .map((q) => q.passageContent?.trim())
+            .filter((p): p is string => Boolean(p)),
+        ),
+      );
+      const results = await questionsRepository.createManyPassages(
+        db,
+        distinctPassages,
+      );
+      for (const result of results) {
+        passageMap[result.content] = result.id;
+      }
+      return passageMap;
+    });
 
-        for (const subject of distinctSubjects) {
-          const chapterId =
-            await questionsRepository.findOrCreateDefaultChapter(db, subject);
-          chapterMap[subject] = chapterId;
-        }
-
-        // Find or create passages for comprehension questions
-        const distinctPassages = Array.from(
-          new Set(
-            resolvedQuestions
-              .map((q) => q.passageContent?.trim())
-              .filter((p): p is string => Boolean(p)),
-          ),
-        );
-
-        for (const passageContent of distinctPassages) {
-          const passageId = await questionsRepository.findOrCreatePassage(
-            db,
-            passageContent,
-          );
-          passageMap[passageContent] = passageId;
-        }
-
-        return { chapterMap, passageMap };
-      },
-    );
-
-    // 7. Prepare payload and persist all questions to the database
     const saveResult = await step.run("save-questions", async () => {
       try {
-        const defaultSubjectKey = "general";
-        const fallbackChapterId =
-          chapterMap[defaultSubjectKey] ||
-          Object.values(chapterMap)[0] ||
-          (await questionsRepository.findOrCreateDefaultChapter(db, "general"));
-
         const payload: CreateQuestionItem[] = resolvedQuestions.map((q) => {
-          const subjectKey = (q.subject || "general").toLowerCase().trim();
-          const chapterId = chapterMap[subjectKey] || fallbackChapterId;
           const passageId = q.passageContent
             ? passageMap[q.passageContent.trim()] || null
             : null;
 
           return {
             id: generateUUIDv7(),
-            chapterId,
+            chapterId: null,
             passageId,
             fileId: q.fileId,
             question: q.question,
@@ -407,56 +374,6 @@ export const extractQuestions = inngest.createFunction(
       }
     });
 
-    // 8. Classify questions and assign curriculum chapter IDs
-    const classifiedCount = await step.run(
-      "classify-and-assign-chapters",
-      async () => {
-        if (
-          !saveResult.insertedQuestions ||
-          saveResult.insertedQuestions.length === 0
-        ) {
-          return 0;
-        }
-
-        logger.info(
-          { documentId, count: saveResult.insertedQuestions.length },
-          "Starting 2-step hierarchical curriculum classification with Groq LLM.",
-        );
-
-        try {
-          const classifications =
-            await curriculumClassifierService.classifyQuestions(
-              db,
-              saveResult.insertedQuestions,
-            );
-
-          const updates = classifications.map((c) => ({
-            id: c.id,
-            chapterId: c.chapterId,
-          }));
-
-          await questionsRepository.updateManyChapterIds(db, updates);
-
-          logger.info(
-            {
-              documentId,
-              classifiedCount: updates.length,
-            },
-            "Curriculum classification and chapter ID updates completed.",
-          );
-
-          return updates.length;
-        } catch (err) {
-          logger.error(
-            { documentId, error: err },
-            "Curriculum classification encountered an error; questions remain with subject fallback chapters.",
-          );
-          return 0;
-        }
-      },
-    );
-
-    // 9. Mark document as successfully processed
     await step.run("mark-document-completed", async () => {
       await documentsRepository.updateProcessingStatus(
         db,
@@ -464,23 +381,5 @@ export const extractQuestions = inngest.createFunction(
         "completed",
       );
     });
-
-    logger.info(
-      {
-        documentId,
-        totalQuestionsSaved: saveResult.savedCount,
-        totalQuestionsClassified: classifiedCount,
-      },
-      "Document processing, question extraction, and classification completed successfully.",
-    );
-
-    return {
-      success: true,
-      documentId,
-      totalPages: allDocPages.length,
-      successfulPages: allDocPages.length,
-      totalQuestionsSaved: saveResult.savedCount,
-      totalQuestionsClassified: classifiedCount,
-    };
   },
 );

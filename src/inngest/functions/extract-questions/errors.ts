@@ -19,7 +19,11 @@ export class OcrValidationError extends OcrError {
 
   constructor(
     message: string,
-    options?: { validationErrors?: string[]; pageNo?: number; attempt?: number },
+    options?: {
+      validationErrors?: string[];
+      pageNo?: number;
+      attempt?: number;
+    },
   ) {
     super(message);
     this.name = "OcrValidationError";
@@ -49,7 +53,10 @@ export class QuestionMergeError extends Error {
 }
 
 export class QuestionPersistError extends Error {
-  constructor(message: string, public readonly cause?: unknown) {
+  constructor(
+    message: string,
+    public readonly cause?: unknown,
+  ) {
     super(message);
     this.name = "QuestionPersistError";
   }
@@ -57,7 +64,10 @@ export class QuestionPersistError extends Error {
 
 export class ChapterResolutionError extends Error {
   constructor(subject: string, message?: string) {
-    super(message || `Failed to resolve or create chapter for subject: "${subject}".`);
+    super(
+      message ||
+        `Failed to resolve or create chapter for subject: "${subject}".`,
+    );
     this.name = "ChapterResolutionError";
   }
 }

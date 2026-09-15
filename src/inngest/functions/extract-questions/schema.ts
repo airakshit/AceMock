@@ -7,13 +7,15 @@ const subjectSchema = z.enum([
   "chemistry",
   "maths",
   "grammar",
-  "comprehension"
+  "comprehension",
 ]);
 
 const questionDataSchema = z
   .object({
     // Primary identifier — required for every data item
-    serialNo: z.coerce.number().describe("Primary identifier for every question or solution."),
+    serialNo: z.coerce
+      .number()
+      .describe("Primary identifier for every question or solution."),
 
     // Question content
     question: z.string().optional().describe("The actual question text."),
@@ -88,7 +90,10 @@ export const structuredOCRExtractionSchema = z
 
     paragraph: z.string().optional(),
 
-    data: z.array(questionDataSchema).nullish().transform((val) => val ?? []),
+    data: z
+      .array(questionDataSchema)
+      .nullish()
+      .transform((val) => val ?? []),
   })
   .strict();
 
@@ -121,11 +126,13 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
       },
       paragraph: {
         type: ["string", "null"],
-        description: "ROOT ONLY: Comprehension passage text. NEVER place inside a data[] item.",
+        description:
+          "ROOT ONLY: Comprehension passage text. NEVER place inside a data[] item.",
       },
       data: {
         type: "array",
-        description: "Questions/solutions/answer-keys list. NEVER embed paragraph or section fields inside items.",
+        description:
+          "Questions/solutions/answer-keys list. NEVER embed paragraph or section fields inside items.",
         items: {
           type: "object",
           properties: {
@@ -147,7 +154,14 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
             },
             subject: {
               type: ["string", "null"],
-              enum: ["physics", "chemistry", "maths", "grammar", "comprehension", null],
+              enum: [
+                "physics",
+                "chemistry",
+                "maths",
+                "grammar",
+                "comprehension",
+                null,
+              ],
             },
             marks: { type: ["number", "null"] },
             solution: { type: ["string", "null"] },
@@ -167,26 +181,21 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
               additionalProperties: false,
             },
           },
-          required: [
-            "serialNo",
-          ],
+          required: ["serialNo"],
           anyOf: [
-            { "required": ["question"] },
-            { "required": ["options"] },
-            { "required": ["answerKey"] },
-            { "required": ["solution"] },
-            { "required": ["svgQuestion"] },
-            { "required": ["svgSolution"] },
-            { "required": ["svgOptions"] }
+            { required: ["question"] },
+            { required: ["options"] },
+            { required: ["answerKey"] },
+            { required: ["solution"] },
+            { required: ["svgQuestion"] },
+            { required: ["svgSolution"] },
+            { required: ["svgOptions"] },
           ],
           additionalProperties: false,
         },
       },
     },
-    required: [
-      "isRelevant",
-      "data"
-    ],
+    required: ["isRelevant", "data"],
     additionalProperties: false,
   },
 };

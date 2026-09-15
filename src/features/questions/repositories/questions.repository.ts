@@ -14,7 +14,7 @@ import { generateUUIDv7 } from "../../shared/utils";
 
 export interface CreateQuestionItem {
   id?: string;
-  chapterId: string;
+  chapterId?: string | null;
   passageId?: string | null;
   fileId?: string | null;
   question: string;
@@ -111,10 +111,7 @@ export class QuestionsRepository {
     return deleted.length;
   }
 
-  async createPassage(
-    db: DbExecutor,
-    content: string,
-  ): Promise<string> {
+  async createPassage(db: DbExecutor, content: string): Promise<string> {
     const [passage] = await db
       .insert(passages)
       .values({
@@ -126,132 +123,28 @@ export class QuestionsRepository {
     return passage.id;
   }
 
-  async findOrCreatePassage(
+  async createManyPassages(
     db: DbExecutor,
-    content: string,
-  ): Promise<string> {
-    const trimmed = content.trim();
-    const [existing] = await db
-      .select({ id: passages.id })
-      .from(passages)
-      .where(eq(passages.content, trimmed))
-      .limit(1);
-
-    if (existing) {
-      return existing.id;
-    }
-
-    return this.createPassage(db, trimmed);
-  }
-
-  async findOrCreateDefaultChapter(
-    db: DbExecutor,
-    subjectInput?: string | null,
-  ): Promise<string> {
-    const normalized = (subjectInput || "general").toLowerCase().trim();
-    let subjectSlug = "general";
-    let subjectName = "General";
-
-    if (normalized.includes("phys")) {
-      subjectSlug = "physics";
-      subjectName = "Physics";
-    } else if (normalized.includes("chem")) {
-      subjectSlug = "chemistry";
-      subjectName = "Chemistry";
-    } else if (normalized.includes("math")) {
-      subjectSlug = "mathematics";
-      subjectName = "Mathematics";
-    } else if (
-      normalized.includes("eng") ||
-      normalized.includes("gram") ||
-      normalized.includes("comp")
-    ) {
-      subjectSlug = "english";
-      subjectName = "English";
-    } else if (normalized.length > 0) {
-      subjectSlug = normalized.replace(/[^a-z0-9]+/g, "-");
-      subjectName =
-        normalized.charAt(0).toUpperCase() + normalized.slice(1);
-    }
-
-    // 1. Ensure subject exists
-    let [subject] = await db
-      .select()
-      .from(subjects)
-      .where(eq(subjects.slug, subjectSlug))
-      .limit(1);
-
-    if (!subject) {
-      const [createdSubject] = await db
-        .insert(subjects)
-        .values({
-          id: generateUUIDv7(),
-          name: subjectName,
-          slug: subjectSlug,
-        })
-        .onConflictDoUpdate({
-          target: subjects.slug,
-          set: { name: subjectName },
-        })
-        .returning();
-      subject = createdSubject;
-    }
-
-    // 2. Ensure section exists
-    const sectionSlug = `${subjectSlug}-general`;
-    const sectionName = `${subjectName} General`;
-
-    let [section] = await db
-      .select()
-      .from(sections)
-      .where(eq(sections.slug, sectionSlug))
-      .limit(1);
-
-    if (!section) {
-      const [createdSection] = await db
-        .insert(sections)
-        .values({
-          id: generateUUIDv7(),
-          subjectId: subject.id,
-          name: sectionName,
-          slug: sectionSlug,
-        })
-        .onConflictDoUpdate({
-          target: sections.slug,
-          set: { name: sectionName },
-        })
-        .returning();
-      section = createdSection;
-    }
-
-    // 3. Ensure default chapter exists
-    const chapterSlug = `uncategorized-${subjectSlug}`;
-    const chapterName = `Uncategorized ${subjectName}`;
-
-    let [chapter] = await db
-      .select()
-      .from(chapters)
-      .where(eq(chapters.slug, chapterSlug))
-      .limit(1);
-
-    if (!chapter) {
-      const [createdChapter] = await db
-        .insert(chapters)
-        .values({
-          id: generateUUIDv7(),
-          sectionId: section.id,
-          name: chapterName,
-          slug: chapterSlug,
-        })
-        .onConflictDoUpdate({
-          target: chapters.slug,
-          set: { name: chapterName },
-        })
-        .returning();
-      chapter = createdChapter;
-    }
-
-    return chapter.id;
+    passageContents: string[],
+  ): Promise<
+    {
+      id: string;
+      createdAt: Date;
+      updatedAt: Date;
+      content: string;
+    }[]
+  > {
+    const toInsert = passageContents.map((value) => {
+      return {
+        id: generateUUIDv7(),
+        content: value,
+      };
+    });
+    const insertedPassages = await db
+      .insert(passages)
+      .values(toInsert)
+      .returning();
+    return insertedPassages;
   }
 
   async findById(db: DbExecutor, id: string) {

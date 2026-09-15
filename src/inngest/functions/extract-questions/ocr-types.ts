@@ -4,10 +4,6 @@ import type {
 } from "@/features/questions/types";
 import type { StructuredSchemaParseResult } from "./schema";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// OCR Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * The output of a single page OCR execution.
  */
@@ -62,4 +58,3 @@ export interface ResolvedQuestion {
   svgQuestion?: string | null;
   svgSolution?: string | null;
 }
-
