@@ -1,3 +1,10 @@
+class LLMErrorOptions implements ErrorOptions {
+  constructor(
+    public retryable: boolean,
+    public cause?: any,
+  ) {}
+}
+
 class LLMServiceError extends Error {
   public llmProvider: string;
   public statusCode?: number | undefined;
@@ -5,7 +12,7 @@ class LLMServiceError extends Error {
   constructor(
     message: string,
     provider: string,
-    options?: ErrorOptions,
+    options?: LLMErrorOptions,
     statusCode?: number,
   ) {
     super(message, options);
@@ -27,7 +34,7 @@ class RateLimitError extends LLMServiceError {
       retryAfterMs: number;
     },
     statusCode?: number,
-    options?: ErrorOptions,
+    options?: LLMErrorOptions,
   ) {
     super(message, provider, options, statusCode);
     this.model = details.model;
