@@ -1,4 +1,4 @@
-import { OpenAICompatibleLLM } from "./base";
+import { BaseLLMProvider } from "./base";
 
 export const GroqModels = {
   QWEN_VISION_MODEL: "qwen/qwen3.6-27b",
@@ -12,7 +12,7 @@ export const GroqModels = {
 
 export type GroqModel = (typeof GroqModels)[keyof typeof GroqModels];
 
-export class GroqLLMService extends OpenAICompatibleLLM<GroqModel> {
+export class GroqLLMService extends BaseLLMProvider<GroqModel> {
   constructor(apiKey: string, defaultModel: GroqModel = "openai/gpt-oss-120b") {
     super({
       providerName: "Groq",

@@ -1,4 +1,5 @@
-import { OpenAICompatibleLLM } from "./base";
+import { BaseLLMProvider } from "./base";
+import { ChatCompletionResponse } from "./base";
 
 export const OpenRouterModels = {
   INCLUSION_AI_LING_3_FLASH_V1: "inclusionai/ling-3.0-flash-vl:free",
@@ -15,7 +16,15 @@ export const OpenRouterModels = {
 export type OpenRouterModel =
   (typeof OpenRouterModels)[keyof typeof OpenRouterModels];
 
-export class OpenRouterLLMService extends OpenAICompatibleLLM<OpenRouterModel> {
+interface OpenRouterErrorResponse {
+  error: {
+    code: number | string;
+    message?: string;
+    metadata?: Record<string, unknown>;
+  };
+}
+
+export class OpenRouterLLMService extends BaseLLMProvider<OpenRouterModel> {
   constructor(
     apiKey: string,
     defaultModel: OpenRouterModel = "dots-studio/dots-3-note-preview:free",
@@ -27,5 +36,26 @@ export class OpenRouterLLMService extends OpenAICompatibleLLM<OpenRouterModel> {
       availableModels: Object.values(OpenRouterModels),
       defaultModel,
     });
+  }
+
+  protected handleErrors(
+    res: Response,
+    data: ChatCompletionResponse | null,
+  ): void {
+    const errorData = data as OpenRouterErrorResponse | null;
+
+    console.error("OpenRouter error:", {
+      status: res.status,
+      statusText: res.statusText,
+      code: errorData?.error?.code,
+      message: errorData?.error?.message,
+      metadata: errorData?.error?.metadata,
+    });
+
+    throw new Error(
+      `[${this.providerName}] ${res.status} ${
+        errorData?.error?.message ?? res.statusText
+      }`,
+    );
   }
 }

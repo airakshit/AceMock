@@ -4,7 +4,7 @@ export interface StructuredJsonOptions {
   strict: boolean;
 }
 
-export interface OpenAICompatibleConfig<TModel extends string = string> {
+export interface ProviderConfig<TModel extends string = string> {
   /** Human-readable name, only used in error messages */
   providerName: string;
   /** e.g. "https://api.groq.com/openai/v1" (trailing slash optional) */
@@ -20,12 +20,12 @@ export interface OpenAICompatibleConfig<TModel extends string = string> {
   timeoutMs?: number;
 }
 
-interface ChatCompletionResponse {
+export interface ChatCompletionResponse {
   choices?: { message?: { content?: string | null } }[];
   error?: { message?: string };
 }
 
-export abstract class OpenAICompatibleLLM<TModel extends string = string> {
+export abstract class BaseLLMProvider<TModel extends string = string> {
   protected readonly providerName: string;
   protected readonly baseUrl: string;
   protected readonly apiKey: string;
@@ -35,7 +35,7 @@ export abstract class OpenAICompatibleLLM<TModel extends string = string> {
   public readonly availableModels: readonly TModel[];
   public model: TModel;
 
-  constructor(config: OpenAICompatibleConfig<TModel>) {
+  constructor(config: ProviderConfig<TModel>) {
     this.providerName = config.providerName;
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.apiKey = config.apiKey;
@@ -81,19 +81,20 @@ export abstract class OpenAICompatibleLLM<TModel extends string = string> {
       .json()
       .catch(() => null)) as ChatCompletionResponse | null;
 
-    console.log(res);
-
     if (!res.ok) {
-      const message = data?.error?.message ?? res.statusText;
-      throw new Error(
-        `[${this.providerName}] request failed (${res.status}): ${message}`,
-      );
+      this.handleErrors(res, data);
     }
 
     return data?.choices?.[0]?.message?.content ?? null;
   }
 
-  // ---- overridable building blocks -------------------------------------
+  protected handleErrors(res: Response, data: ChatCompletionResponse | null) {
+    console.log(`Provider: ${this.providerName}, ErrorData: `, data);
+    const message = data?.error?.message ?? res.statusText;
+    throw new Error(
+      `[${this.providerName}] request failed (${res.status}): ${message}`,
+    );
+  }
 
   protected buildHeaders(): Record<string, string> {
     return {
