@@ -3,7 +3,7 @@
 import { useCallback, useRef } from "react";
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RichContent } from "./RichContent";
+import { RichContent } from "./rendering/RichContent";
 import type { OptionKey, OptionType, QuestionMode } from "./types";
 
 interface OptionsListProps {

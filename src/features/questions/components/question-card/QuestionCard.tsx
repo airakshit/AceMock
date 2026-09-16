@@ -1,8 +1,7 @@
 "use client";
 
 import { Lightbulb } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { RichContent } from "./RichContent";
+import { RichContent } from "./rendering/RichContent";
 import { OptionsList } from "./OptionsList";
 import { SubjectTag } from "./SubjectTag";
 import { DiagramViewer } from "./DiagramViewer";
