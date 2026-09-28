@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth/minimal";
-import { lastLoginMethod } from "better-auth/plugins";
+import { admin, lastLoginMethod } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { db } from "@/db";
@@ -42,5 +42,12 @@ export const auth = betterAuth({
       generateId: () => uuidv7(),
     },
   },
-  plugins: [lastLoginMethod(), nextCookies()],
+  plugins: [
+    admin({
+      defaultRole: "user",
+      adminRoles: ["admin"],
+    }),
+    lastLoginMethod(),
+    nextCookies(),
+  ],
 });
