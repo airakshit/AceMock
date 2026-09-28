@@ -1,35 +1,19 @@
 "use server";
 
+import { requireAdmin } from "@/features/shared/actions/require-admin";
 import { questionsService } from "../service";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
+import { GetRecentQuestionsActionResponse } from "./types";
 
-export type QuestionItemDTO = Awaited<
-  ReturnType<typeof questionsService.getRecentQuestions>
->[number];
-
-export interface GetRecentQuestionsActionResponse {
-  questions: QuestionItemDTO[];
-  documentId?: string | null;
-  documentTitle?: string | null;
-}
-
-export interface DocumentFilterOptionDTO {
-  id: string;
-  title: string;
-  questionCount: number;
-  createdAt: string | null;
-}
-
-export interface GetRecentDocumentsActionResponse {
-  documents: DocumentFilterOptionDTO[];
-}
 
 export async function getRecentQuestionsAction(
   limitOrParams: number | { limit?: number; documentId?: string } = 50,
   legacyDocId?: string,
 ): Promise<ServerActionResult<GetRecentQuestionsActionResponse>> {
   try {
+    await requireAdmin();
+
     let limit = 50;
     let documentId: string | undefined = undefined;
 
@@ -58,20 +42,3 @@ export async function getRecentQuestionsAction(
   }
 }
 
-export async function getRecentDocumentsForFilterAction(): Promise<
-  ServerActionResult<GetRecentDocumentsActionResponse>
-> {
-  try {
-    const documents = await questionsService.getRecentDocumentsForFilter(30);
-
-    return {
-      success: true,
-      data: {
-        documents,
-      },
-      message: `Fetched ${documents.length} documents successfully.`,
-    };
-  } catch (error) {
-    return handleActionError(error);
-  }
-}

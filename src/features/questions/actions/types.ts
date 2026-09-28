@@ -1,5 +1,6 @@
 import { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import { QuestionDifficulty, QuestionOption, QuestionOptionKey } from "../types";
+import { questionsService } from "../service";
 
 export interface CreateQuestionFilePayload {
   clientFileId: string;
@@ -24,4 +25,29 @@ export interface CreateQuestionActionPayload {
 export interface CreateQuestionActionResponse {
   questionId: string;
   files: SignedUrlResponseObject[];
+}
+
+/**
+ * Derived from the service return type of `getRecentQuestions`.
+ * This ensures the DTO always stays in sync with the service layer.
+ */
+export type QuestionItemDTO = Awaited<
+  ReturnType<typeof questionsService.getRecentQuestions>
+>[number];
+
+export interface GetRecentQuestionsActionResponse {
+  questions: QuestionItemDTO[];
+  documentId?: string | null;
+  documentTitle?: string | null;
+}
+
+export interface DocumentFilterOptionDTO {
+  id: string;
+  title: string;
+  questionCount: number;
+  createdAt: string | null;
+}
+
+export interface GetRecentDocumentsActionResponse {
+  documents: DocumentFilterOptionDTO[];
 }

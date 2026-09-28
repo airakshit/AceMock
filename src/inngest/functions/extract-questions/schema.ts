@@ -100,8 +100,7 @@ export const structuredOCRExtractionSchema = z
 export type StructuredSchemaParseResult = z.infer<
   typeof structuredOCRExtractionSchema
 >;
-
-import type { StructuredJsonOptions } from "@/services/llm";
+import { StructuredJsonOptions } from "@/services/llm/base";
 
 export const structuredOCRJsonSchema: StructuredJsonOptions = {
   name: "structured_ocr_extraction",
@@ -126,13 +125,9 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
       },
       paragraph: {
         type: ["string", "null"],
-        description:
-          "ROOT ONLY: Comprehension passage text. NEVER place inside a data[] item.",
       },
       data: {
         type: "array",
-        description:
-          "Questions/solutions/answer-keys list. NEVER embed paragraph or section fields inside items.",
         items: {
           type: "object",
           properties: {
@@ -168,6 +163,7 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
             optionIncomplete: { type: ["boolean", "null"] },
             incomplete: { type: ["boolean", "null"] },
             isContinuation: { type: ["boolean", "null"] },
+
             svgQuestion: { type: ["string", "null"] },
             svgSolution: { type: ["string", "null"] },
             svgOptions: {

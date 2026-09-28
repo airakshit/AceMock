@@ -20,6 +20,8 @@ import {
   structuredOCRJsonSchema,
 } from "./schema";
 import { env } from "@/config/env/server";
+import { RateLimitError } from "@/services/llm/errors";
+import { RetryAfterError } from "inngest";
 
 export interface OcrPageEventData {
   userId: string;
@@ -57,11 +59,14 @@ export const ocrPage = inngest.createFunction(
       return await supabaseStorageClient.getPageAccessUrl(storagePath);
     });
 
-    const llmService = new GeminiLLMService(
-      env.GEMINI_API_KEY,
-      "gemma-4-26b-a4b-it",
+    // const llmService = new GeminiLLMService(
+    //   env.GEMINI_API_KEY,
+    //   GeminiModels.GEMINI_3_FLASH,
+    // );
+    const llmService = new OpenRouterLLMService(
+      env.OPENROUTER_API_KEY!,
+      OpenRouterModels.DOTS_3_NOTE_PREVIEW,
     );
-
     const extraction = await step.run(
       "llm-ocr-extraction",
       async (): Promise<{
@@ -71,12 +76,30 @@ export const ocrPage = inngest.createFunction(
         isRelevant: boolean;
         parsedData?: StructuredSchemaParseResult;
       }> => {
-        const rawText = await llmService.call(
-          structuredOutputExtractionPromptV3,
-          undefined,
-          [signedUrl],
-          structuredOCRJsonSchema,
-        );
+        let rawText: string | null = null;
+        try {
+          rawText = await llmService.call(
+            structuredOutputExtractionPromptV3,
+            undefined,
+            [signedUrl],
+            structuredOCRJsonSchema,
+          );
+          logger.debug("Output is : ", {
+            output: rawText,
+            model: llmService.model,
+          });
+        } catch (error) {
+          if (error instanceof RateLimitError) {
+            logger.error("Rate limit error occurred", {
+              message: error.message,
+              cause: error.cause,
+              retryingAfterSeconds: error.retryAfterMs / 1000,
+              model: error.model,
+              provider: error.llmProvider,
+            });
+            throw new RetryAfterError(error.message, error.retryAfterMs);
+          }
+        }
 
         if (!rawText && attempt < TOTAL_RETRIES) {
           throw new OcrEmptyResponseError(

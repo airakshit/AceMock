@@ -1,6 +1,6 @@
 "use server";
 
-import { requireSession } from "@/features/shared/actions/require-session";
+import { requireAdmin } from "@/features/shared/actions/require-admin";
 import { questionsService } from "../service";
 import {
   CreateQuestionActionPayload,
@@ -13,7 +13,7 @@ export async function createQuestionAction(
   payload: CreateQuestionActionPayload,
 ): Promise<ServerActionResult<CreateQuestionActionResponse>> {
   try {
-    const session = await requireSession();
+    const session = await requireAdmin();
 
     const data = await questionsService.createNewQuestion(
       session.user.id,

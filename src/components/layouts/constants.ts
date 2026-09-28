@@ -23,11 +23,25 @@ export const APP_NAV_ITEMS: NavItem[] = [
     href: "/documents",
     icon: SlidersHorizontal,
   },
+];
+
+export const ADMIN_NAV_ITEMS: NavItem[] = [
+  {
+    title: "Overview",
+    href: "/admin",
+    icon: LayoutDashboard,
+  },
   {
     title: "Questions",
-    href: "/questions",
+    href: "/admin/questions",
     icon: HelpCircle,
+  },
+  {
+    title: "Mock Tests",
+    href: "/admin/mocks",
+    icon: ClipboardList,
   },
 ];
 
 export const APP_NAME = "Ace Mock";
+

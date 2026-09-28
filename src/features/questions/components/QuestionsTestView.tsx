@@ -25,10 +25,9 @@ import type {
 } from "./question-card/types";
 import {
   getRecentQuestionsAction,
-  getRecentDocumentsForFilterAction,
-  QuestionItemDTO,
-  DocumentFilterOptionDTO,
 } from "../actions/get-questions";
+import { getRecentDocumentsForFilterAction } from "../actions";
+import { QuestionItemDTO, DocumentFilterOptionDTO } from "../actions/types";
 import { cn } from "@/lib/utils";
 
 export function QuestionsTestView() {
