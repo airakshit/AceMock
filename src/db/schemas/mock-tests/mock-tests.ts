@@ -16,9 +16,8 @@ export const mockTests = pgTable("mock-tests", {
 
   name: text("name").notNull(),
   totalMarks: integer("total_marks").notNull(),
+  negativePercentagePerQuestion: integer("negative_percent_per_question").notNull().default(0),
   duration_seconds: integer("duration_seconds").notNull(),
-  visibility: visibilityEnum("visibility").notNull().default("public"),
-
   instructions: text("instructions"),
 
   createdAt: timestamp("created_at", { withTimezone: true })
