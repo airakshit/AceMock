@@ -29,7 +29,7 @@ const ADMIN_MODULES = [
     description: "Configure and assemble mock examinations, time limits, and question sets.",
     href: "/admin/mocks",
     icon: ClipboardList,
-    badge: "Coming Soon",
+    badge: "Management",
   },
 ];
 

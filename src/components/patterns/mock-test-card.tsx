@@ -1,4 +1,4 @@
-import { ArrowRight, Clock3, FileText } from "lucide-react";
+import { ArrowRight, Clock3, FileText, Award, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { colors, type DifficultyLevel, typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,8 @@ export interface MockTestCardData {
   title: string;
   durationMinutes: number;
   totalQuestions: number;
+  totalMarks?: number;
+  negativePercentage?: number;
   subject?: string;
   difficulty?: "Easy" | "Medium" | "Hard";
   isPopular?: boolean;
@@ -83,6 +85,20 @@ export function MockTestCard({
             <FileText className="size-3.5 text-muted-foreground/70" />
             <span className="font-medium text-foreground/80">{test.totalQuestions}</span> questions
           </span>
+
+          {test.totalMarks !== undefined ? (
+            <span className="inline-flex items-center gap-1">
+              <Award className="size-3.5 text-muted-foreground/70" />
+              <span className="font-medium text-foreground/80">{test.totalMarks}</span> marks
+            </span>
+          ) : null}
+
+          {test.negativePercentage !== undefined && test.negativePercentage > 0 ? (
+            <span className="inline-flex items-center gap-1">
+              <Percent className="size-3.5 text-muted-foreground/70" />
+              <span>-{test.negativePercentage}%</span>
+            </span>
+          ) : null}
         </div>
       </div>
 

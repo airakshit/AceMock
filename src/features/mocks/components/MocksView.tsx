@@ -1,43 +1,60 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { BookOpen, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BookOpen, Search, X, RefreshCw, Loader2, ClipboardList } from "lucide-react";
+import { toast } from "sonner";
 import { MockTestCard } from "@/components/patterns/mock-test-card";
-import { mocksMockData } from "@/features/mocks/mockData";
+import { Button } from "@/components/ui/button";
 import { layout } from "@/lib/design-system";
-import { cn } from "@/lib/utils";
+import { MockTestListItemProjection } from "../dto/projections";
+import { getMockTestsAction } from "../actions/get-mock-tests";
 
-export function MocksView() {
+interface MocksViewProps {
+  initialTests?: MockTestListItemProjection[];
+}
+
+export function MocksView({ initialTests = [] }: MocksViewProps) {
+  const [tests, setTests] = useState<MockTestListItemProjection[]>(initialTests);
+  const [isLoading, setIsLoading] = useState(initialTests.length === 0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("All");
-  const [selectedSubject, setSelectedSubject] = useState<string>("All");
 
-  const subjects = useMemo(() => {
-    const set = new Set<string>();
-    mocksMockData.tests.forEach((t) => {
-      if (t.subject) set.add(t.subject);
-    });
-    return ["All", ...Array.from(set)];
-  }, []);
+  const fetchTests = async (showRefreshSpinner = false) => {
+    try {
+      if (showRefreshSpinner) setIsRefreshing(true);
+      const res = await getMockTestsAction();
+      if (res.success) {
+        setTests(res.data);
+      } else {
+        toast.error(res.error.message || "Failed to load mock tests.");
+      }
+    } catch (err) {
+      toast.error("An error occurred while fetching mock tests.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
-  const difficulties = ["All", "Easy", "Medium", "Hard"];
+  useEffect(() => {
+    if (initialTests.length === 0) {
+      fetchTests();
+    }
+  }, [initialTests.length]);
 
   const filteredTests = useMemo(() => {
-    return mocksMockData.tests.filter((test) => {
-      const matchesSearch =
-        searchQuery.trim() === "" ||
-        test.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        test.subject?.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!searchQuery.trim()) return tests;
+    const query = searchQuery.toLowerCase().trim();
+    return tests.filter(
+      (test) =>
+        test.name.toLowerCase().includes(query) ||
+        test.instructions?.toLowerCase().includes(query),
+    );
+  }, [tests, searchQuery]);
 
-      const matchesDifficulty =
-        selectedDifficulty === "All" || test.difficulty === selectedDifficulty;
-
-      const matchesSubject =
-        selectedSubject === "All" || test.subject === selectedSubject;
-
-      return matchesSearch && matchesDifficulty && matchesSubject;
-    });
-  }, [searchQuery, selectedDifficulty, selectedSubject]);
+  const handleStartTest = (testId: string) => {
+    toast.info("Exam taking simulation session is coming up in the next phase!");
+  };
 
   return (
     <div className="space-y-5">
@@ -48,7 +65,7 @@ export function MocksView() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search mock tests by keyword or subject..."
+            placeholder="Search mock tests by title..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-8.5 w-full rounded-md border border-border bg-background pl-8.5 pr-7 text-xs text-foreground placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-colors"
@@ -64,77 +81,57 @@ export function MocksView() {
           )}
         </div>
 
-        {/* Filter Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] font-medium text-muted-foreground">Difficulty:</span>
-            <div className="flex items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5">
-              {difficulties.map((diff) => (
-                <button
-                  key={diff}
-                  type="button"
-                  onClick={() => setSelectedDifficulty(diff)}
-                  className={cn(
-                    "rounded px-2 py-0.5 text-xs font-medium transition-colors",
-                    selectedDifficulty === diff
-                      ? "bg-card text-foreground font-semibold shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {diff}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <span className="hidden sm:inline-block text-xs font-medium text-muted-foreground ml-auto">
-            {filteredTests.length} {filteredTests.length === 1 ? "test" : "tests"}
+        {/* Right Toolbar Controls */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            {filteredTests.length} {filteredTests.length === 1 ? "test" : "tests"} available
           </span>
+
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => fetchTests(true)}
+            disabled={isRefreshing}
+            className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
+          >
+            <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
         </div>
       </div>
 
-      {/* Subject Filter Chips */}
-      {subjects.length > 2 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-          {subjects.map((sub) => (
-            <button
-              key={sub}
-              type="button"
-              onClick={() => setSelectedSubject(sub)}
-              className={cn(
-                "shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                selectedSubject === sub
-                  ? "bg-foreground text-background font-medium"
-                  : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {sub}
-            </button>
-          ))}
+      {/* Tests Grid */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+          <Loader2 className="size-6 animate-spin text-primary" />
+          <p className="text-xs font-medium">Fetching mock tests from server...</p>
         </div>
-      )}
-
-      {/* Mock Tests Grid */}
-      {filteredTests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/40 p-10 text-center">
-          <div className="flex size-10 items-center justify-center rounded-md bg-muted/60 text-muted-foreground mb-2.5">
-            <BookOpen className="size-5 text-muted-foreground" />
+      ) : filteredTests.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/40 p-12 text-center space-y-3">
+          <div className="flex size-10 items-center justify-center rounded-md bg-muted/60 text-muted-foreground">
+            <ClipboardList className="size-5 text-muted-foreground" />
           </div>
-          <p className="text-sm font-semibold text-foreground">No matching mock tests</p>
-          <p className="mt-1 text-xs text-muted-foreground max-w-xs">
-            Try adjusting your search keywords or resetting difficulty and subject filters.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setSearchQuery("");
-              setSelectedDifficulty("All");
-              setSelectedSubject("All");
-            }}
-            className="mt-3 text-xs font-medium text-foreground underline underline-offset-4 hover:text-foreground/80"
-          >
-            Clear all filters
-          </button>
+          <div className="space-y-1 max-w-sm">
+            <p className="text-sm font-semibold text-foreground">
+              {searchQuery ? "No matching mock tests" : "No mock tests available yet"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {searchQuery
+                ? "Try searching for a different keyword."
+                : "Mock examinations will appear here once published by administrators."}
+            </p>
+          </div>
+          {searchQuery && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSearchQuery("")}
+              className="text-xs mt-2"
+            >
+              Clear search filter
+            </Button>
+          )}
         </div>
       ) : (
         <div className={layout.gridCards}>
@@ -143,12 +140,13 @@ export function MocksView() {
               key={test.id}
               test={{
                 id: test.id,
-                title: test.title,
-                durationMinutes: test.durationMinutes,
-                totalQuestions: test.totalQuestions,
-                subject: test.subject,
-                difficulty: test.difficulty,
+                title: test.name,
+                durationMinutes: Math.round(test.durationSeconds / 60),
+                totalQuestions: test.questionCount,
+                totalMarks: test.totalMarks,
+                negativePercentage: test.negativePercentagePerQuestion,
               }}
+              onAction={handleStartTest}
             />
           ))}
         </div>
