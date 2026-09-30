@@ -32,11 +32,11 @@ import {
   questionFormSchema,
   type QuestionFormData,
 } from "../schemas";
-import {
-  CreateQuestionActionPayload,
-  CreateQuestionActionResponse,
-  CreateQuestionFilePayload,
-} from "../actions/types";
+import type {
+  CreateQuestionFileCommand,
+  CreateQuestionPayloadCommand,
+} from "../dto/payloads";
+import type { CreateQuestionResult } from "../dto/results";
 import { createQuestionAction } from "../actions/create-question";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { useQuestionUploader } from "../uploads/use-question-uploader";
@@ -47,8 +47,8 @@ import { QuestionDifficulty, QuestionOptionKey } from "../types";
 
 interface QuestionFormProps {
   onSubmitAction?: (
-    payload: CreateQuestionActionPayload,
-  ) => Promise<ServerActionResult<CreateQuestionActionResponse>>;
+    payload: CreateQuestionPayloadCommand,
+  ) => Promise<ServerActionResult<CreateQuestionResult>>;
   onSuccess?: () => void;
 }
 
@@ -106,7 +106,7 @@ export function QuestionForm({
   const onSubmit = async (data: QuestionFormData) => {
     setIsSubmitting(true);
     try {
-      const filesPayload: CreateQuestionFilePayload[] = [];
+      const filesPayload: CreateQuestionFileCommand[] = [];
 
       if (data.diagramFile?.file) {
         filesPayload.push({
@@ -128,7 +128,7 @@ export function QuestionForm({
         });
       }
 
-      const payload: CreateQuestionActionPayload = {
+      const payload: CreateQuestionPayloadCommand = {
         chapterSlug: data.chapterSlug,
         question: data.question,
         options: data.options,

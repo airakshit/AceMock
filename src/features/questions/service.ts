@@ -1,16 +1,22 @@
 import { db } from "@/db";
-import { CreateQuestionActionPayload, CreateQuestionActionResponse } from "./actions/types";
+import { CreateQuestionPayloadCommand } from "./dto/payloads";
+import { CreateQuestionResult } from "./dto/results";
+import {
+  DocumentWithQuestionCountProjection,
+  QuestionDetailsProjection,
+} from "./dto/projections";
 import { questionsRepository } from "./repositories/questions.repository";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
 
+
 class QuestionsService {
   async createNewQuestion(
     userId: string,
-    payload: CreateQuestionActionPayload,
-  ): Promise<CreateQuestionActionResponse> {
+    payload: CreateQuestionPayloadCommand,
+  ): Promise<CreateQuestionResult> {
     const chapter = await questionsRepository.findChapterBySlug(
       db,
       payload.chapterSlug,
@@ -32,18 +38,18 @@ class QuestionsService {
 
     const diagramStoragePath = diagramFile
       ? storagePaths.getQuestionDiagramPath(
-          userId,
-          questionId,
-          diagramFile.name,
-        )
+        userId,
+        questionId,
+        diagramFile.name,
+      )
       : null;
 
     const solutionDiagramStoragePath = solutionDiagramFile
       ? storagePaths.getQuestionSolutionDiagramPath(
-          userId,
-          questionId,
-          solutionDiagramFile.name,
-        )
+        userId,
+        questionId,
+        solutionDiagramFile.name,
+      )
       : null;
 
     await questionsRepository.create(db, {
@@ -54,10 +60,10 @@ class QuestionsService {
       correctOption: payload.correctOption,
       marks: payload.marks,
       difficulty: payload.difficulty,
-      diagram_url: diagramStoragePath,
+      questionDiagram: diagramStoragePath,
       hint: payload.hint,
       solution: payload.solution,
-      solution_diagram_url: solutionDiagramStoragePath,
+      solutionDiagram: solutionDiagramStoragePath,
     });
 
     // If there are files to upload, get signed upload URLs
@@ -85,7 +91,10 @@ class QuestionsService {
     };
   }
 
-  async getRecentQuestions(limit: number = 50, documentId?: string) {
+  async getRecentQuestions(
+    limit: number = 50,
+    documentId?: string,
+  ): Promise<QuestionDetailsProjection[]> {
     const rawQuestions = await questionsRepository.findRecentWithCurriculum(
       db,
       limit,
@@ -96,18 +105,18 @@ class QuestionsService {
     const pathsToSign = new Set<string>();
     for (const q of rawQuestions) {
       if (
-        q.diagram_url &&
-        !q.diagram_url.startsWith("http") &&
-        !q.diagram_url.startsWith("data:")
+        q.questionDiagram &&
+        !q.questionDiagram.startsWith("http") &&
+        !q.questionDiagram.startsWith("data:")
       ) {
-        pathsToSign.add(q.diagram_url);
+        pathsToSign.add(q.questionDiagram);
       }
       if (
-        q.solution_diagram_url &&
-        !q.solution_diagram_url.startsWith("http") &&
-        !q.solution_diagram_url.startsWith("data:")
+        q.solutionDiagram &&
+        !q.solutionDiagram.startsWith("http") &&
+        !q.solutionDiagram.startsWith("data:")
       ) {
-        pathsToSign.add(q.solution_diagram_url);
+        pathsToSign.add(q.solutionDiagram);
       }
     }
 
@@ -126,71 +135,29 @@ class QuestionsService {
       }
     }
 
-    return rawQuestions.map((q) => {
-      const diagramUrl = q.diagram_url
-        ? urlMap.get(q.diagram_url) || q.diagram_url
+    return rawQuestions.map((q): QuestionDetailsProjection => {
+      const questionDiagram = q.questionDiagram
+        ? urlMap.get(q.questionDiagram) || q.questionDiagram
         : null;
-      const solutionDiagramUrl = q.solution_diagram_url
-        ? urlMap.get(q.solution_diagram_url) || q.solution_diagram_url
+      const solutionDiagram = q.solutionDiagram
+        ? urlMap.get(q.solutionDiagram) || q.solutionDiagram
         : null;
-
-      const rawOptions = (
-        Array.isArray(q.options) ? q.options : []
-      ) as Array<{
-        key?: string;
-        content?: string;
-        text?: string;
-      }>;
-
-      const formattedOptions = rawOptions.map((opt, idx) => {
-        const keys = ["A", "B", "C", "D"] as const;
-        const key = (opt.key || keys[idx] || "A") as "A" | "B" | "C" | "D";
-        const content = opt.content || opt.text || "";
-        return {
-          key,
-          content,
-          isCorrect: key === q.correctOption,
-        };
-      });
 
       return {
-        id: q.id,
-        subject: (q.subjectSlug || "general").toLowerCase(),
-        subjectName: q.subjectName || "General",
-        sectionName: q.sectionName || null,
-        chapterName: q.chapterName || null,
-        questionText: q.question,
-        options: formattedOptions,
-        correctOption: (q.correctOption || "A") as "A" | "B" | "C" | "D",
-        explanation: q.solution || undefined,
-        hint: q.hint || undefined,
-        marks: q.marks ?? 1,
-        negativeMarks: 0,
-        difficulty: q.difficulty,
-        diagramUrl,
-        solutionDiagramUrl,
-        createdAt: q.createdAt ? q.createdAt.toISOString() : null,
-        updatedAt: q.updatedAt ? q.updatedAt.toISOString() : null,
-        fileId: q.fileId || null,
-        fileName: q.fileName || null,
-        documentId: q.documentId || null,
-        documentTitle: q.documentTitle || null,
+        ...q,
+        questionDiagram,
+        solutionDiagram,
       };
     });
   }
 
-  async getRecentDocumentsForFilter(limit: number = 20) {
-    const rawDocs = await questionsRepository.findRecentDocumentsWithQuestions(
+  async getRecentDocumentsForFilter(
+    limit: number = 20,
+  ): Promise<DocumentWithQuestionCountProjection[]> {
+    return questionsRepository.findRecentDocumentsWithQuestions(
       db,
       limit,
     );
-
-    return rawDocs.map((d) => ({
-      id: d.id,
-      title: d.title || "Untitled Document",
-      questionCount: Number(d.questionCount || 0),
-      createdAt: d.createdAt ? d.createdAt.toISOString() : null,
-    }));
   }
 }
 

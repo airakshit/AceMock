@@ -1,4 +1,5 @@
 import { BaseLLMProvider, ChatCompletionResponse } from "./base";
+import { LLMErrorOptions, LLMServiceError, RateLimitError } from "./errors";
 
 export const GeminiModels = {
   GEMINI_2_5_FLASH: "gemini-2.5-flash",

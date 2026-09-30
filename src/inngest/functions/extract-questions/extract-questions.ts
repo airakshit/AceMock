@@ -344,10 +344,10 @@ export const extractQuestions = inngest.createFunction(
             correctOption: q.correctOption,
             marks: q.marks,
             difficulty: q.difficulty,
-            diagram_url: q.diagram_url ?? null,
+            questionDiagram: q.diagram_url ?? null,
             hint: q.hint ?? null,
             solution: q.solution ?? null,
-            solution_diagram_url: q.solution_diagram_url ?? null,
+            solutionDiagram: q.solution_diagram_url ?? null,
           };
         });
 

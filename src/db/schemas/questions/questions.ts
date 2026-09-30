@@ -11,7 +11,6 @@ import {
 import { chapters } from "./chapters";
 import { passages } from "./passages";
 import { documentFiles } from "../documents";
-import { sections } from "./sections";
 
 export const questionDifficutlyEnum = pgEnum("question_difficulty_enum", [
   "easy",
@@ -51,10 +50,10 @@ export const questions = pgTable("questions", {
 
   difficulty: questionDifficutlyEnum("difficulty").default("medium").notNull(),
 
-  diagram_url: text("diagram_url"),
+  questionDiagram: text("question_diagram"),
   hint: text("hint"),
   solution: text("solution"),
-  solution_diagram_url: text("solution_diagram_url"),
+  solutionDiagram: text("solution_diagram"), // Diagrams will be svg or image urls.
 
   createdAt: timestamp("created_at", {
     withTimezone: true,

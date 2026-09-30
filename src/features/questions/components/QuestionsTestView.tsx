@@ -27,11 +27,14 @@ import {
   getRecentQuestionsAction,
 } from "../actions/get-questions";
 import { getRecentDocumentsForFilterAction } from "../actions";
-import { QuestionItemDTO, DocumentFilterOptionDTO } from "../actions/types";
+import type {
+  QuestionDetailsProjection,
+  DocumentWithQuestionCountProjection,
+} from "../dto/projections";
 import { cn } from "@/lib/utils";
 
 export function QuestionsTestView() {
-  const [questions, setQuestions] = useState<QuestionItemDTO[]>([]);
+  const [questions, setQuestions] = useState<QuestionDetailsProjection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +43,7 @@ export function QuestionsTestView() {
   const [documentIdInput, setDocumentIdInput] = useState<string>("");
   const [activeDocumentId, setActiveDocumentId] = useState<string>("");
   const [activeDocumentTitle, setActiveDocumentTitle] = useState<string | null>(null);
-  const [recentDocs, setRecentDocs] = useState<DocumentFilterOptionDTO[]>([]);
+  const [recentDocs, setRecentDocs] = useState<DocumentWithQuestionCountProjection[]>([]);
 
   // Filter & Display state
   const [mode, setMode] = useState<QuestionMode>("review");
@@ -63,7 +66,8 @@ export function QuestionsTestView() {
 
       if (res.success && res.data) {
         setQuestions(res.data.questions);
-        setActiveDocumentTitle(res.data.documentTitle || null);
+        const title = res.data.questions.length > 0 ? res.data.questions[0].documentTitle : null;
+        setActiveDocumentTitle(title || null);
         if (res.data.questions.length === 0) {
           if (docId) {
             toast.info(`No questions found for document ID: ${docId.slice(0, 8)}...`);
@@ -167,8 +171,9 @@ export function QuestionsTestView() {
   const subjectOptions = useMemo(() => {
     const subjects = new Set<string>();
     questions.forEach((q) => {
-      if (q.subject) {
-        subjects.add(q.subject.toLowerCase());
+      const subject = q.subjectSlug || q.subjectName;
+      if (subject) {
+        subjects.add(subject.toLowerCase());
       }
     });
     return Array.from(subjects);
@@ -177,14 +182,15 @@ export function QuestionsTestView() {
   // Filtered questions
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
+      const subject = (q.subjectSlug || q.subjectName || "general").toLowerCase();
       const matchesSubject =
         selectedSubject === "all" ||
-        q.subject.toLowerCase() === selectedSubject.toLowerCase();
+        subject === selectedSubject.toLowerCase();
 
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !query ||
-        q.questionText?.toLowerCase().includes(query) ||
+        q.question?.toLowerCase().includes(query) ||
         q.chapterName?.toLowerCase().includes(query) ||
         q.sectionName?.toLowerCase().includes(query) ||
         q.subjectName?.toLowerCase().includes(query) ||
@@ -424,7 +430,7 @@ export function QuestionsTestView() {
             </button>
             {subjectOptions.map((subj) => {
               const count = questions.filter(
-                (q) => q.subject.toLowerCase() === subj.toLowerCase(),
+                (q) => (q.subjectSlug || q.subjectName || "general").toLowerCase() === subj.toLowerCase(),
               ).length;
               return (
                 <button
@@ -586,17 +592,36 @@ export function QuestionsTestView() {
           </div>
 
           {filteredQuestions.map((q, idx) => {
+            const rawOptions = (
+              Array.isArray(q.options) ? q.options : []
+            ) as Array<{
+              key?: string;
+              content?: string;
+              text?: string;
+            }>;
+
+            const formattedOptions = rawOptions.map((opt, oIdx) => {
+              const keys = ["A", "B", "C", "D"] as const;
+              const key = (opt.key || keys[oIdx] || "A") as OptionKey;
+              const content = opt.content || opt.text || "";
+              return {
+                key,
+                content,
+                isCorrect: key === q.correctOption,
+              };
+            });
+
             const cardData: QuestionCardType = {
               id: q.id,
-              subject: q.subject,
-              questionText: q.questionText,
-              options: q.options,
-              correctOption: q.correctOption as OptionKey,
-              explanation: q.explanation,
+              subject: (q.subjectSlug || "general").toLowerCase(),
+              questionText: q.question,
+              options: formattedOptions,
+              correctOption: (q.correctOption || "A") as OptionKey,
+              explanation: q.solution || undefined,
               marks: q.marks,
-              negativeMarks: q.negativeMarks,
-              diagramUrl: q.diagramUrl,
-              solutionDiagramUrl: q.solutionDiagramUrl,
+              negativeMarks: 0,
+              diagramUrl: q.questionDiagram,
+              solutionDiagramUrl: q.solutionDiagram,
             };
 
             return (

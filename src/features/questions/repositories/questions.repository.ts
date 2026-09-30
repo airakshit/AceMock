@@ -9,24 +9,20 @@ import {
 } from "@/db/schemas";
 import { asc, count, desc, eq, inArray } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
-import { QuestionDifficulty, QuestionOption } from "../types";
 import { generateUUIDv7 } from "../../shared/utils";
+import {
+  CreateQuestionItemCommand,
+} from "../dto/commands";
+import {
+  ChapterCurriculumMappingProjection,
+  DocumentWithQuestionCountProjection,
+  PassageProjection,
+  QuestionDetailsProjection
+} from "../dto/projections";
 
-export interface CreateQuestionItem {
-  id?: string;
-  chapterId?: string | null;
-  passageId?: string | null;
-  fileId?: string | null;
-  question: string;
-  options: QuestionOption[];
-  correctOption: string;
-  marks?: number;
-  difficulty?: QuestionDifficulty;
-  diagram_url?: string | null;
-  hint?: string | null;
-  solution?: string | null;
-  solution_diagram_url?: string | null;
-}
+// Backward-compatible alias for existing consumers (e.g. inngest)
+export type CreateQuestionItem = CreateQuestionItemCommand;
+
 
 export class QuestionsRepository {
   async findChapterBySlug(db: DbExecutor, slug: string) {
@@ -41,20 +37,8 @@ export class QuestionsRepository {
 
   async create(
     db: DbExecutor,
-    data: {
-      id: string;
-      chapterId: string;
-      question: string;
-      options: QuestionOption[];
-      correctOption: string;
-      marks: number;
-      difficulty: QuestionDifficulty;
-      diagram_url?: string | null;
-      hint?: string | null;
-      solution?: string | null;
-      solution_diagram_url?: string | null;
-    },
-  ) {
+    data: CreateQuestionItemCommand,
+  ): Promise<typeof questions.$inferSelect> {
     const [question] = await db
       .insert(questions)
       .values({
@@ -65,35 +49,40 @@ export class QuestionsRepository {
         correctOption: data.correctOption,
         marks: data.marks,
         difficulty: data.difficulty,
-        diagram_url: data.diagram_url ?? null,
+        passageId: data.passageId ?? null,
+        fileId: data.fileId ?? null,
+        questionDiagram: data.questionDiagram ?? null,
         hint: data.hint ?? null,
         solution: data.solution ?? null,
-        solution_diagram_url: data.solution_diagram_url ?? null,
+        solutionDiagram: data.solutionDiagram ?? null,
       })
       .returning();
 
     return question;
   }
 
-  async createMany(db: DbExecutor, items: CreateQuestionItem[]) {
+  async createMany(
+    db: DbExecutor,
+    items: CreateQuestionItemCommand[],
+  ): Promise<(typeof questions.$inferSelect)[]> {
     if (items.length === 0) {
       return [];
     }
 
     const valuesToInsert = items.map((item) => ({
-      id: item.id || generateUUIDv7(),
+      id: item.id,
       chapterId: item.chapterId,
-      passageId: item.passageId ?? null,
-      fileId: item.fileId ?? null,
       question: item.question,
       options: item.options,
       correctOption: item.correctOption,
-      marks: item.marks ?? 1,
-      difficulty: item.difficulty ?? ("medium" as QuestionDifficulty),
-      diagram_url: item.diagram_url ?? null,
+      marks: item.marks,
+      difficulty: item.difficulty,
+      passageId: item.passageId ?? null,
+      fileId: item.fileId ?? null,
+      questionDiagram: item.questionDiagram ?? null,
       hint: item.hint ?? null,
       solution: item.solution ?? null,
-      solution_diagram_url: item.solution_diagram_url ?? null,
+      solutionDiagram: item.solutionDiagram ?? null,
     }));
 
     return db.insert(questions).values(valuesToInsert).returning();
@@ -126,14 +115,7 @@ export class QuestionsRepository {
   async createManyPassages(
     db: DbExecutor,
     passageContents: string[],
-  ): Promise<
-    {
-      id: string;
-      createdAt: Date;
-      updatedAt: Date;
-      content: string;
-    }[]
-  > {
+  ): Promise<PassageProjection[]> {
     const toInsert = passageContents.map((value) => {
       return {
         id: generateUUIDv7(),
@@ -147,7 +129,10 @@ export class QuestionsRepository {
     return insertedPassages;
   }
 
-  async findById(db: DbExecutor, id: string) {
+  async findById(
+    db: DbExecutor,
+    id: string,
+  ): Promise<typeof questions.$inferSelect | null> {
     const [question] = await db
       .select()
       .from(questions)
@@ -157,7 +142,10 @@ export class QuestionsRepository {
     return question || null;
   }
 
-  async findByFileId(db: DbExecutor, fileId: string) {
+  async findByFileId(
+    db: DbExecutor,
+    fileId: string,
+  ): Promise<(typeof questions.$inferSelect)[]> {
     return db
       .select()
       .from(questions)
@@ -165,7 +153,10 @@ export class QuestionsRepository {
       .orderBy(desc(questions.createdAt));
   }
 
-  async findRecent(db: DbExecutor, limit: number = 20) {
+  async findRecent(
+    db: DbExecutor,
+    limit: number = 20,
+  ): Promise<(typeof questions.$inferSelect)[]> {
     return db
       .select()
       .from(questions)
@@ -177,7 +168,7 @@ export class QuestionsRepository {
     db: DbExecutor,
     limit: number = 50,
     documentId?: string,
-  ) {
+  ): Promise<QuestionDetailsProjection[]> {
     const baseQuery = db
       .select({
         id: questions.id,
@@ -186,10 +177,10 @@ export class QuestionsRepository {
         correctOption: questions.correctOption,
         marks: questions.marks,
         difficulty: questions.difficulty,
-        diagram_url: questions.diagram_url,
+        questionDiagram: questions.questionDiagram,
         hint: questions.hint,
         solution: questions.solution,
-        solution_diagram_url: questions.solution_diagram_url,
+        solutionDiagram: questions.solutionDiagram,
         createdAt: questions.createdAt,
         updatedAt: questions.updatedAt,
         chapterId: chapters.id,
@@ -220,8 +211,11 @@ export class QuestionsRepository {
     return baseQuery.orderBy(desc(questions.createdAt)).limit(limit);
   }
 
-  async findRecentDocumentsWithQuestions(db: DbExecutor, limit: number = 20) {
-    return db
+  async findRecentDocumentsWithQuestions(
+    db: DbExecutor,
+    limit: number = 20,
+  ): Promise<DocumentWithQuestionCountProjection[]> {
+    const records = await db
       .select({
         id: documents.id,
         title: documents.title,
@@ -234,9 +228,18 @@ export class QuestionsRepository {
       .groupBy(documents.id, documents.title, documents.createdAt)
       .orderBy(desc(documents.createdAt))
       .limit(limit);
+
+    return records.map((record) => ({
+      id: record.id,
+      title: record.title,
+      createdAt: record.createdAt,
+      questionCount: Number(record.questionCount || 0),
+    }));
   }
 
-  async getAllChaptersMap(db: DbExecutor) {
+  async getAllChaptersMap(
+    db: DbExecutor,
+  ): Promise<Map<string, ChapterCurriculumMappingProjection>> {
     const records = await db
       .select({
         id: chapters.id,
@@ -253,16 +256,7 @@ export class QuestionsRepository {
       .leftJoin(sections, eq(chapters.sectionId, sections.id))
       .leftJoin(subjects, eq(sections.subjectId, subjects.id));
 
-    const map = new Map<
-      string,
-      {
-        id: string;
-        name: string;
-        slug: string;
-        sectionSlug: string | null;
-        subjectSlug: string | null;
-      }
-    >();
+    const map = new Map<string, ChapterCurriculumMappingProjection>();
 
     for (const record of records) {
       map.set(record.slug, {

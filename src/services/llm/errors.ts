@@ -1,11 +1,11 @@
-class LLMErrorOptions implements ErrorOptions {
+export class LLMErrorOptions implements ErrorOptions {
   constructor(
     public retryable: boolean,
     public cause?: any,
   ) {}
 }
 
-class LLMServiceError extends Error {
+export class LLMServiceError extends Error {
   public llmProvider: string;
   public statusCode?: number | undefined;
 
@@ -21,7 +21,7 @@ class LLMServiceError extends Error {
   }
 }
 
-class RateLimitError extends LLMServiceError {
+export class RateLimitError extends LLMServiceError {
   readonly errorCode = "RATE_LIMIT_ERROR";
   public model: string;
   public retryAfterMs: number;

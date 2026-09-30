@@ -4,10 +4,10 @@ import { requireAdmin } from "@/features/shared/actions/require-admin";
 import { questionsService } from "../service";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
-import { GetRecentDocumentsActionResponse } from "./types";
+import { GetRecentDocumentsResult } from "../dto/results";
 
 export async function getRecentDocumentsForFilterAction(): Promise<
-  ServerActionResult<GetRecentDocumentsActionResponse>
+  ServerActionResult<GetRecentDocumentsResult>
 > {
   try {
     await requireAdmin();

@@ -2,16 +2,14 @@
 
 import { requireAdmin } from "@/features/shared/actions/require-admin";
 import { questionsService } from "../service";
-import {
-  CreateQuestionActionPayload,
-  CreateQuestionActionResponse,
-} from "./types";
+import { CreateQuestionPayloadCommand } from "../dto/payloads";
+import { CreateQuestionResult, } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 
 export async function createQuestionAction(
-  payload: CreateQuestionActionPayload,
-): Promise<ServerActionResult<CreateQuestionActionResponse>> {
+  payload: CreateQuestionPayloadCommand,
+): Promise<ServerActionResult<CreateQuestionResult>> {
   try {
     const session = await requireAdmin();
 

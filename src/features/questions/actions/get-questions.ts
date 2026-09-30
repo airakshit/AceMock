@@ -4,13 +4,12 @@ import { requireAdmin } from "@/features/shared/actions/require-admin";
 import { questionsService } from "../service";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
-import { GetRecentQuestionsActionResponse } from "./types";
-
+import { GetRecentQuestionsResult } from "../dto/results";
 
 export async function getRecentQuestionsAction(
   limitOrParams: number | { limit?: number; documentId?: string } = 50,
   legacyDocId?: string,
-): Promise<ServerActionResult<GetRecentQuestionsActionResponse>> {
+): Promise<ServerActionResult<GetRecentQuestionsResult>> {
   try {
     await requireAdmin();
 
@@ -32,8 +31,6 @@ export async function getRecentQuestionsAction(
       success: true,
       data: {
         questions,
-        documentId: documentId || null,
-        documentTitle,
       },
       message: `Fetched ${questions.length} questions successfully.`,
     };
