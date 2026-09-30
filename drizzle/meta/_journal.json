@@ -92,6 +92,13 @@
       "when": 1790786352903,
       "tag": "0012_unknown_celestials",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790788438033,
+      "tag": "0013_cynical_swordsman",
+      "breakpoints": true
     }
   ]
 }

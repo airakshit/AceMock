@@ -10,7 +10,7 @@ import { user } from "../auth";
 
 export const visibilityEnum = pgEnum("visibility_enum", ["public", "private"]);
 
-export const mockTests = pgTable("mock-tests", {
+export const mockTests = pgTable("mock_tests", {
   id: uuid("id").primaryKey(),
   userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }),
 

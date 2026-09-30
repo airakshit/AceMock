@@ -2,7 +2,7 @@ import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { questions } from "../questions";
 import { mockTests } from "./mock-tests";
 
-export const mockTestsQuestions = pgTable("mock-tests-questions", {
+export const mockTestsQuestions = pgTable("mock_tests_questions", {
   id: uuid("id").primaryKey(),
   mockTestId: uuid("mock_test_id")
     .references(() => mockTests.id)
