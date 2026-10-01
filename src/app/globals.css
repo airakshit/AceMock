@@ -154,6 +154,23 @@
     @apply font-sans antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     text-rendering: optimizeLegibility;
+    /* Anchor jumps land below the sticky app header */
+    scroll-padding-top: 5rem;
+    /* Clean tap feedback on touch devices */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  /* Keyboard fallback: any focusable element without its own focus style
+     still gets a visible, brand-tinted outline. */
+  :focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--brand) 65%, transparent);
+    outline-offset: 2px;
   }
 
   body {
@@ -339,4 +356,31 @@
 .rich-content .katex .mfrac > .vlist-t2 > .vlist-r > .vlist > span {
   padding-top: 0.04em;
   padding-bottom: 0.04em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Accessibility — respect the user's motion preferences
+ *
+ * Collapses decorative transitions and animations while keeping functional
+ * loaders (spinners) alive so progress states remain readable.
+ * ────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* Spinners communicate real progress — keep them running. */
+  .animate-spin,
+  [class*="animate-spin"] {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

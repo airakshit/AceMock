@@ -407,7 +407,7 @@ export function DocumentCard({
                   size="sm"
                   onClick={handleRefreshStatus}
                   disabled={isRefreshingStatus}
-                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-md transition-colors"
+                  className="size-7 -my-1 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-md transition-colors"
                   title="Refresh document processing status"
                 >
                   <RefreshCw
@@ -541,9 +541,9 @@ export function DocumentCard({
           </div>
 
           {/* Right section: Action Buttons */}
-          <div className="flex items-center justify-end shrink-0 gap-1.5 border-t sm:border-t-0 pt-3 sm:pt-0 border-border/40">
+          <div className="flex flex-wrap items-center justify-start gap-1.5 border-t border-border/40 pt-3 sm:justify-end sm:border-t-0 sm:pt-0">
             {isEditing ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Button
                   type="button"
                   variant="outline"
@@ -571,7 +571,7 @@ export function DocumentCard({
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {/* Process / Extract Questions Button */}
                 <Button
                   type="button"

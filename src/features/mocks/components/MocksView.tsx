@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, RefreshCw, ClipboardList } from "lucide-react";
+import { ClipboardList, RefreshCw, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { MockTestCard } from "@/components/patterns/mock-test-card";
+import { SearchInput } from "@/components/patterns/search-input";
+import { EmptyState } from "@/components/patterns/empty-state";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { layout } from "@/lib/design-system";
@@ -17,11 +19,11 @@ interface MocksViewProps {
 
 function MockTestsSkeleton() {
   return (
-    <div className={layout.gridCards}>
+    <div role="status" aria-label="Loading mock tests" className={layout.gridCards}>
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="flex h-56 flex-col justify-between rounded-xl border border-border/80 bg-card p-5 shadow-card"
+          className="flex h-56 animate-pulse flex-col justify-between rounded-xl border border-border/80 bg-card p-5 shadow-card"
         >
           <div className="space-y-3">
             <div className="flex gap-2">
@@ -35,9 +37,10 @@ function MockTestsSkeleton() {
               <Skeleton className="h-7 w-full rounded-lg" />
             </div>
           </div>
-          <Skeleton className="h-7 w-full rounded-lg" />
+          <Skeleton className="h-9 w-full rounded-lg" />
         </div>
       ))}
+      <span className="sr-only">Loading mock tests...</span>
     </div>
   );
 }
@@ -88,31 +91,16 @@ export function MocksView({ initialTests = [] }: MocksViewProps) {
   return (
     <div className="space-y-6">
       {/* Search & Filter Toolbar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-card md:flex-row md:items-center md:justify-between">
-        {/* Search Input */}
-        <div className="group relative flex-1 md:max-w-sm">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-brand" />
-          <input
-            type="text"
-            placeholder="Search mock tests by title..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-full rounded-lg border border-border bg-background pr-8 pl-8.5 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus:border-brand/40 focus:outline-none focus:ring-3 focus:ring-brand/15"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Clear search"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-card sm:flex-row sm:items-center sm:justify-between">
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search mock tests by title..."
+          label="Search mock tests"
+          className="sm:max-w-xs lg:max-w-sm"
+        />
 
-        {/* Right Toolbar Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
           <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground tabular-nums">
             {filteredTests.length}{" "}
             {filteredTests.length === 1 ? "test" : "tests"}
@@ -123,6 +111,7 @@ export function MocksView({ initialTests = [] }: MocksViewProps) {
             size="sm"
             onClick={() => fetchTests(true)}
             disabled={isRefreshing}
+            aria-label="Refresh mock tests"
             className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
             <RefreshCw
@@ -137,34 +126,30 @@ export function MocksView({ initialTests = [] }: MocksViewProps) {
       {isLoading ? (
         <MockTestsSkeleton />
       ) : filteredTests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-card/40 p-12 text-center">
-          <div className="mb-3 flex size-12 items-center justify-center rounded-xl bg-brand-muted text-brand">
-            {searchQuery ? (
-              <Search className="size-5" />
-            ) : (
-              <ClipboardList className="size-5" />
-            )}
-          </div>
-          <p className="text-sm font-semibold text-foreground">
-            {searchQuery ? "No matching mock tests" : "No mock tests available yet"}
-          </p>
-          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-            {searchQuery
+        <EmptyState
+          icon={searchQuery ? Search : ClipboardList}
+          title={
+            searchQuery ? "No matching mock tests" : "No mock tests available yet"
+          }
+          description={
+            searchQuery
               ? "Try a different keyword or clear the search to see everything."
-              : "Mock examinations will appear here once published by administrators."}
-          </p>
+              : "Mock examinations will appear here once published by administrators."
+          }
+        >
           {searchQuery && (
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => setSearchQuery("")}
-              className="mt-4 text-xs"
+              className="gap-1 text-xs"
             >
-              Clear search filter
+              <X className="size-3.5" />
+              Clear search
             </Button>
           )}
-        </div>
+        </EmptyState>
       ) : (
         <div className={layout.gridCards}>
           {filteredTests.map((test) => (

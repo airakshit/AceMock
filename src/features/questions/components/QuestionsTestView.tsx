@@ -17,15 +17,19 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { SearchInput } from "@/components/patterns/search-input";
+import { EmptyState } from "@/components/patterns/empty-state";
 import { QuestionCard } from "./question-card/QuestionCard";
 import type {
   QuestionCardType,
   OptionKey,
   QuestionMode,
 } from "./question-card/types";
-import {
-  getRecentQuestionsAction,
-} from "../actions/get-questions";
+import { getRecentQuestionsAction } from "../actions/get-questions";
 import { getRecentDocumentsForFilterAction } from "../actions";
 import type {
   QuestionDetailsProjection,
@@ -42,8 +46,12 @@ export function QuestionsTestView() {
   // Document filter state
   const [documentIdInput, setDocumentIdInput] = useState<string>("");
   const [activeDocumentId, setActiveDocumentId] = useState<string>("");
-  const [activeDocumentTitle, setActiveDocumentTitle] = useState<string | null>(null);
-  const [recentDocs, setRecentDocs] = useState<DocumentWithQuestionCountProjection[]>([]);
+  const [activeDocumentTitle, setActiveDocumentTitle] = useState<string | null>(
+    null,
+  );
+  const [recentDocs, setRecentDocs] = useState<
+    DocumentWithQuestionCountProjection[]
+  >([]);
 
   // Filter & Display state
   const [mode, setMode] = useState<QuestionMode>("review");
@@ -55,6 +63,7 @@ export function QuestionsTestView() {
   const fetchQuestions = async (
     questionLimit: number = limit,
     docId: string = activeDocumentId,
+    opts?: { silent?: boolean },
   ) => {
     setIsLoading(true);
     setError(null);
@@ -66,18 +75,27 @@ export function QuestionsTestView() {
 
       if (res.success && res.data) {
         setQuestions(res.data.questions);
-        const title = res.data.questions.length > 0 ? res.data.questions[0].documentTitle : null;
+        const title =
+          res.data.questions.length > 0
+            ? res.data.questions[0].documentTitle
+            : null;
         setActiveDocumentTitle(title || null);
-        if (res.data.questions.length === 0) {
-          if (docId) {
-            toast.info(`No questions found for document ID: ${docId.slice(0, 8)}...`);
+        // Initial loads and filter changes communicate state in-place
+        // (skeletons, banners, empty states) — keep toasts for explicit actions.
+        if (!opts?.silent) {
+          if (res.data.questions.length === 0) {
+            if (docId) {
+              toast.info(
+                `No questions found for document ID: ${docId.slice(0, 8)}...`,
+              );
+            } else {
+              toast.info("No questions found in the database.");
+            }
           } else {
-            toast.info("No questions found in the database.");
+            toast.success(
+              `Loaded ${res.data.questions.length} questions${docId ? ` for document` : ""}.`,
+            );
           }
-        } else {
-          toast.success(
-            `Loaded ${res.data.questions.length} questions${docId ? ` for document` : ""}.`,
-          );
         }
       } else if (!res.success) {
         const errorMsg = res.error?.message || "Failed to load questions.";
@@ -105,9 +123,9 @@ export function QuestionsTestView() {
     if (initialDocId) {
       setDocumentIdInput(initialDocId);
       setActiveDocumentId(initialDocId);
-      fetchQuestions(limit, initialDocId);
+      fetchQuestions(limit, initialDocId, { silent: true });
     } else {
-      fetchQuestions(limit, "");
+      fetchQuestions(limit, "", { silent: true });
     }
 
     // Load available recent documents with question counts for quick filtering
@@ -137,7 +155,7 @@ export function QuestionsTestView() {
       window.history.replaceState(null, "", newUrl);
     }
 
-    fetchQuestions(limit, trimmed);
+    fetchQuestions(limit, trimmed, { silent: true });
   };
 
   const handleClearDocumentFilter = () => {
@@ -154,7 +172,7 @@ export function QuestionsTestView() {
       window.history.replaceState(null, "", newUrl);
     }
 
-    fetchQuestions(limit, "");
+    fetchQuestions(limit, "", { silent: true });
   };
 
   const handleRefresh = () => {
@@ -182,10 +200,13 @@ export function QuestionsTestView() {
   // Filtered questions
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      const subject = (q.subjectSlug || q.subjectName || "general").toLowerCase();
+      const subject = (
+        q.subjectSlug ||
+        q.subjectName ||
+        "general"
+      ).toLowerCase();
       const matchesSubject =
-        selectedSubject === "all" ||
-        subject === selectedSubject.toLowerCase();
+        selectedSubject === "all" || subject === selectedSubject.toLowerCase();
 
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch =
@@ -206,29 +227,27 @@ export function QuestionsTestView() {
     <div className="space-y-6 max-w-6xl mx-auto pb-16">
       {/* ─── Top Control Panel ─── */}
       <div className="rounded-2xl border bg-card/60 backdrop-blur-sm p-4 sm:p-5 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold tracking-tight">
-                Question Bank Testing View
-              </h2>
-              <Badge variant="outline" className="font-mono text-xs">
-                Backend Live
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Testing view for questions extracted and persisted via the OCR
-              workflow.
-            </p>
-          </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Badge
+            variant="outline"
+            className="w-fit font-mono text-xs"
+            title="Questions are served directly from the database"
+          >
+            Backend Live
+          </Badge>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2.5 flex-wrap">
             {/* Mode Switcher */}
-            <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
+            <div
+              role="group"
+              aria-label="Question display mode"
+              className="inline-flex rounded-lg border bg-muted/40 p-0.5"
+            >
               <button
                 type="button"
                 onClick={() => setMode("exam")}
+                aria-pressed={mode === "exam"}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer",
                   mode === "exam"
@@ -241,6 +260,7 @@ export function QuestionsTestView() {
               <button
                 type="button"
                 onClick={() => setMode("review")}
+                aria-pressed={mode === "review"}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer",
                   mode === "review"
@@ -313,6 +333,7 @@ export function QuestionsTestView() {
                 }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                 title="Clear input"
+                aria-label="Clear document ID input"
               >
                 <X className="size-3.5" />
               </button>
@@ -338,22 +359,25 @@ export function QuestionsTestView() {
 
             {/* Quick dropdown for recent documents */}
             {recentDocs.length > 0 && (
-              <select
+              <NativeSelect
                 value={activeDocumentId}
                 onChange={(e) => {
                   const val = e.target.value;
                   setDocumentIdInput(val);
                   handleApplyDocumentFilter(val);
                 }}
-                className="h-8 max-w-[200px] sm:max-w-[240px] bg-background border rounded-md px-2 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer truncate"
+                aria-label="Select a recent document"
+                className="min-w-0 flex-1 sm:max-w-60 sm:flex-none"
               >
-                <option value="">Or select recent document...</option>
+                <NativeSelectOption value="">
+                  Or select recent document...
+                </NativeSelectOption>
                 {recentDocs.map((doc) => (
-                  <option key={doc.id} value={doc.id}>
+                  <NativeSelectOption key={doc.id} value={doc.id}>
                     {doc.title} ({doc.questionCount} Qs)
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </select>
+              </NativeSelect>
             )}
 
             {activeDocumentId && (
@@ -375,14 +399,17 @@ export function QuestionsTestView() {
         {activeDocumentId && (
           <div className="flex items-center justify-between gap-3 px-3.5 py-2 rounded-lg bg-primary/10 border border-primary/20 text-xs">
             <div className="flex items-center gap-2 min-w-0">
-              <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+              <Badge
+                variant="default"
+                className="text-[10px] px-1.5 py-0 h-4 shrink-0"
+              >
                 Document Filter
               </Badge>
               <span className="font-semibold text-foreground truncate">
                 {activeDocumentTitle || "Document"}
               </span>
               <span
-                className="font-mono text-muted-foreground text-[11px] truncate max-w-[160px] sm:max-w-none"
+                className="font-mono text-muted-foreground text-[11px] truncate max-w-40 sm:max-w-none"
                 title={activeDocumentId}
               >
                 ({activeDocumentId})
@@ -402,46 +429,55 @@ export function QuestionsTestView() {
         )}
 
         {/* Filters & Search Row */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 border-t border-border/60">
+        <div className="flex flex-col items-start gap-3 border-t border-border/60 pt-3 sm:flex-row sm:items-center">
           {/* Search Input */}
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by question text, chapter, document, or ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 text-sm h-9 bg-background/80"
-            />
-          </div>
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search by question text, chapter, document, or ID..."
+            label="Search questions"
+            className="w-full sm:flex-1 sm:min-w-0"
+          />
 
           {/* Subject Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          <div
+            role="group"
+            aria-label="Filter questions by subject"
+            className="flex w-full items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar sm:w-auto sm:pb-0"
+          >
             <button
               type="button"
               onClick={() => setSelectedSubject("all")}
+              aria-pressed={selectedSubject === "all"}
               className={cn(
-                "px-2.5 py-1 text-xs rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap",
+                "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
                 selectedSubject === "all"
-                  ? "bg-primary text-primary-foreground font-semibold"
-                  : "bg-muted/70 text-muted-foreground hover:text-foreground",
+                  ? "bg-brand text-brand-foreground font-semibold shadow-sm"
+                  : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               All ({questions.length})
             </button>
             {subjectOptions.map((subj) => {
               const count = questions.filter(
-                (q) => (q.subjectSlug || q.subjectName || "general").toLowerCase() === subj.toLowerCase(),
+                (q) =>
+                  (
+                    q.subjectSlug ||
+                    q.subjectName ||
+                    "general"
+                  ).toLowerCase() === subj.toLowerCase(),
               ).length;
               return (
                 <button
                   key={subj}
                   type="button"
                   onClick={() => setSelectedSubject(subj)}
+                  aria-pressed={selectedSubject === subj}
                   className={cn(
-                    "px-2.5 py-1 text-xs rounded-full font-medium transition-colors cursor-pointer capitalize whitespace-nowrap",
+                    "shrink-0 capitalize rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
                     selectedSubject === subj
-                      ? "bg-primary text-primary-foreground font-semibold"
-                      : "bg-muted/70 text-muted-foreground hover:text-foreground",
+                      ? "bg-brand text-brand-foreground font-semibold shadow-sm"
+                      : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   {subj} ({count})
@@ -451,19 +487,21 @@ export function QuestionsTestView() {
           </div>
 
           {/* Limit Selector */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-            <span>Limit:</span>
-            <select
+          <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <label htmlFor="questions-limit">Limit:</label>
+            <NativeSelect
+              id="questions-limit"
+              size="sm"
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value))}
-              className="bg-background border rounded-md px-2 py-1 text-xs font-medium cursor-pointer"
+              className="w-auto"
             >
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={200}>200</option>
-              <option value={500}>500</option>
-            </select>
+              <NativeSelectOption value={20}>20</NativeSelectOption>
+              <NativeSelectOption value={50}>50</NativeSelectOption>
+              <NativeSelectOption value={100}>100</NativeSelectOption>
+              <NativeSelectOption value={200}>200</NativeSelectOption>
+              <NativeSelectOption value={500}>500</NativeSelectOption>
+            </NativeSelect>
           </div>
         </div>
       </div>
@@ -488,7 +526,8 @@ export function QuestionsTestView() {
 
       {/* ─── Content State: Loading Skeleton ─── */}
       {isLoading && (
-        <div className="space-y-4">
+        <div role="status" aria-label="Loading questions" className="space-y-4">
+          <span className="sr-only">Loading questions...</span>
           {[1, 2, 3].map((i) => (
             <div
               key={i}
@@ -515,22 +554,29 @@ export function QuestionsTestView() {
 
       {/* ─── Content State: Empty State ─── */}
       {!isLoading && filteredQuestions.length === 0 && (
-        <div className="rounded-2xl border border-dashed bg-card/40 p-12 text-center space-y-4">
-          <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
-            <BookOpen className="size-6" />
-          </div>
-          <div className="max-w-md mx-auto space-y-1.5">
-            <h3 className="text-base font-semibold">No questions found</h3>
-            <p className="text-sm text-muted-foreground">
-              {activeDocumentId
-                ? `No questions found for document ID "${activeDocumentId}". The document may still be processing, or has no extracted questions yet.`
-                : questions.length === 0
-                  ? "There are currently no questions stored in the database. Go to the Documents page, upload an exam paper, and click 'Process' to extract questions."
-                  : "No questions match your current search or filter criteria. Try adjusting your query."}
-            </p>
-          </div>
+        <EmptyState
+          icon={
+            activeDocumentId || searchQuery || selectedSubject !== "all"
+              ? Search
+              : BookOpen
+          }
+          title={
+            activeDocumentId
+              ? "No questions found for this document"
+              : questions.length === 0
+                ? "No questions in the database yet"
+                : "No matching questions"
+          }
+          description={
+            activeDocumentId
+              ? `The document may still be processing, or it has no extracted questions yet.`
+              : questions.length === 0
+                ? "Upload an exam paper on the Documents page and run extraction to populate the question bank."
+                : "No questions match your current search or filter criteria. Try adjusting your query."
+          }
+        >
           {activeDocumentId ? (
-            <div className="flex items-center justify-center gap-2 pt-1">
+            <>
               <Button
                 variant="outline"
                 size="sm"
@@ -549,16 +595,16 @@ export function QuestionsTestView() {
                 <Layers className="size-3.5" />
                 View in Documents
               </Link>
-            </div>
+            </>
           ) : questions.length === 0 ? (
             <Link
               href="/documents"
               className={cn(
                 buttonVariants({ variant: "default", size: "sm" }),
-                "mt-2 inline-flex items-center gap-2",
+                "inline-flex items-center gap-1.5 text-xs",
               )}
             >
-              <Layers className="size-4" />
+              <Layers className="size-3.5" />
               Go to Documents Page
             </Link>
           ) : (
@@ -569,12 +615,12 @@ export function QuestionsTestView() {
                 setSearchQuery("");
                 setSelectedSubject("all");
               }}
-              className="mt-2 text-xs"
+              className="text-xs"
             >
               Clear Filters
             </Button>
           )}
-        </div>
+        </EmptyState>
       )}
 
       {/* ─── Content State: Questions List ─── */}
@@ -587,7 +633,8 @@ export function QuestionsTestView() {
               {activeDocumentId && " (from filtered document)"}
             </span>
             <span>
-              Mode: <strong className="text-foreground capitalize">{mode}</strong>
+              Mode:{" "}
+              <strong className="text-foreground capitalize">{mode}</strong>
             </span>
           </div>
 
@@ -659,7 +706,7 @@ export function QuestionsTestView() {
                           title={`Click to filter by Document ID: ${q.documentId || ""}`}
                         >
                           <FileText className="size-3 text-muted-foreground" />
-                          <span className="truncate max-w-[180px] sm:max-w-[240px]">
+                          <span className="truncate max-w-45 sm:max-w-60">
                             {q.documentTitle}
                           </span>
                         </button>

@@ -1,8 +1,7 @@
 import { Award, BarChart2, CheckCircle2, Target, TrendingUp } from "lucide-react";
 import { MetricCard } from "@/components/patterns/metric-card";
+import { EmptyState } from "@/components/patterns/empty-state";
 import { SectionHeader } from "@/components/patterns/page-header";
-import { typography } from "@/lib/design-system";
-import { cn } from "@/lib/utils";
 import type { DashboardMetrics } from "@/features/dashboard/types";
 
 interface MetricsSectionProps {
@@ -31,17 +30,11 @@ export function MetricsSection({ data }: MetricsSectionProps) {
       />
 
       {!data.hasAttemptedTests || data.metrics.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-card/40 px-6 py-12 text-center">
-          <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-brand-muted text-brand">
-            <BarChart2 className="size-5" />
-          </div>
-          <p className="text-sm font-semibold text-foreground">
-            No mock tests completed yet
-          </p>
-          <p className={cn(typography.caption, "mt-1 max-w-sm text-muted-foreground")}>
-            Complete your first mock test below to begin tracking your score analytics, percentile rank, and accuracy.
-          </p>
-        </div>
+        <EmptyState
+          icon={BarChart2}
+          title="No mock tests completed yet"
+          description="Complete your first mock test below to begin tracking your score analytics, percentile rank, and accuracy."
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {data.metrics.map((metric) => (

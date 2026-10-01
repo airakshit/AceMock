@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   FileText,
-  Search,
   CheckCircle2,
   Clock,
   Percent,
@@ -27,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SearchInput } from "@/components/patterns/search-input";
 import { DocumentOptionForMockProjection } from "../../dto/projections";
 import { getDocumentsForMockCreationAction } from "../../actions/get-documents-for-mock-creation";
 import { createMockTestFromDocumentsAction } from "../../actions/create-mock-test-from-documents";
@@ -273,16 +273,12 @@ export function CreateMockTestModal({
               </div>
 
               {/* Document Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Filter available documents..."
-                  value={searchDocQuery}
-                  onChange={(e) => setSearchDocQuery(e.target.value)}
-                  className="h-8.5 w-full rounded-lg border border-border bg-background pl-8.5 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-colors"
-                />
-              </div>
+              <SearchInput
+                value={searchDocQuery}
+                onChange={setSearchDocQuery}
+                placeholder="Filter available documents..."
+                label="Filter available documents"
+              />
 
               {/* Documents List */}
               <div className="rounded-lg border border-border/80 bg-muted/20 p-2 max-h-52 overflow-y-auto space-y-1.5">

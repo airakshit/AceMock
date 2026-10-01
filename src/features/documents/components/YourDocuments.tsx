@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { FileStack, Loader2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/patterns/empty-state";
 import { typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import type { DocumentItemDTO } from "../actions/types";
@@ -86,29 +87,22 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-10 text-center space-y-3 bg-card/40">
+        <div
+          role="status"
+          aria-label="Loading documents"
+          className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-10 text-center space-y-3 bg-card/40"
+        >
           <Loader2 className="size-6 animate-spin text-brand" />
           <p className="text-xs text-muted-foreground">
             Loading your study documents...
           </p>
         </div>
       ) : documents.length === 0 ? (
-        <div
-          className={cn(
-            "flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-10 text-center space-y-3 bg-card/40",
-            typography.bodyMuted,
-          )}
-        >
-          <div className="flex size-12 items-center justify-center rounded-full border border-border/60 bg-muted/60 text-muted-foreground">
-            <FileStack className="size-6 text-brand" />
-          </div>
-          <p className="text-sm font-semibold text-foreground">
-            No documents uploaded yet
-          </p>
-          <p className="text-xs text-muted-foreground max-w-sm">
-            Upload syllabi, past question papers, or study notes above to automatically generate targeted mock questions.
-          </p>
-        </div>
+        <EmptyState
+          icon={FileStack}
+          title="No documents uploaded yet"
+          description="Upload syllabi, past question papers, or study notes above to automatically generate targeted mock questions."
+        />
       ) : (
         <div className="space-y-3">
           {documents.map((doc) => (

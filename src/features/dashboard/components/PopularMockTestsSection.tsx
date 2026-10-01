@@ -70,7 +70,11 @@ export function PopularMockTestsSection({
 
       {/* Category Filter Chips */}
       {subjects.length > 2 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+        <div
+          role="group"
+          aria-label="Filter mock tests by subject"
+          className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar"
+        >
           {subjects.map((subject) => {
             const isSelected = selectedSubject === subject;
             return (
@@ -78,8 +82,9 @@ export function PopularMockTestsSection({
                 key={subject}
                 type="button"
                 onClick={() => setSelectedSubject(subject)}
+                aria-pressed={isSelected}
                 className={cn(
-                  "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
                   isSelected
                     ? "bg-brand text-brand-foreground shadow-sm"
                     : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",

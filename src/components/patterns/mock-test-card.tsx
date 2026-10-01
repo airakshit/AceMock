@@ -123,7 +123,7 @@ export function MockTestCard({
         <Button
           size="sm"
           variant="outline"
-          className="w-full justify-between text-xs font-medium transition-colors group-hover:border-brand/40 group-hover:bg-brand group-hover:text-brand-foreground"
+          className="h-9 w-full justify-between text-xs font-medium transition-colors group-hover:border-brand/40 group-hover:bg-brand group-hover:text-brand-foreground"
           onClick={() => onAction?.(test.id)}
         >
           <span>{actionLabel}</span>
