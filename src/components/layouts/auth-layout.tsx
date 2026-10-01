@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { layout } from "@/lib/design-system";
+import { AuthBrandPanel } from "@/components/layouts/components/AuthBrandPanel";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -8,15 +8,15 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, className }: AuthLayoutProps) {
   return (
-    <div className={cn(layout.pageShell, "relative min-h-screen bg-background justify-center", className)}>
-      {/* Subtle micro grid */}
-      <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:20px_20px] opacity-50"
-        aria-hidden="true"
-      />
+    <div className={cn("grid min-h-svh lg:grid-cols-[1.05fr_1fr]", className)}>
+      <AuthBrandPanel />
 
-      <div className={cn(layout.pageContainer, "relative z-10")}>
-        {children}
+      {/* Form column */}
+      <div className="relative flex items-center justify-center bg-background px-5 py-10 sm:px-8">
+        <div className="pointer-events-none absolute inset-0 bg-grid-fade opacity-50 lg:hidden" />
+        <div className="relative z-10 w-full max-w-[var(--auth-card-max-width)]">
+          {children}
+        </div>
       </div>
     </div>
   );

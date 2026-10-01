@@ -23,21 +23,24 @@ function SignInContent() {
 
   return (
     <AuthCard>
-      <AuthHeader title="Welcome back" />
+      <AuthHeader
+        title="Welcome back"
+        description="Sign in to continue your preparation."
+      />
+
+      <ContinueWithGoogle callbackURL="/dashboard" />
+
+      <OrDivider label="or continue with email" />
+
+      <SignInForm
+        onSuccess={() => router.push("/dashboard")}
+        callbackURL="/dashboard"
+      />
 
       <AuthSwitchLink
         prompt="Don't have an account?"
         linkText="Sign up"
         href="/signup"
-      />
-
-      <ContinueWithGoogle callbackURL="/dashboard" />
-
-      <OrDivider />
-
-      <SignInForm
-        onSuccess={() => router.push("/dashboard")}
-        callbackURL="/dashboard"
       />
     </AuthCard>
   );

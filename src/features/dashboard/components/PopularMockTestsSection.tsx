@@ -70,7 +70,7 @@ export function PopularMockTestsSection({
 
       {/* Category Filter Chips */}
       {subjects.length > 2 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
           {subjects.map((subject) => {
             const isSelected = selectedSubject === subject;
             return (
@@ -79,9 +79,9 @@ export function PopularMockTestsSection({
                 type="button"
                 onClick={() => setSelectedSubject(subject)}
                 className={cn(
-                  "shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                  "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
                   isSelected
-                    ? "bg-foreground text-background font-medium"
+                    ? "bg-brand text-brand-foreground shadow-sm"
                     : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >

@@ -12,13 +12,13 @@ interface MetricsSectionProps {
 function getMetricIcon(id: string) {
   switch (id) {
     case "tests-taken":
-      return <CheckCircle2 className="size-3.5 text-muted-foreground" />;
+      return <CheckCircle2 className="size-4" />;
     case "average-score":
-      return <Target className="size-3.5 text-muted-foreground" />;
+      return <Target className="size-4" />;
     case "best-rank":
-      return <Award className="size-3.5 text-muted-foreground" />;
+      return <Award className="size-4" />;
     default:
-      return <TrendingUp className="size-3.5 text-muted-foreground" />;
+      return <TrendingUp className="size-4" />;
   }
 }
 
@@ -31,9 +31,9 @@ export function MetricsSection({ data }: MetricsSectionProps) {
       />
 
       {!data.hasAttemptedTests || data.metrics.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/40 px-6 py-9 text-center">
-          <div className="flex size-10 items-center justify-center rounded-md bg-muted/60 text-muted-foreground mb-2.5">
-            <BarChart2 className="size-5 text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-card/40 px-6 py-12 text-center">
+          <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-brand-muted text-brand">
+            <BarChart2 className="size-5" />
           </div>
           <p className="text-sm font-semibold text-foreground">
             No mock tests completed yet
@@ -43,14 +43,14 @@ export function MetricsSection({ data }: MetricsSectionProps) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {data.metrics.map((metric) => (
             <MetricCard
               key={metric.id}
               label={metric.label}
               value={metric.value}
               hint={metric.hint}
-              accent={metric.accent}
+              accent={metric.accent ?? "default"}
               icon={getMetricIcon(metric.id)}
             />
           ))}

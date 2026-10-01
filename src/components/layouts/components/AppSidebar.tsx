@@ -35,62 +35,74 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar overflow-hidden">
+    <Sidebar
+      collapsible="icon"
+      className="overflow-hidden border-r border-sidebar-border/70 bg-sidebar"
+    >
       {/* Brand Header — h-14 matches AppHeader height */}
-      <SidebarHeader className="h-14 border-b border-sidebar-border/60 p-0 overflow-hidden shrink-0">
+      <SidebarHeader className="h-14 shrink-0 overflow-hidden border-b border-sidebar-border/60 p-0">
         <Link
           href="/dashboard"
           onClick={handleNavClick}
-          className="flex h-full w-full items-center px-2 text-sidebar-foreground transition-colors hover:bg-sidebar-accent/40"
+          className="group/brand flex h-full w-full items-center px-2 transition-colors hover:bg-sidebar-accent/40"
         >
           {/* Logo container: exactly size-10 (40px) centered in 56px rail */}
           <div className="flex size-10 shrink-0 items-center justify-center">
-            <div className="flex size-7.5 items-center justify-center rounded-lg bg-foreground text-background shadow-xs">
-              <Layers className="size-4 text-background" />
+            <div className="flex size-8 items-center justify-center rounded-[10px] bg-brand-gradient text-white shadow-sm ring-1 ring-inset ring-white/20 transition-transform duration-200 group-hover/brand:scale-105">
+              <Layers className="size-4" />
             </div>
           </div>
 
           {/* Brand Title: smooth width/opacity reveal */}
           <div
             className={cn(
-              "flex flex-col min-w-0 overflow-hidden whitespace-nowrap pl-1 transition-all duration-200 ease-out",
-              isExpanded || isMobile ? "max-w-44 opacity-100" : "max-w-0 opacity-0 pointer-events-none",
+              "flex min-w-0 flex-col overflow-hidden whitespace-nowrap pl-1 transition-all duration-200 ease-out",
+              isExpanded || isMobile
+                ? "max-w-44 opacity-100"
+                : "pointer-events-none max-w-0 opacity-0",
             )}
           >
-            <span className="truncate text-xs font-bold tracking-tight text-foreground uppercase">
+            <span className="truncate font-heading text-sm font-bold tracking-tight text-foreground">
               {APP_NAME}
             </span>
-            <span className="text-[10px] text-muted-foreground font-normal tracking-tight truncate">
-              Test & Analytics
+            <span className="truncate text-[10px] font-medium tracking-wide text-muted-foreground">
+              Test &amp; Analytics
             </span>
           </div>
         </Link>
       </SidebarHeader>
 
       {/* Navigation Items */}
-      <SidebarContent className="p-2 space-y-1 overflow-x-hidden overflow-y-auto no-scrollbar">
+      <SidebarContent className="space-y-1 overflow-x-hidden overflow-y-auto p-2 no-scrollbar">
         {APP_NAV_ITEMS.map((item) => {
           const isActive =
-            pathname === item.href ||
-            pathname.startsWith(`${item.href}/`);
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           const buttonContent = (
             <Link
               href={item.href}
               onClick={handleNavClick}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "group flex h-10 w-full items-center rounded-lg text-xs font-medium transition-colors duration-150",
+                "group relative flex h-10 w-full items-center rounded-lg text-sm font-medium transition-colors duration-150",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-foreground font-semibold shadow-2xs border border-sidebar-border/60"
+                  ? "bg-brand-muted font-semibold text-foreground"
                   : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
               )}
             >
+              {/* Active accent bar */}
+              {isActive ? (
+                <span className="absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-brand" />
+              ) : null}
+
               {/* Centralized Icon Wrapper: exactly size-10 (40px) */}
               <div className="flex size-10 shrink-0 items-center justify-center">
                 <item.icon
                   className={cn(
                     "size-4 shrink-0 transition-colors",
-                    isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground",
+                    isActive
+                      ? "text-brand"
+                      : "text-muted-foreground group-hover:text-foreground",
                   )}
                 />
               </div>
@@ -98,14 +110,13 @@ export function AppSidebar() {
               {/* Text Label: smoothly expands without wrapping */}
               <div
                 className={cn(
-                  "flex flex-1 items-center justify-between min-w-0 overflow-hidden whitespace-nowrap pr-2.5 transition-all duration-200 ease-out",
-                  isExpanded ? "max-w-44 opacity-100" : "max-w-0 opacity-0 pointer-events-none",
+                  "flex min-w-0 flex-1 items-center justify-between overflow-hidden whitespace-nowrap pr-2.5 transition-all duration-200 ease-out",
+                  isExpanded
+                    ? "max-w-44 opacity-100"
+                    : "pointer-events-none max-w-0 opacity-0",
                 )}
               >
                 <span className="truncate">{item.title}</span>
-                {isActive && (
-                  <span className="size-1.5 rounded-full bg-foreground shrink-0 ml-2" />
-                )}
               </div>
             </Link>
           );
@@ -115,7 +126,11 @@ export function AppSidebar() {
             return (
               <Tooltip key={item.href}>
                 <TooltipTrigger render={buttonContent} />
-                <TooltipContent side="right" sideOffset={12} className="text-xs font-medium">
+                <TooltipContent
+                  side="right"
+                  sideOffset={12}
+                  className="text-xs font-medium"
+                >
                   {item.title}
                 </TooltipContent>
               </Tooltip>
@@ -127,7 +142,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Footer Theme Selector */}
-      <SidebarFooter className="border-t border-sidebar-border/60 p-2 shrink-0 overflow-hidden">
+      <SidebarFooter className="shrink-0 overflow-hidden border-t border-sidebar-border/60 p-2">
         <SidebarThemeToggle />
       </SidebarFooter>
     </Sidebar>

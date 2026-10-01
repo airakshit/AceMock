@@ -204,22 +204,30 @@ export function DocumentForm({
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="w-full rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden"
+      className="w-full overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-card"
     >
       {/* Top row container */}
       <div
         className={cn(
-          "w-full flex items-center justify-between gap-3 p-4 sm:p-6 transition-colors hover:bg-muted/40",
+          "flex w-full items-center justify-between gap-3 p-4 transition-colors hover:bg-muted/40 sm:p-5",
           isOpen && "border-b",
         )}
       >
-        <CollapsibleTrigger className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer select-none focus:outline-none">
-          <span className="text-base sm:text-lg font-bold truncate">
-            Create Document
+        <CollapsibleTrigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left select-none focus:outline-none">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-muted text-brand">
+            <FileText className="size-4.5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-heading text-base font-bold tracking-tight sm:text-lg">
+              Create Document
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              Upload PDFs or images to build a practice set
+            </span>
           </span>
 
           {!isOpen && totalFilesCount > 0 && (
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+            <span className="ml-1 inline-flex shrink-0 items-center rounded-full bg-brand-muted px-2.5 py-0.5 text-xs font-medium text-brand">
               {totalFilesCount} {totalFilesCount === 1 ? "file" : "files"}
             </span>
           )}

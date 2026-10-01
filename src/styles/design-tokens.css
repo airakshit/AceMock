@@ -43,12 +43,29 @@
     --tracking-widest: 0.14em;
 
     /* Brand Identity (Electric Indigo / Sapphire) */
-    --brand: oklch(0.56 0.22 264);
-    --brand-hover: oklch(0.50 0.24 264);
+    --brand: oklch(0.54 0.22 264);
+    --brand-hover: oklch(0.48 0.23 264);
     --brand-foreground: oklch(0.99 0 0);
     --brand-muted: oklch(0.56 0.22 264 / 10%);
     --brand-subtle: oklch(0.56 0.22 264 / 5%);
     --brand-glow: 0 0 24px -4px oklch(0.56 0.22 264 / 25%);
+
+    /* Secondary accent — cool cyan for gradients & highlights */
+    --brand-accent: oklch(0.62 0.15 220);
+    --brand-accent-foreground: oklch(0.99 0 0);
+
+    /* Signature gradients */
+    --gradient-brand: linear-gradient(
+        135deg,
+        oklch(0.54 0.22 264) 0%,
+        oklch(0.58 0.19 285) 48%,
+        oklch(0.62 0.15 220) 100%
+    );
+    --gradient-brand-soft: linear-gradient(
+        135deg,
+        oklch(0.56 0.22 264 / 12%) 0%,
+        oklch(0.62 0.15 220 / 6%) 100%
+    );
 
     /* Semantic Test Difficulty Accents */
     --diff-easy: oklch(0.62 0.17 145);
@@ -61,21 +78,38 @@
     --diff-hard-bg: oklch(0.58 0.22 27 / 12%);
     --diff-hard-border: oklch(0.58 0.22 27 / 25%);
 
-    /* Elevation & Depth Shadows */
+    /* Elevation & Depth Shadows — layered, crisp, low-haze */
     --shadow-subtle: 0 1px 2px 0 oklch(0 0 0 / 0.03);
-    --shadow-card: 0 1px 3px 0 oklch(0 0 0 / 0.04), 0 4px 12px -2px oklch(0 0 0 / 0.03);
-    --shadow-card-hover: 0 4px 6px -1px oklch(0 0 0 / 0.06), 0 12px 24px -4px oklch(0.56 0.22 264 / 0.08);
+    --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 2px 6px -1px oklch(0 0 0 / 0.03),
+        0 0 0 1px oklch(0 0 0 / 0.02);
+    --shadow-card-hover: 0 2px 4px -1px oklch(0 0 0 / 0.05), 0 12px 28px -6px oklch(0.54 0.22 264 / 0.12);
     --shadow-popover: 0 10px 30px -5px oklch(0 0 0 / 0.1);
+    --shadow-focus: 0 0 0 3px oklch(0.54 0.22 264 / 25%);
 }
 
 .dark {
     /* Dark Theme Adjustments */
-    --brand: oklch(0.68 0.20 264);
-    --brand-hover: oklch(0.74 0.18 264);
+    --brand: oklch(0.70 0.18 264);
+    --brand-hover: oklch(0.76 0.16 264);
     --brand-foreground: oklch(0.12 0.02 264);
     --brand-muted: oklch(0.68 0.20 264 / 16%);
     --brand-subtle: oklch(0.68 0.20 264 / 8%);
     --brand-glow: 0 0 28px -4px oklch(0.68 0.20 264 / 35%);
+
+    --brand-accent: oklch(0.74 0.13 215);
+    --brand-accent-foreground: oklch(0.12 0.02 264);
+
+    --gradient-brand: linear-gradient(
+        135deg,
+        oklch(0.62 0.20 264) 0%,
+        oklch(0.64 0.18 285) 48%,
+        oklch(0.70 0.14 215) 100%
+    );
+    --gradient-brand-soft: linear-gradient(
+        135deg,
+        oklch(0.68 0.20 264 / 18%) 0%,
+        oklch(0.70 0.14 215 / 10%) 100%
+    );
 
     --diff-easy: oklch(0.74 0.16 145);
     --diff-easy-bg: oklch(0.74 0.16 145 / 16%);
@@ -88,7 +122,9 @@
     --diff-hard-border: oklch(0.68 0.20 27 / 30%);
 
     --shadow-subtle: 0 1px 2px 0 oklch(0 0 0 / 0.2);
-    --shadow-card: 0 1px 3px 0 oklch(0 0 0 / 0.3), 0 4px 12px -2px oklch(0 0 0 / 0.2);
-    --shadow-card-hover: 0 4px 8px -1px oklch(0 0 0 / 0.4), 0 12px 28px -4px oklch(0.68 0.20 264 / 0.15);
+    --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.35), 0 2px 8px -1px oklch(0 0 0 / 0.25),
+        0 0 0 1px oklch(1 0 0 / 0.04);
+    --shadow-card-hover: 0 2px 6px -1px oklch(0 0 0 / 0.4), 0 16px 32px -8px oklch(0.68 0.20 264 / 0.22);
     --shadow-popover: 0 12px 36px -6px oklch(0 0 0 / 0.5);
+    --shadow-focus: 0 0 0 3px oklch(0.68 0.20 264 / 35%);
 }

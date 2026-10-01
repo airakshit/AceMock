@@ -190,18 +190,18 @@ export function FileDropzone({
           }
         }}
         className={cn(
-          "relative flex w-full min-w-0 flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-all duration-200 cursor-pointer select-none",
+          "group relative flex w-full min-w-0 flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-all duration-200 cursor-pointer select-none",
           isDragging
-            ? "border-primary bg-primary/5 shadow-inner scale-[0.99]"
-            : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/40",
+            ? "border-brand bg-brand/5 shadow-inner scale-[0.99]"
+            : "border-muted-foreground/25 hover:border-brand/50 hover:bg-muted/40",
           invalid && "border-destructive/80 bg-destructive/5",
           disabled &&
             "cursor-not-allowed opacity-60 hover:bg-transparent hover:border-muted-foreground/25",
         )}
       >
         <div className="flex flex-col items-center justify-center gap-3 py-4">
-          <div className="flex size-12 items-center justify-center rounded-full border bg-background/80 shadow-xs transition-transform group-hover:scale-105">
-            <Icon className="size-6 text-muted-foreground" />
+          <div className="flex size-12 items-center justify-center rounded-xl border bg-background/80 shadow-xs transition-transform group-hover:scale-105">
+            <Icon className="size-5 text-brand" />
           </div>
 
           <div className="space-y-1">

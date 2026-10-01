@@ -16,21 +16,24 @@ function SignUpContent() {
 
     return (
         <AuthCard>
-            <AuthHeader title="Sign up" />
+            <AuthHeader
+                title="Create your account"
+                description="Start building smarter practice tests today."
+            />
+
+            <ContinueWithGoogle callbackURL="/dashboard" label="Sign up with Google" />
+
+            <OrDivider label="or continue with email" />
+
+            <SignUpForm
+                onSuccess={() => router.push("/dashboard")}
+                callbackURL="/dashboard"
+            />
 
             <AuthSwitchLink
                 prompt="Already have an account?"
                 linkText="Log in"
                 href="/signin"
-            />
-
-            <ContinueWithGoogle callbackURL="/dashboard" />
-
-            <OrDivider />
-
-            <SignUpForm
-                onSuccess={() => router.push("/dashboard")}
-                callbackURL="/dashboard"
             />
         </AuthCard>
     );

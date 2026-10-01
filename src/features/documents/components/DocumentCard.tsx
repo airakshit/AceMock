@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { colors, motion, typography } from "@/lib/design-system";
+import { colors, typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -375,10 +375,10 @@ export function DocumentCard({
     <>
       <div
         className={cn(
-          "w-full rounded-xl border border-border/80 bg-card text-card-foreground shadow-xs overflow-hidden transition-all",
+          "w-full overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-card transition-all",
           isEditing
-            ? "ring-2 ring-brand/40 border-brand/60 bg-card/95"
-            : motion.cardHover,
+            ? "border-brand/60 bg-card/95 ring-2 ring-brand/40"
+            : "hover:border-brand/25 hover:shadow-card-hover",
         )}
       >
         {/* Main horizontal content row */}

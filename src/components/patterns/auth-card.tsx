@@ -13,7 +13,7 @@ export function AuthCard({ children, className }: AuthCardProps) {
     <div
       className={cn(
         layout.stack,
-        "rounded-xl border border-border bg-card p-6 shadow-xs sm:p-7",
+        "rounded-2xl border border-border/80 bg-card p-6 shadow-card sm:p-8",
         className,
       )}
     >
@@ -38,15 +38,20 @@ export function AuthHeader({
   return (
     <header className={cn("space-y-1.5 text-center", className)}>
       {showLogo && (
-        <div className="mx-auto mb-2.5 flex size-9 items-center justify-center rounded-lg bg-foreground text-background shadow-2xs">
-          <Layers className="size-4.5 text-background" />
+        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-sm ring-1 ring-inset ring-white/20 lg:hidden">
+          <Layers className="size-5" />
         </div>
       )}
-      <h1 data-page-title className={cn(typography.pageTitle, "text-xl font-bold tracking-tight")}>
+      <h1
+        data-page-title
+        className={cn(typography.pageTitle, "text-xl font-bold tracking-tight")}
+      >
         {title}
       </h1>
       {description ? (
-        <p className={typography.sectionSubtitle}>{description}</p>
+        <p className={cn(typography.sectionSubtitle, "text-balance")}>
+          {description}
+        </p>
       ) : null}
     </header>
   );

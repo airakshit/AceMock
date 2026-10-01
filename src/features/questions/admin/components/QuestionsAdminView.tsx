@@ -9,16 +9,19 @@ export function QuestionsAdminView() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* Top Banner / Actions Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-card p-4 sm:p-5 shadow-xs">
-        <div className="space-y-1">
+      <div className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-border/80 bg-card p-4 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="relative z-10 space-y-1">
           <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-muted text-brand">
               <HelpCircle className="size-4" />
             </span>
             <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Question Authoring & Catalog
+              Question Authoring &amp; Catalog
             </h2>
-            <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-[10px] font-semibold tracking-wide uppercase">
+            <Badge
+              variant="outline"
+              className="border-brand/30 bg-brand-muted text-[10px] font-semibold tracking-wide text-brand uppercase"
+            >
               Admin Control
             </Badge>
           </div>
@@ -27,10 +30,10 @@ export function QuestionsAdminView() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="relative z-10 flex shrink-0 items-center gap-2">
           <Link
             href="/admin/questions/test"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/80 shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-2xs transition-colors hover:bg-muted/80"
           >
             <Database className="size-3.5 text-muted-foreground" />
             <span>Inspect Database Questions</span>
