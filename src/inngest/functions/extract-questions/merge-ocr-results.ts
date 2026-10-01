@@ -1,8 +1,9 @@
 import type { QuestionOption } from "@/features/questions/types";
-import type { OcrPageResult, ResolvedQuestion } from "./ocr-types";
-import { parseAndValidateStructuredOCR } from "./utils";
+import type { ResolvedQuestion } from "./types";
+import { OcrPageResult } from "../ocr-page/types";
+import { parseAndValidateStructuredOCR } from "../ocr-page/utils";
 import { QuestionMergeError } from "./errors";
-import type { StructuredSchemaParseResult } from "./schema";
+import type { StructuredSchemaParseResult } from "../ocr-page/structured-question-schema";
 
 interface MergedQuestionRecord {
   serialNo: number;

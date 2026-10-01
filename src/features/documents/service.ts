@@ -12,7 +12,7 @@ import { ServerActionError } from "../shared/actions/error";
 import { inngest } from "@/inngest/client";
 import { documentQueries } from "./repositories/document-queries";
 import { filePagesRepository } from "./repositories/file-pages.repository";
-import { EXTRACT_QUESTIONS_EVENT } from "@/inngest/functions/extract-questions/extract-questions";
+import { EXTRACT_QUESTIONS_EVENT } from "@/inngest/functions/extract-questions/func";
 
 class DocumentsService {
   async createNewDocument(
@@ -343,7 +343,11 @@ class DocumentsService {
       userId,
     );
 
-    if (!docWithPages || !docWithPages.files || docWithPages.files.length === 0) {
+    if (
+      !docWithPages ||
+      !docWithPages.files ||
+      docWithPages.files.length === 0
+    ) {
       throw new ServerActionError(
         "BAD_REQUEST",
         "Cannot process a document with no uploaded files.",
@@ -394,7 +398,10 @@ class DocumentsService {
     );
 
     if (!updatedDoc) {
-      throw new ServerActionError("NOT_FOUND", "Document not found after trigger.");
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found after trigger.",
+      );
     }
 
     return {

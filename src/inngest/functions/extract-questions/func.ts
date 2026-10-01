@@ -4,7 +4,7 @@ import { documentQueries } from "@/features/documents/repositories/document-quer
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { FullDocumentResult } from "@/features/documents/repositories/types";
 import { JsonifyObject } from "inngest/types";
-import { ocrPage } from "./ocr-page";
+
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import {
   questionsRepository,
@@ -12,8 +12,9 @@ import {
 } from "@/features/questions/repositories/questions.repository";
 import { generateUUIDv7 } from "@/features/shared/utils";
 import { mergeOcrResults } from "./merge-ocr-results";
-import type { OcrPageResult, ResolvedQuestion } from "./ocr-types";
-import { OcrPageFailedError, QuestionPersistError } from "./errors";
+import type { ResolvedQuestion } from "./types";
+import { QuestionPersistError } from "./errors";
+import { ocrPage, OcrPageResult, OcrPageFailedError } from "../ocr-page";
 
 export interface ExtractDocumentQuestionEventData {
   userId: string;

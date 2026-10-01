@@ -1,7 +1,7 @@
 import {
   StructuredSchemaParseResult,
   structuredOCRExtractionSchema,
-} from "./schema";
+} from "../ocr-page/structured-question-schema";
 
 type StructuredOCRParseResult = {
   cleanedText: string | null;
@@ -88,7 +88,7 @@ function sanitizeLatexString(val: unknown): unknown {
     .replace(/\r([a-zA-Z])/g, "\\r$1")
     .replace(
       /\n(eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim)\b/g,
-      "\\n$1"
+      "\\n$1",
     )
     .replace(/(^|[^\\])\bext\{/g, "$1\\text{");
 }
@@ -126,7 +126,10 @@ function normalizeStructuredOCR(raw: unknown): unknown {
       }
       delete cleanItem.sectionLabel;
 
-      if (cleanItem.sectionStart !== undefined && root.sectionStart === undefined) {
+      if (
+        cleanItem.sectionStart !== undefined &&
+        root.sectionStart === undefined
+      ) {
         root.sectionStart = cleanItem.sectionStart;
       }
       delete cleanItem.sectionStart;
@@ -136,7 +139,10 @@ function normalizeStructuredOCR(raw: unknown): unknown {
       }
       delete cleanItem.sectionEnd;
 
-      if (cleanItem.sectionEnds !== undefined && root.sectionEnd === undefined) {
+      if (
+        cleanItem.sectionEnds !== undefined &&
+        root.sectionEnd === undefined
+      ) {
         root.sectionEnd = cleanItem.sectionEnds;
       }
       delete cleanItem.sectionEnds;
@@ -156,9 +162,15 @@ function normalizeStructuredOCR(raw: unknown): unknown {
       if (typeof cleanItem.hint === "string") {
         cleanItem.hint = sanitizeLatexString(cleanItem.hint);
       }
-      if (cleanItem.options && typeof cleanItem.options === "object" && !Array.isArray(cleanItem.options)) {
+      if (
+        cleanItem.options &&
+        typeof cleanItem.options === "object" &&
+        !Array.isArray(cleanItem.options)
+      ) {
         const cleanOptions: Record<string, unknown> = {};
-        for (const [optKey, optVal] of Object.entries(cleanItem.options as Record<string, unknown>)) {
+        for (const [optKey, optVal] of Object.entries(
+          cleanItem.options as Record<string, unknown>,
+        )) {
           cleanOptions[optKey] = sanitizeLatexString(optVal);
         }
         cleanItem.options = cleanOptions;

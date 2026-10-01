@@ -7,18 +7,18 @@ import {
 } from "@/services/llm/prompts";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
 import { db } from "@/db";
-import type { OcrPageResult } from "./ocr-types";
+import { OcrPageResult } from "./types";
 import {
   OpenRouterLLMService,
   OpenRouterModels,
 } from "@/services/llm/openrouter.service";
 import { GeminiLLMService, GeminiModels } from "@/services/llm/gemini.service";
 import { parseAndValidateStructuredOCR } from "./utils";
-import { OcrEmptyResponseError, OcrValidationError } from "./errors";
+import { OcrValidationError, OcrEmptyResponseError } from "./errors";
 import {
   type StructuredSchemaParseResult,
   structuredOCRJsonSchema,
-} from "./schema";
+} from "./structured-question-schema";
 import { env } from "@/config/env/server";
 import { RateLimitError } from "@/services/llm/errors";
 import { RetryAfterError } from "inngest";

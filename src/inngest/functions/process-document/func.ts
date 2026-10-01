@@ -1,5 +1,5 @@
-import { inngest } from "../client";
-import { processFileBlob } from "../documents/document-preprocessing";
+import { inngest } from "../../client";
+import { processFileBlob } from "./preprocessing";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
@@ -7,7 +7,7 @@ import { documentFilesRepository } from "@/features/documents/repositories/docum
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { performance } from "node:perf_hooks";
 import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
-import { EXTRACT_QUESTIONS_EVENT } from "./extract-questions/extract-questions";
+import { EXTRACT_QUESTIONS_EVENT } from "../extract-questions/func";
 
 export interface ProcessDocumentEventData {
   userId: string;
@@ -222,4 +222,3 @@ export const processDocument = inngest.createFunction(
     };
   },
 );
-
