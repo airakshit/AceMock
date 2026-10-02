@@ -5,6 +5,7 @@
 export type QuestionSubject = "physics" | "chemistry" | "mathematics" | "english" | "general" | (string & {});
 export type QuestionMode = "exam" | "review";
 export type OptionKey = "A" | "B" | "C" | "D";
+export type QuestionDifficultyLevel = "easy" | "medium" | "hard";
 
 export type OptionType = {
   /** Always one of A | B | C | D — explicit key, not index-derived */
@@ -18,6 +19,8 @@ export type OptionType = {
 export type QuestionCardType = {
   id: string;
   subject: QuestionSubject;
+  /** Optional difficulty chip shown in the card header */
+  difficulty?: QuestionDifficultyLevel;
   /** Raw OCR / markdown text with embedded LaTeX */
   questionText: string;
   /** Always 4 options (A B C D) for MCQ */

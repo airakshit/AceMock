@@ -661,6 +661,7 @@ export function QuestionsTestView() {
             const cardData: QuestionCardType = {
               id: q.id,
               subject: (q.subjectSlug || "general").toLowerCase(),
+              difficulty: q.difficulty,
               questionText: q.question,
               options: formattedOptions,
               correctOption: (q.correctOption || "A") as OptionKey,
@@ -715,10 +716,6 @@ export function QuestionsTestView() {
                   </div>
 
                   <div className="flex items-center gap-2 font-mono text-[11px] opacity-75 shrink-0">
-                    {q.difficulty && (
-                      <span className="capitalize">{q.difficulty}</span>
-                    )}
-                    <span>•</span>
                     <span title={q.id}>ID: {q.id.slice(0, 8)}...</span>
                   </div>
                 </div>

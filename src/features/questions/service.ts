@@ -1,15 +1,30 @@
 import { db } from "@/db";
-import { CreateQuestionPayloadCommand } from "./dto/payloads";
-import { CreateQuestionResult } from "./dto/results";
+import {
+  CreateQuestionBookmarkPayloadCommand,
+  CreateQuestionPayloadCommand,
+  CreateQuestionReportPayloadCommand,
+  RemoveQuestionBookmarkPayloadCommand,
+} from "./dto/payloads";
+import {
+  CreateQuestionBookmarkResult,
+  CreateQuestionReportResult,
+  CreateQuestionResult,
+  RemoveQuestionBookmarkResult,
+} from "./dto/results";
 import {
   DocumentWithQuestionCountProjection,
   QuestionDetailsProjection,
 } from "./dto/projections";
 import { questionsRepository } from "./repositories/questions.repository";
+import { questionBookmarksRepository } from "./repositories/question-bookmarks.repository";
+import { questionReportsRepository } from "./repositories/question-reports.repository";
+import { isQuestionReportType } from "./types";
 import { storagePaths } from "@/lib/supabase/storage-paths";
-import { generateUUIDv7 } from "../shared/utils";
+import { generateUUIDv7, isValidUUID } from "../shared/utils";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
+
+const MAX_REPORT_DESCRIPTION_LENGTH = 2000;
 
 
 class QuestionsService {
@@ -158,6 +173,141 @@ class QuestionsService {
       db,
       limit,
     );
+  }
+
+  /**
+   * Bookmarks a question for the current user.
+   * Idempotent: if the bookmark already exists it is returned unchanged.
+   */
+  async createQuestionBookmark(
+    userId: string,
+    payload: CreateQuestionBookmarkPayloadCommand,
+  ): Promise<CreateQuestionBookmarkResult> {
+    this.assertValidQuestionId(payload.questionId);
+
+    const question = await questionsRepository.findById(db, payload.questionId);
+    if (!question) {
+      throw new ServerActionError("NOT_FOUND", "Question not found.");
+    }
+
+    const existing = await questionBookmarksRepository.findByUserAndQuestion(
+      db,
+      userId,
+      payload.questionId,
+    );
+
+    if (existing) {
+      return {
+        bookmarkId: existing.id,
+        questionId: existing.questionId,
+        alreadyBookmarked: true,
+      };
+    }
+
+    const bookmark = await questionBookmarksRepository.create(db, {
+      id: generateUUIDv7(),
+      userId,
+      questionId: payload.questionId,
+    });
+
+    return {
+      bookmarkId: bookmark.id,
+      questionId: bookmark.questionId,
+      alreadyBookmarked: false,
+    };
+  }
+
+  /**
+   * Removes the current user's bookmark for a question.
+   * Idempotent: returns `removed: false` when there was nothing to remove.
+   */
+  async removeQuestionBookmark(
+    userId: string,
+    payload: RemoveQuestionBookmarkPayloadCommand,
+  ): Promise<RemoveQuestionBookmarkResult> {
+    this.assertValidQuestionId(payload.questionId);
+
+    const removed = await questionBookmarksRepository.deleteByUserAndQuestion(
+      db,
+      userId,
+      payload.questionId,
+    );
+
+    return { questionId: payload.questionId, removed };
+  }
+
+  /**
+   * Records a report for a question under a predefined category.
+   * Idempotent per (user, question, report type).
+   */
+  async reportQuestion(
+    userId: string,
+    payload: CreateQuestionReportPayloadCommand,
+  ): Promise<CreateQuestionReportResult> {
+    this.assertValidQuestionId(payload.questionId);
+
+    if (!isQuestionReportType(payload.reportType)) {
+      throw new ServerActionError(
+        "BAD_REQUEST",
+        `Invalid report type "${String(payload.reportType)}".`,
+      );
+    }
+
+    const description =
+      typeof payload.description === "string" ? payload.description.trim() : "";
+
+    if (description.length > MAX_REPORT_DESCRIPTION_LENGTH) {
+      throw new ServerActionError(
+        "BAD_REQUEST",
+        `Report description must be ${MAX_REPORT_DESCRIPTION_LENGTH} characters or less.`,
+      );
+    }
+
+    const question = await questionsRepository.findById(db, payload.questionId);
+    if (!question) {
+      throw new ServerActionError("NOT_FOUND", "Question not found.");
+    }
+
+    const existing = await questionReportsRepository.findUserReport(
+      db,
+      userId,
+      payload.questionId,
+      payload.reportType,
+    );
+
+    if (existing) {
+      return {
+        reportId: existing.id,
+        questionId: existing.questionId,
+        reportType: existing.reportType,
+        alreadyReported: true,
+      };
+    }
+
+    const report = await questionReportsRepository.create(db, {
+      id: generateUUIDv7(),
+      userId,
+      questionId: payload.questionId,
+      reportType: payload.reportType,
+      description: description || null,
+    });
+
+    return {
+      reportId: report.id,
+      questionId: report.questionId,
+      reportType: report.reportType,
+      alreadyReported: false,
+    };
+  }
+
+  /** Rejects malformed ids before they reach Postgres. */
+  private assertValidQuestionId(questionId: string): void {
+    if (!questionId || !isValidUUID(questionId)) {
+      throw new ServerActionError(
+        "BAD_REQUEST",
+        "A valid question id is required.",
+      );
+    }
   }
 }
 

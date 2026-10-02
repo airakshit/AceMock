@@ -5,6 +5,7 @@ export type {
   QuestionCardProps,
   QuestionSubject,
   QuestionMode,
+  QuestionDifficultyLevel,
   OptionKey,
   OptionType,
 } from "./question-card/types";

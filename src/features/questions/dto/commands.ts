@@ -1,7 +1,7 @@
 // Contains the input for the repositories. For db operations.
 // Accessed by: services and repositories
 
-import { QuestionDifficulty, QuestionOption } from "../types";
+import { QuestionDifficulty, QuestionOption, QuestionReportType } from "../types";
 
 
 export interface CreateQuestionItemCommand {
@@ -56,4 +56,24 @@ export interface CreatePassageCommand {
  */
 export interface CreateManyPassagesCommand {
   passageContents: string[];
+}
+
+/**
+ * Command for inserting a question bookmark row.
+ */
+export interface CreateQuestionBookmarkItemCommand {
+  id: string;
+  userId: string;
+  questionId: string;
+}
+
+/**
+ * Command for inserting a question report row.
+ */
+export interface CreateQuestionReportItemCommand {
+  id: string;
+  userId: string;
+  questionId: string;
+  reportType: QuestionReportType;
+  description?: string | null;
 }
