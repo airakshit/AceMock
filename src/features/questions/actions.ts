@@ -4,3 +4,5 @@ export * from "./actions/get-recent-documents-for-filter";
 export * from "./actions/create-question-bookmark";
 export * from "./actions/remove-question-bookmark";
 export * from "./actions/report-question";
+export * from "./actions/get-bookmarked-questions";
+export * from "./actions/get-question-solution";

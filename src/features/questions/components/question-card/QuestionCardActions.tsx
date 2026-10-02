@@ -24,6 +24,12 @@ import type { QuestionReportType } from "../../types";
 
 interface QuestionCardActionsProps {
   questionId: string;
+  /**
+   * Initial bookmark state of the question. When `true` the button
+   * renders already-bookmarked on first paint and the create request is
+   * never sent (frontend boolean guard — only a remove is allowed).
+   */
+  isBookmarked?: boolean;
   className?: string;
 }
 
@@ -31,7 +37,10 @@ interface QuestionCardActionsProps {
  * Bookmark and report controls rendered in the QuestionCard header.
  *
  * - Bookmark toggles through the create/remove server actions; state only
- *   flips after a successful response (with toasts for feedback).
+ *   flips after a successful response (with toasts for feedback). The
+ *   `isBookmarked` prop seeds the state so consumers that already know
+ *   the question is saved (e.g. the bookmarks page) render the amber
+ *   filled icon immediately and skip the create request entirely.
  * - Report opens a menu built from `QUESTION_REPORT_OPTIONS` (the
  *   `question_report_type_enum` values) — every option is shown with its
  *   label and description. Options already reported for this question are
@@ -39,9 +48,10 @@ interface QuestionCardActionsProps {
  */
 export function QuestionCardActions({
   questionId,
+  isBookmarked: initialBookmarked = false,
   className,
 }: QuestionCardActionsProps) {
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(initialBookmarked);
   const [reportedTypes, setReportedTypes] = useState<QuestionReportType[]>([]);
   const [isBookmarkPending, startBookmarkTransition] = useTransition();
   const [isReportPending, startReportTransition] = useTransition();
@@ -51,6 +61,8 @@ export function QuestionCardActions({
 
     startBookmarkTransition(async () => {
       if (isBookmarked) {
+        // Frontend boolean guard: when already bookmarked, we never fall
+        // through to the create request — the toggle removes instead.
         const res = await removeQuestionBookmarkAction({ questionId });
         if (res.success) {
           setIsBookmarked(false);
@@ -109,7 +121,8 @@ export function QuestionCardActions({
         title={isBookmarked ? "Remove bookmark" : "Bookmark question"}
         className={cn(
           "text-muted-foreground hover:text-foreground",
-          isBookmarked && "text-amber-500 hover:text-amber-600",
+          isBookmarked &&
+            "bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/30 hover:bg-amber-500/15 hover:text-amber-700 dark:text-amber-500 dark:ring-amber-500/40 dark:hover:text-amber-400",
         )}
       >
         {isBookmarkPending ? (

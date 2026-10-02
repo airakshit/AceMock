@@ -3,28 +3,38 @@ import {
   CreateQuestionBookmarkPayloadCommand,
   CreateQuestionPayloadCommand,
   CreateQuestionReportPayloadCommand,
+  GetBookmarkedQuestionsPayloadCommand,
+  GetQuestionSolutionPayloadCommand,
   RemoveQuestionBookmarkPayloadCommand,
 } from "./dto/payloads";
 import {
   CreateQuestionBookmarkResult,
   CreateQuestionReportResult,
   CreateQuestionResult,
+  GetBookmarkedQuestionsResult,
+  GetQuestionSolutionResult,
   RemoveQuestionBookmarkResult,
 } from "./dto/results";
 import {
+  BookmarkedQuestionProjection,
   DocumentWithQuestionCountProjection,
   QuestionDetailsProjection,
 } from "./dto/projections";
 import { questionsRepository } from "./repositories/questions.repository";
 import { questionBookmarksRepository } from "./repositories/question-bookmarks.repository";
 import { questionReportsRepository } from "./repositories/question-reports.repository";
-import { isQuestionReportType } from "./types";
+import {
+  isQuestionReportType,
+  QuestionOptionKey,
+} from "./types";
+import { decodeBookmarkCursor, encodeBookmarkCursor } from "./utils";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7, isValidUUID } from "../shared/utils";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
 
 const MAX_REPORT_DESCRIPTION_LENGTH = 2000;
+const BOOKMARKS_PAGE_SIZE = 20;
 
 
 class QuestionsService {
@@ -116,39 +126,14 @@ class QuestionsService {
       documentId,
     );
 
-    // Collect paths to sign if they are storage paths
+    // Collect diagram paths so they can be signed in one batch
     const pathsToSign = new Set<string>();
     for (const q of rawQuestions) {
-      if (
-        q.questionDiagram &&
-        !q.questionDiagram.startsWith("http") &&
-        !q.questionDiagram.startsWith("data:")
-      ) {
-        pathsToSign.add(q.questionDiagram);
-      }
-      if (
-        q.solutionDiagram &&
-        !q.solutionDiagram.startsWith("http") &&
-        !q.solutionDiagram.startsWith("data:")
-      ) {
-        pathsToSign.add(q.solutionDiagram);
-      }
+      if (q.questionDiagram) pathsToSign.add(q.questionDiagram);
+      if (q.solutionDiagram) pathsToSign.add(q.solutionDiagram);
     }
 
-    const urlMap = new Map<string, string>();
-    if (pathsToSign.size > 0) {
-      try {
-        const signedList = await supabaseStorageClient.getPageAccessUrls(
-          Array.from(pathsToSign),
-          3600,
-        );
-        for (const item of signedList) {
-          urlMap.set(item.path, item.signedUrl);
-        }
-      } catch (err) {
-        console.error("Failed to sign question diagram URLs:", err);
-      }
-    }
+    const urlMap = await this.signStoragePaths(pathsToSign);
 
     return rawQuestions.map((q): QuestionDetailsProjection => {
       const questionDiagram = q.questionDiagram
@@ -308,6 +293,171 @@ class QuestionsService {
         "A valid question id is required.",
       );
     }
+  }
+
+  /**
+   * One cursor-paginated page of the user's bookmarked questions.
+   * Ordered by bookmark time (newest first); never uses OFFSET.
+   *
+   * By default the page carries questions + options only; requesting
+   * `includeSolution: true` additionally loads each question's correct
+   * option, solution, and signed solution diagram.
+   */
+  async getBookmarkedQuestions(
+    userId: string,
+    payload: GetBookmarkedQuestionsPayloadCommand,
+  ): Promise<GetBookmarkedQuestionsResult> {
+    const cursor = payload.cursor ? decodeBookmarkCursor(payload.cursor) : null;
+    const subjectSlug = payload.subjectSlug?.trim() || undefined;
+
+    if (
+      payload.includeSolution !== undefined &&
+      typeof payload.includeSolution !== "boolean"
+    ) {
+      throw new ServerActionError(
+        "BAD_REQUEST",
+        `"includeSolution" must be a boolean, got ${typeof payload.includeSolution}.`,
+      );
+    }
+
+    const includeSolution = payload.includeSolution === true;
+
+    // Fetch one extra row to determine whether another page exists.
+    const rows = await questionBookmarksRepository.findBookmarkedQuestions(db, {
+      userId,
+      cursor,
+      subjectSlug,
+      includeSolution,
+      limit: BOOKMARKS_PAGE_SIZE + 1,
+    });
+
+    const hasMore = rows.length > BOOKMARKS_PAGE_SIZE;
+    const page = hasMore ? rows.slice(0, BOOKMARKS_PAGE_SIZE) : rows;
+
+    // Sign question diagrams always; solution diagrams only when they
+    // will actually appear in the payload.
+    const pathsToSign: string[] = [];
+    for (const q of page) {
+      if (q.questionDiagram) pathsToSign.push(q.questionDiagram);
+      if (includeSolution && q.solutionDiagram)
+        pathsToSign.push(q.solutionDiagram);
+    }
+    const urlMap = await this.signStoragePaths(pathsToSign);
+
+    const questions = page.map((q): BookmarkedQuestionProjection => {
+      const base: BookmarkedQuestionProjection = {
+        bookmarkId: q.bookmarkId,
+        bookmarkedAt: q.bookmarkedAt,
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        marks: q.marks,
+        difficulty: q.difficulty,
+        questionDiagram: q.questionDiagram
+          ? urlMap.get(q.questionDiagram) || q.questionDiagram
+          : null,
+        hasSolution: q.hasSolution,
+        chapterName: q.chapterName,
+        sectionName: q.sectionName,
+        subjectName: q.subjectName,
+        subjectSlug: q.subjectSlug,
+      };
+
+      if (!includeSolution) return base;
+
+      return {
+        ...base,
+        correctOption: q.correctOption as QuestionOptionKey,
+        solution: q.solution,
+        solutionDiagramUrl: q.solutionDiagram
+          ? urlMap.get(q.solutionDiagram) || q.solutionDiagram
+          : null,
+      };
+    });
+
+    const lastRow = page[page.length - 1];
+    return {
+      questions,
+      hasMore,
+      nextCursor:
+        hasMore && lastRow
+          ? encodeBookmarkCursor({
+              bookmarkedAt: lastRow.bookmarkedAt,
+              bookmarkId: lastRow.bookmarkId,
+            })
+          : null,
+    };
+  }
+
+  /**
+   * Reveals the correct option and solution for one question.
+   * Gated: the question must belong to the user's bookmarks.
+   */
+  async getQuestionSolution(
+    userId: string,
+    payload: GetQuestionSolutionPayloadCommand,
+  ): Promise<GetQuestionSolutionResult> {
+    this.assertValidQuestionId(payload.questionId);
+
+    const question = await questionsRepository.findById(db, payload.questionId);
+    if (!question) {
+      throw new ServerActionError("NOT_FOUND", "Question not found.");
+    }
+
+    const bookmark = await questionBookmarksRepository.findByUserAndQuestion(
+      db,
+      userId,
+      payload.questionId,
+    );
+    if (!bookmark) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Question not found in your bookmarks.",
+      );
+    }
+
+    let solutionDiagramUrl: string | null = question.solutionDiagram;
+    if (question.solutionDiagram) {
+      const urlMap = await this.signStoragePaths([question.solutionDiagram]);
+      solutionDiagramUrl =
+        urlMap.get(question.solutionDiagram) ?? question.solutionDiagram;
+    }
+
+    return {
+      questionId: question.id,
+      correctOption: question.correctOption as QuestionOptionKey,
+      solution: question.solution,
+      solutionDiagramUrl,
+    };
+  }
+
+  /**
+   * Signs Supabase storage paths for page display. Raw http/data URLs are
+   * skipped; signing failures degrade gracefully to the raw value.
+   */
+  private async signStoragePaths(
+    paths: Iterable<string>,
+  ): Promise<Map<string, string>> {
+    const toSign = Array.from(paths).filter(
+      (path) => path && !path.startsWith("http") && !path.startsWith("data:"),
+    );
+
+    const urlMap = new Map<string, string>();
+    if (toSign.length === 0) return urlMap;
+
+    try {
+      const signedList = await supabaseStorageClient.getPageAccessUrls(
+        toSign,
+        3600,
+      );
+      for (const item of signedList) {
+        urlMap.set(item.path, item.signedUrl);
+      }
+    } catch (err) {
+      console.error("Failed to sign question diagram URLs:", err);
+    }
+
+    return urlMap;
   }
 }
 

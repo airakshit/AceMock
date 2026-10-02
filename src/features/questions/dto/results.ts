@@ -1,8 +1,12 @@
 // Contains the payload for result of server action or service.
 
 import { SignedUrlResponseObject } from "@/features/shared/storage-service";
-import { DocumentWithQuestionCountProjection, QuestionDetailsProjection } from "./projections";
-import { QuestionReportType } from "../types";
+import {
+  BookmarkedQuestionProjection,
+  DocumentWithQuestionCountProjection,
+  QuestionDetailsProjection,
+} from "./projections";
+import { QuestionOptionKey, QuestionReportType } from "../types";
 
 /**
  * Service result for creating a question, returning the generated question ID
@@ -57,4 +61,27 @@ export interface CreateQuestionReportResult {
   questionId: string;
   reportType: QuestionReportType;
   alreadyReported: boolean;
+}
+
+/**
+ * One cursor-paginated page of bookmarked questions.
+ * `nextCursor` is null once the list is exhausted; it must be passed
+ * back verbatim to fetch the following page.
+ */
+export interface GetBookmarkedQuestionsResult {
+  questions: BookmarkedQuestionProjection[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/**
+ * Revealed solution for a single bookmarked question — includes the
+ * correct option and any written solution / solution diagram.
+ */
+export interface GetQuestionSolutionResult {
+  questionId: string;
+  correctOption: QuestionOptionKey;
+  solution: string | null;
+  /** Signed URL for the solution diagram, when one exists. */
+  solutionDiagramUrl: string | null;
 }

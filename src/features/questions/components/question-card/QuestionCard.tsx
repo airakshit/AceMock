@@ -1,12 +1,13 @@
 "use client";
 
-import { Lightbulb } from "lucide-react";
+import { Eye, EyeOff, Lightbulb, Loader2 } from "lucide-react";
 import { RichContent } from "./rendering/RichContent";
 import { OptionsList } from "./OptionsList";
 import { SubjectTag } from "./SubjectTag";
 import { DifficultyTag } from "./DifficultyTag";
 import { DiagramViewer } from "./DiagramViewer";
 import { QuestionCardActions } from "./QuestionCardActions";
+import { Button } from "@/components/ui/button";
 import type { QuestionCardProps } from "./types";
 
 /**
@@ -19,9 +20,16 @@ import type { QuestionCardProps } from "./types";
  * Parent owns the selected-answer state via `selectedAnswer` + `onAnswerChange`.
  * Bookmark / report controls keep their own state (see QuestionCardActions).
  *
+ * The footer solution controls only appear when `solutionControls` is
+ * provided — the bookmarks page opts in; mock/test views never do, so
+ * answers cannot be revealed there. The footer shows "View solution"
+ * until the data is in memory, then toggles "Hide/Show solution" —
+ * hiding keeps the loaded data, so re-showing never re-fetches.
+ *
  * Layout:
  *   header  — [Q#] [subject] [difficulty] · [marks] │ [bookmark] [report]
  *   body    — question text, diagram, options, and (review) explanation
+ *   footer  — [View/Hide/Show solution] (opt-in consumers only)
  */
 export function QuestionCard({
   question,
@@ -29,6 +37,8 @@ export function QuestionCard({
   mode,
   selectedAnswer,
   onAnswerChange,
+  isBookmarked = false,
+  solutionControls,
 }: QuestionCardProps) {
   const {
     id,
@@ -86,7 +96,7 @@ export function QuestionCard({
             <div className="h-4 w-px bg-border" aria-hidden="true" />
           )}
 
-          <QuestionCardActions questionId={id} />
+          <QuestionCardActions questionId={id} isBookmarked={isBookmarked} />
         </div>
       </header>
 
@@ -111,24 +121,80 @@ export function QuestionCard({
           onAnswerChange={onAnswerChange}
         />
 
-        {/* Explanation & Solution Working (review mode only) */}
-        {mode === "review" && (explanation || solutionDiagramUrl) && (
-          <section className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-            <div className="flex items-center gap-1.5">
-              <Lightbulb className="size-4 text-amber-500" />
-              <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                {explanation ? "Explanation" : "Solution"}
-              </h4>
-            </div>
-            {explanation && <RichContent text={explanation} className="text-sm" />}
-            <DiagramViewer
-              url={solutionDiagramUrl}
-              alt="Solution working"
-              label="Solution Working"
-            />
-          </section>
-        )}
+        {/* Explanation & Solution Working (review mode only).
+            When a solution was loaded but is empty, show N/A instead of
+            silently hiding the section (bookmarks page). */}
+        {mode === "review" &&
+          (explanation || solutionDiagramUrl || solutionControls?.isLoaded) && (
+            <section className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <div className="flex items-center gap-1.5">
+                <Lightbulb className="size-4 text-amber-500" />
+                <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                  {explanation ? "Explanation" : "Solution"}
+                </h4>
+              </div>
+              {explanation ? (
+                <RichContent text={explanation} className="text-sm" />
+              ) : (
+                !solutionDiagramUrl && (
+                  <p className="text-sm font-medium text-muted-foreground">N/A</p>
+                )
+              )}
+              <DiagramViewer
+                url={solutionDiagramUrl}
+                alt="Solution working"
+                label="Solution Working"
+              />
+            </section>
+          )}
       </div>
+
+      {/* ─── Footer: opt-in solution controls (bookmarks page only) ─── */}
+      {solutionControls && (
+        <footer className="flex items-center justify-end border-t bg-muted/20 px-4 py-2.5 sm:px-5">
+          {!solutionControls.isLoaded ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={solutionControls.onView}
+              disabled={solutionControls.isLoading}
+              className="gap-1.5 text-xs font-medium"
+            >
+              {solutionControls.isLoading ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Lightbulb className="size-3.5 text-amber-500" />
+              )}
+              {solutionControls.isLoading
+                ? "Loading solution..."
+                : "View solution"}
+            </Button>
+          ) : solutionControls.isVisible ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={solutionControls.onHide}
+              className="gap-1.5 text-xs font-medium"
+            >
+              <EyeOff className="size-3.5" />
+              Hide solution
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={solutionControls.onShow}
+              className="gap-1.5 text-xs font-medium"
+            >
+              <Eye className="size-3.5" />
+              Show solution
+            </Button>
+          )}
+        </footer>
+      )}
     </article>
   );
 }

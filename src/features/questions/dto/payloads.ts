@@ -57,3 +57,28 @@ export interface CreateQuestionReportPayloadCommand {
     /** Optional free-text detail, surfaced to admins reviewing the report. */
     description?: string;
 }
+
+/**
+ * Payload for one cursor-paginated page of the user's bookmarked questions.
+ * `cursor` is the opaque token returned by the previous page — there is no
+ * limit/offset anywhere in the flow.
+ */
+export interface GetBookmarkedQuestionsPayloadCommand {
+    cursor?: string;
+    /** Subject slug filter; omitted/empty means all subjects. */
+    subjectSlug?: string;
+    /**
+     * Load toggle: `true` returns each question together with its correct
+     * option and solution; omitted/false (the default) returns questions
+     * + options only.
+     */
+    includeSolution?: boolean;
+}
+
+/**
+ * Payload for revealing the solution (and correct option) of a single
+ * bookmarked question.
+ */
+export interface GetQuestionSolutionPayloadCommand {
+    questionId: string;
+}

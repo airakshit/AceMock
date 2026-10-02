@@ -1,4 +1,5 @@
 import {
+  Bookmark,
   ClipboardList,
   HelpCircle,
   LayoutDashboard,
@@ -22,6 +23,11 @@ export const APP_NAV_ITEMS: NavItem[] = [
     title: "Documents",
     href: "/documents",
     icon: SlidersHorizontal,
+  },
+  {
+    title: "Bookmarks",
+    href: "/bookmarks",
+    icon: Bookmark,
   },
 ];
 

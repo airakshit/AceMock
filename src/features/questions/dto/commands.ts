@@ -1,7 +1,11 @@
 // Contains the input for the repositories. For db operations.
 // Accessed by: services and repositories
 
-import { QuestionDifficulty, QuestionOption, QuestionReportType } from "../types";
+import {
+  QuestionDifficulty,
+  QuestionOption,
+  QuestionReportType,
+} from "../types";
 
 
 export interface CreateQuestionItemCommand {
@@ -76,4 +80,29 @@ export interface CreateQuestionReportItemCommand {
   questionId: string;
   reportType: QuestionReportType;
   description?: string | null;
+}
+
+/**
+ * Decoded keyset position for bookmark pagination — (bookmarkedAt, id)
+ * of the last row on the previous page. Ordering is
+ * `createdAt DESC, id DESC`, so the cursor predicate is
+ * `(created_at, id) < (cursor.bookmarkedAt, cursor.bookmarkId)`.
+ */
+export interface BookmarkCursor {
+  bookmarkedAt: Date;
+  bookmarkId: string;
+}
+
+/**
+ * Repository query command for one page of a user's bookmarked questions.
+ * `includeSolution` controls whether the raw solution columns (correct
+ * option, solution, solution diagram) are selected at all — solution
+ * loading is never a row filter, so ordering/cursors stay identical.
+ */
+export interface GetBookmarkedQuestionsQueryCommand {
+  userId: string;
+  cursor: BookmarkCursor | null;
+  subjectSlug?: string;
+  includeSolution: boolean;
+  limit: number;
 }

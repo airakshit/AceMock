@@ -25,8 +25,13 @@ export type QuestionCardType = {
   questionText: string;
   /** Always 4 options (A B C D) for MCQ */
   options: OptionType[];
-  /** Authoritative correct answer key */
-  correctOption: OptionKey;
+  /**
+   * Authoritative correct answer key. Optional because some consumers
+   * (e.g. the bookmarks page) only receive it after an explicit
+   * "View solution" request — until then the card renders exam-style
+   * and never reveals an answer.
+   */
+  correctOption?: OptionKey;
   /** Shown only in review mode */
   explanation?: string;
   marks?: number;
@@ -44,4 +49,33 @@ export type QuestionCardProps = {
   /** Parent owns selected-answer state — fully controlled */
   selectedAnswer: OptionKey | null;
   onAnswerChange: (key: OptionKey) => void;
+  /**
+   * Whether the question is already bookmarked. Controls the bookmark
+   * button's initial visual state (amber, filled icon) and acts as a
+   * frontend guard so no create request is sent when it is already
+   * bookmarked. The bookmarks page passes `true`.
+   */
+  isBookmarked?: boolean;
+  /**
+   * Bookmarks-page-only solution controls. When omitted — as in mock
+   * tests — no solution buttons are ever rendered and no solution data
+   * reaches the card.
+   *
+   * - `isLoaded`: solution data is in memory (fetched on demand, or
+   *   loaded with the page when it was requested with
+   *   `includeSolution: true`).
+   * - `isVisible`: the loaded solution is currently revealed (grading +
+   *   explanation panel). Hiding keeps `isLoaded` true, so re-showing
+   *   never issues another request.
+   * - `isLoading`: a solution fetch is in flight.
+   * - `onView` / `onHide` / `onShow`: footer button callbacks.
+   */
+  solutionControls?: {
+    isLoaded: boolean;
+    isVisible: boolean;
+    isLoading: boolean;
+    onView: () => void;
+    onHide: () => void;
+    onShow: () => void;
+  };
 };

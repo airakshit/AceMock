@@ -8,7 +8,9 @@ import type { OptionKey, OptionType, QuestionMode } from "./types";
 
 interface OptionsListProps {
   options: OptionType[];
-  correctOption: OptionKey;
+  /** May be absent pre-solution (bookmarks page) — review highlighting
+   *  only activates once it is known. */
+  correctOption?: OptionKey;
   mode: QuestionMode;
   selectedAnswer: OptionKey | null;
   onAnswerChange: (key: OptionKey) => void;
@@ -24,11 +26,13 @@ type OptionState =
 
 function getOptionState(
   key: OptionKey,
-  correctOption: OptionKey,
+  correctOption: OptionKey | undefined,
   selectedAnswer: OptionKey | null,
   mode: QuestionMode,
 ): OptionState {
-  if (mode === "exam") {
+  // Without a known correct answer there is nothing to grade against —
+  // fall back to plain selected/unselected rendering.
+  if (mode !== "review" || !correctOption) {
     return selectedAnswer === key ? "selected" : "default";
   }
 

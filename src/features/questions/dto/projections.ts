@@ -3,7 +3,7 @@
 
 // Accessed by: services and repositories
 
-import { QuestionDifficulty, QuestionOption } from "../types";
+import { QuestionDifficulty, QuestionOption, QuestionOptionKey } from "../types";
 
 /**
  * Base read model projection representing a row in the `questions` table.
@@ -100,4 +100,67 @@ export interface PassageProjection {
   content: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Read model projection for one bookmarked question (cursor-paginated
+ * bookmarks page).
+ *
+ * `correctOption` / `solution` / `solutionDiagramUrl` are only populated
+ * when the page is explicitly requested with `includeSolution: true`;
+ * by default the list carries questions and options only.
+ */
+export interface BookmarkedQuestionProjection {
+  /** Bookmark row id — also the keyset tie-breaker for pagination. */
+  bookmarkId: string;
+  /** When the question was bookmarked — the keyset sort key. */
+  bookmarkedAt: Date;
+  id: string;
+  question: string;
+  options: QuestionOption[] | unknown;
+  marks: number;
+  difficulty: QuestionDifficulty;
+  /** Signed URL after the service signs storage paths. */
+  questionDiagram: string | null;
+  /** Whether a written solution exists (drives the solution badge). */
+  hasSolution: boolean;
+  chapterName: string | null;
+  sectionName: string | null;
+  subjectName: string | null;
+  subjectSlug: string | null;
+  /** Present only when solutions were loaded with this page. */
+  correctOption?: QuestionOptionKey;
+  /** Present only when solutions were loaded with this page. */
+  solution?: string | null;
+  /** Signed URL; present only when solutions were loaded with this page. */
+  solutionDiagramUrl?: string | null;
+}
+
+/**
+ * Raw db row returned by `findBookmarkedQuestions`. Carries the solution
+ * columns for the service to conditionally project — never serialized to
+ * clients directly. When the query ran with `includeSolution: false`
+ * those columns are selected as NULL, so they must be read as nullable.
+ */
+export interface BookmarkedQuestionRow {
+  bookmarkId: string;
+  bookmarkedAt: Date;
+  id: string;
+  question: string;
+  options: QuestionOption[] | unknown;
+  marks: number;
+  difficulty: QuestionDifficulty;
+  questionDiagram: string | null;
+  /** Whether a written solution exists — always real, never a NULL fill. */
+  hasSolution: boolean;
+  /** char(1) A-D when `includeSolution` was true, otherwise NULL. */
+  correctOption: string | null;
+  /** NULL when no solution exists — or when `includeSolution` was false. */
+  solution: string | null;
+  /** Raw storage path (NULL when absent / not included); signed by the service. */
+  solutionDiagram: string | null;
+  chapterName: string | null;
+  sectionName: string | null;
+  subjectName: string | null;
+  subjectSlug: string | null;
 }
