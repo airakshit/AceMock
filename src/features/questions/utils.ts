@@ -6,10 +6,8 @@ import type { BookmarkCursor } from "./dto/commands";
 
 /**
  * Encodes a keyset position into an opaque, URL-safe cursor token.
- *
+ * opaque-string: means internal structure is intentionally hidden for api consumers.
  * Format: base64url("<ISO-8601>_<bookmarkId>") — versioned by structure
- * rather than an explicit prefix; `decodeBookmarkCursor` validates both
- * halves and rejects anything malformed with BAD_REQUEST.
  */
 export function encodeBookmarkCursor(cursor: BookmarkCursor): string {
   const raw = `${cursor.bookmarkedAt.toISOString()}_${cursor.bookmarkId}`;

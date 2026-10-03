@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import remarkBreaks from "remark-breaks";
@@ -18,6 +18,7 @@ import {
   wrapMultiDigitScripts,
   type NormalizeOptions,
 } from "./latexNormalize";
+import { registerCopyRoot } from "./clean-copy";
 
 export interface RichContentProps {
   /** Raw OCR / markdown text with embedded LaTeX ($...$, $$...$$, \ce{}) */
@@ -130,7 +131,6 @@ class RichContentErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: unknown, info: React.ErrorInfo) {
-    // eslint-disable-next-line no-console
     console.error("RichContent: markdown render failed", error, info);
   }
 
@@ -155,6 +155,16 @@ function RichContentBase({
 }: RichContentProps) {
   const remarkPlugins = useMemo(() => [remarkMath, remarkBreaks], []);
 
+  // Copying inside this content must yield clean text with formulas as
+  // LaTeX source (see ./clean-copy.ts). Keyed on `text` because the root
+  // div only exists while there is text to render.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => registerCopyRoot(rootRef.current), [text]);
+
+  // normalizeOptions is a plain object; compare by value so callers can
+  // pass an inline literal without defeating memoization.
+  const normalizeKey = JSON.stringify(normalizeOptions ?? {});
+
   const formattedContent = useMemo(() => {
     if (!text) return text;
     try {
@@ -164,17 +174,14 @@ function RichContentBase({
       // on an unexpected OCR edge case. (normalizeMathAndChemistry already
       // isolates its own internal stages, so this only catches something
       // truly unexpected — e.g. a bad options object.)
-      // eslint-disable-next-line no-console
       console.error(
         "RichContent: normalization failed, rendering raw text",
         err,
       );
       return text;
     }
-    // normalizeOptions is a plain object; compare by value so callers can
-    // pass an inline literal without defeating memoization.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, JSON.stringify(normalizeOptions ?? {})]);
+  }, [text, normalizeKey]);
 
   const components = useMemo(
     () => ({
@@ -215,7 +222,7 @@ function RichContentBase({
   }
 
   return (
-    <div className={["rich-content", className].filter(Boolean).join(" ")}>
+    <div ref={rootRef} className={["rich-content", className].filter(Boolean).join(" ")}>
       <RichContentErrorBoundary fallbackText={text}>
         <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
           {formattedContent}

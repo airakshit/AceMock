@@ -328,6 +328,18 @@
   font-size: 1.35em;
 }
 
+/* ── Clean copy fallback ──
+   KaTeX renders a visually hidden MathML mirror next to the visible
+   glyph tree; browsers still serialize it when copying, duplicating
+   every formula. Keep it out of text selections so even copies that
+   bypass the clean-copy handler (rendering/clean-copy.ts) stay clean.
+   Specificity beats katex.min.css's `.katex .katex-mathml`, which
+   loads after globals.css. */
+span.katex > .katex-mathml {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* ── KaTeX global overrides ──
    \dfrac is used in preprocessing, but some residual \frac may slip through.
    These overrides raise the floor on KaTeX's internal sizing resets. */
