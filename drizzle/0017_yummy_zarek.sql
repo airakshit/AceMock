@@ -1,0 +1,1 @@
+ALTER TABLE "mock_attempt_answers" ADD CONSTRAINT "mock_attempt_answers_attempt_id_question_id_unique" UNIQUE("attempt_id","question_id");
