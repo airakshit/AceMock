@@ -1,6 +1,7 @@
 import {
   boolean,
   check,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -56,8 +57,14 @@ export const mockTests = pgTable(
       .notNull()
       .default(0),
     durationSeconds: integer("duration_seconds").notNull(),
+    /** Attempts a student may take; 0 = unlimited. */
     maxAttempts: integer("max_attempts").notNull().default(1),
-    allowUntimed: boolean("allow_untimed").notNull().default(true),
+    /**
+     * When true the attempt runs without a countdown or auto-submit.
+     * Defaults to false (timed) so a test stays an exam unless the admin
+     * explicitly opts into untimed practice.
+     */
+    allowUntimed: boolean("allow_untimed").notNull().default(false),
     instructions: text("instructions"),
 
     createdAt: timestamp("created_at", {
@@ -111,6 +118,36 @@ export const mockTests = pgTable(
           AND ${table.chapterId} IS NOT NULL
         )
       `,
+    ),
+
+    // Search + keyset pagination (ORDER BY created_at DESC, id DESC).
+    // Every composite index leads with the filter column so a filtered page
+    // can be read straight off the index in cursor order.
+    index("mock_tests_created_at_id_idx").on(table.createdAt, table.id),
+    index("mock_tests_scope_created_at_id_idx").on(
+      table.scope,
+      table.createdAt,
+      table.id,
+    ),
+    index("mock_tests_by_admin_created_at_id_idx").on(
+      table.byAdmin,
+      table.createdAt,
+      table.id,
+    ),
+    index("mock_tests_subject_id_created_at_id_idx").on(
+      table.subjectId,
+      table.createdAt,
+      table.id,
+    ),
+    index("mock_tests_section_id_created_at_id_idx").on(
+      table.sectionId,
+      table.createdAt,
+      table.id,
+    ),
+    index("mock_tests_chapter_id_created_at_id_idx").on(
+      table.chapterId,
+      table.createdAt,
+      table.id,
     ),
   ],
 );

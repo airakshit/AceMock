@@ -134,6 +134,20 @@
       "when": 1791106898336,
       "tag": "0018_public_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791111680948,
+      "tag": "0019_sturdy_penance",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791114771795,
+      "tag": "0020_thin_blazing_skull",
+      "breakpoints": true
     }
   ]
 }
