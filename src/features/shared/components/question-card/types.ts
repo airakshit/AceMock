@@ -1,8 +1,15 @@
 // Display-layer types for the QuestionCard component.
 // These are separate from the DB-layer QuestionDTO in ../types.ts.
 // The parent is responsible for mapping from QuestionDTO → QuestionCardType.
+import type { questionReportTypeEnum } from "@/db/schemas";
 
-export type QuestionSubject = "physics" | "chemistry" | "mathematics" | "english" | "general" | (string & {});
+export type QuestionSubject =
+  | "physics"
+  | "chemistry"
+  | "mathematics"
+  | "english"
+  | "general"
+  | (string & {});
 export type QuestionMode = "exam" | "review";
 export type OptionKey = "A" | "B" | "C" | "D";
 export type QuestionDifficultyLevel = "easy" | "medium" | "hard";
@@ -14,6 +21,13 @@ export type OptionType = {
   content: string;
   /** Only inspected in review mode. Never leaked in exam mode. */
   isCorrect?: boolean;
+};
+
+export type PassageType = {
+  id: string;
+  content: string;
+  /** Question positions (1-based) in the test that belong to this passage. */
+  questionPositions: number[];
 };
 
 export type QuestionCardType = {
@@ -40,6 +54,8 @@ export type QuestionCardType = {
   diagramUrl?: string | null;
   /** Signed URL for solution working image (from solution_diagram_url column) */
   solutionDiagramUrl?: string | null;
+  /** Optional reading passage linked to this question. */
+  passage?: PassageType | null;
 };
 
 export type QuestionCardProps = {
@@ -79,3 +95,74 @@ export type QuestionCardProps = {
     onShow: () => void;
   };
 };
+
+/**
+ * Report category for a question.
+ * Derived from the `question_report_type_enum` Postgres enum so the
+ * server, service layer, and UI always agree on the valid values.
+ */
+export type QuestionReportType =
+  (typeof questionReportTypeEnum.enumValues)[number];
+
+/**
+ * Display metadata for a single report category — a human readable
+ * label plus the description shown beneath it in the report menu.
+ */
+export interface QuestionReportOption {
+  value: QuestionReportType;
+  label: string;
+  description: string;
+}
+
+/**
+ * Every report option (with its description) for the UI, keyed by the
+ * `question_report_type_enum` values. Declared as `Record` so that adding
+ * a new enum value without a matching entry fails type-checking.
+ */
+const QUESTION_REPORT_OPTION_META = {
+  invalid_question: {
+    label: "Invalid question",
+    description: "The question text is wrong, unclear, or doesn't make sense.",
+  },
+  invalid_options: {
+    label: "Invalid options",
+    description:
+      "An answer choice is duplicated, missing, or clearly not valid.",
+  },
+  invalid_solution: {
+    label: "Invalid solution",
+    description: "The provided solution or explanation is incorrect.",
+  },
+  incomplete_solution: {
+    label: "Incomplete solution",
+    description: "The solution is correct but missing steps or reasoning.",
+  },
+  rendering_error: {
+    label: "Rendering error",
+    description: "Text, LaTeX, images, or diagrams don't display properly.",
+  },
+  other: {
+    label: "Other",
+    description: "Something else that isn't covered by the options above.",
+  },
+} as const satisfies Record<
+  QuestionReportType,
+  { label: string; description: string }
+>;
+
+/** Report options in menu order, ready for display. */
+export const QUESTION_REPORT_OPTIONS: readonly QuestionReportOption[] =
+  Object.entries(QUESTION_REPORT_OPTION_META).map(([value, meta]) => ({
+    value: value as QuestionReportType,
+    ...meta,
+  }));
+
+/** Runtime guard for untrusted server-action input. */
+export function isQuestionReportType(
+  value: unknown,
+): value is QuestionReportType {
+  return (
+    typeof value === "string" &&
+    QUESTION_REPORT_OPTIONS.some((option) => option.value === value)
+  );
+}

@@ -9,3 +9,17 @@ export interface CreateMockTestFromDocumentsPayload {
   instructions?: string;
   customTotalMarks?: number;
 }
+
+export interface StartMockAttemptPayload {
+  mockTestId: string;
+}
+
+export interface SubmitAnswerPayload {
+  attemptId: string;
+  questionId: string;
+  selectedOption: "A" | "B" | "C" | "D";
+}
+
+export interface CompleteAttemptPayload {
+  attemptId: string;
+}

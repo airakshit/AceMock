@@ -5,45 +5,35 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import {
-  AlertTriangle,
   CheckCircle2,
-  HelpCircle,
   Lightbulb,
   Loader2,
   PlusCircle,
   RotateCcw,
-  Sparkles,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { cn } from "@/lib/utils";
-import { layout } from "@/lib/design-system";
 import {
-  questionFormSchema,
-  type QuestionFormData,
-} from "../schemas";
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { questionFormSchema } from "./schemas";
+import { QuestionFormData } from "./types";
 import type {
   CreateQuestionFileCommand,
   CreateQuestionPayloadCommand,
-} from "../dto/payloads";
-import type { CreateQuestionResult } from "../dto/results";
-import { createQuestionAction } from "../actions/create-question";
+} from "../../../dto/payloads";
+import type { CreateQuestionResult } from "../../../dto/results";
+import { createQuestionAction } from "../../../actions/create-question";
 import { ServerActionResult } from "@/features/shared/actions/types";
-import { useQuestionUploader } from "../uploads/use-question-uploader";
+import { useQuestionUploader } from "../../../uploads/use-question-uploader";
 import { CurriculumSelector } from "./CurriculumSelector";
 import { OptionsEditor } from "./OptionsEditor";
 import { QuestionImagePicker } from "./QuestionImagePicker";
-import { QuestionDifficulty, QuestionOptionKey } from "../types";
+import { QuestionDifficulty, QuestionOptionKey } from "../../../types";
 
 interface QuestionFormProps {
   onSubmitAction?: (
@@ -208,7 +198,8 @@ export function QuestionForm({
             </h3>
           </div>
           <p className="text-sm text-muted-foreground">
-            Add a multiple-choice question with diagram, 4 options, and detailed solution.
+            Add a multiple-choice question with diagram, 4 options, and detailed
+            solution.
           </p>
         </div>
 
@@ -225,7 +216,10 @@ export function QuestionForm({
         </Button>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 sm:p-6 space-y-6">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="p-4 sm:p-6 space-y-6"
+      >
         {/* 1. Curriculum (Subject, Section, Chapter) */}
         <section className="rounded-xl border bg-background/50 p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -242,9 +236,15 @@ export function QuestionForm({
             sectionSlug={sectionSlug}
             chapterSlug={chapterSlug}
             disabled={isBusy}
-            onSubjectChange={(val) => form.setValue("subjectSlug", val, { shouldValidate: true })}
-            onSectionChange={(val) => form.setValue("sectionSlug", val, { shouldValidate: true })}
-            onChapterChange={(val) => form.setValue("chapterSlug", val, { shouldValidate: true })}
+            onSubjectChange={(val) =>
+              form.setValue("subjectSlug", val, { shouldValidate: true })
+            }
+            onSectionChange={(val) =>
+              form.setValue("sectionSlug", val, { shouldValidate: true })
+            }
+            onChapterChange={(val) =>
+              form.setValue("chapterSlug", val, { shouldValidate: true })
+            }
             errors={{
               subject: form.formState.errors.subjectSlug?.message,
               section: form.formState.errors.sectionSlug?.message,
@@ -261,7 +261,10 @@ export function QuestionForm({
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid} className="min-w-0">
                 <div className="flex items-center justify-between">
-                  <FieldLabel htmlFor="question" className="text-sm font-semibold">
+                  <FieldLabel
+                    htmlFor="question"
+                    className="text-sm font-semibold"
+                  >
                     Question Statement *
                   </FieldLabel>
                   <span className="text-xs text-muted-foreground">
@@ -295,10 +298,14 @@ export function QuestionForm({
               description="PNG, JPG, or SVG up to 10 MB"
               value={diagramFile}
               disabled={isBusy}
-              onChange={(val) => form.setValue("diagramFile", val, { shouldValidate: true })}
+              onChange={(val) =>
+                form.setValue("diagramFile", val, { shouldValidate: true })
+              }
               onFileAdded={(item) => addFile(item)}
               onFileRemoved={(id) => removeFile(id)}
-              uploadState={diagramFile ? uploadStates[diagramFile.clientFileId] : undefined}
+              uploadState={
+                diagramFile ? uploadStates[diagramFile.clientFileId] : undefined
+              }
             />
           </div>
         </section>
@@ -367,7 +374,10 @@ export function QuestionForm({
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="difficulty" className="text-sm font-semibold">
+                <FieldLabel
+                  htmlFor="difficulty"
+                  className="text-sm font-semibold"
+                >
                   Difficulty Level
                 </FieldLabel>
                 <NativeSelect
@@ -462,7 +472,11 @@ export function QuestionForm({
             description="PNG, JPG, or SVG up to 10 MB"
             value={solutionDiagramFile}
             disabled={isBusy}
-            onChange={(val) => form.setValue("solutionDiagramFile", val, { shouldValidate: true })}
+            onChange={(val) =>
+              form.setValue("solutionDiagramFile", val, {
+                shouldValidate: true,
+              })
+            }
             onFileAdded={(item) => addFile(item)}
             onFileRemoved={(id) => removeFile(id)}
             uploadState={

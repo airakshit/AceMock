@@ -1,6 +1,8 @@
 "use client";
 
-import { Eye, EyeOff, Lightbulb, Loader2 } from "lucide-react";
+import React from "react";
+import { Eye, EyeOff, Lightbulb, Loader2, BookOpen, ChevronDown } from "lucide-react";
+
 import { RichContent } from "./rendering/RichContent";
 import { OptionsList } from "./OptionsList";
 import { SubjectTag } from "./SubjectTag";
@@ -8,7 +10,51 @@ import { DifficultyTag } from "./DifficultyTag";
 import { DiagramViewer } from "./DiagramViewer";
 import { QuestionCardActions } from "./QuestionCardActions";
 import { Button } from "@/components/ui/button";
-import type { QuestionCardProps } from "./types";
+import { cn } from "@/lib/utils";
+import type { QuestionCardProps, PassageType } from "./types";
+
+/** Collapsible passage panel for reading comprehension questions. */
+function PassagePanel({ passage }: { passage: PassageType }) {
+  const [isExpanded, setIsExpanded] = React.useState(true);
+
+  const range =
+    passage.questionPositions.length > 1
+      ? `Questions ${passage.questionPositions[0]}–${passage.questionPositions[passage.questionPositions.length - 1]}`
+      : passage.questionPositions.length === 1
+        ? `Question ${passage.questionPositions[0]}`
+        : "";
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-card mb-4">
+      <button
+        type="button"
+        onClick={() => setIsExpanded((prev) => !prev)}
+        aria-expanded={isExpanded}
+        className="flex w-full items-center justify-between gap-2 border-b border-border/60 bg-muted/40 px-4 py-2.5 text-left transition-colors hover:bg-muted/60"
+      >
+        <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
+          <BookOpen className="size-4 text-primary" />
+          Passage
+          {range && (
+            <span className="font-normal text-muted-foreground">· {range}</span>
+          )}
+        </span>
+        <ChevronDown
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform",
+            !isExpanded && "-rotate-90",
+          )}
+        />
+      </button>
+
+      {isExpanded && (
+        <div className="px-4 py-3">
+          <RichContent text={passage.content} className="text-sm leading-relaxed text-foreground/90" />
+        </div>
+      )}
+    </section>
+  );
+}
 
 /**
  * QuestionCard — fully controlled MCQ question renderer.
@@ -28,7 +74,7 @@ import type { QuestionCardProps } from "./types";
  *
  * Layout:
  *   header  — [Q#] [subject] [difficulty] · [marks] │ [bookmark] [report]
- *   body    — question text, diagram, options, and (review) explanation
+ *   body    — passage (optional), question text, diagram, options, and (review) explanation
  *   footer  — [View/Hide/Show solution] (opt-in consumers only)
  */
 export function QuestionCard({
@@ -52,6 +98,7 @@ export function QuestionCard({
     negativeMarks,
     diagramUrl,
     solutionDiagramUrl,
+    passage,
   } = question;
 
   const hasMarks = (marks != null && marks > 0) || (negativeMarks != null && negativeMarks > 0);
@@ -102,6 +149,9 @@ export function QuestionCard({
 
       {/* ─── Body ─── */}
       <div className="space-y-5 p-4 sm:p-6">
+        {/* Passage (optional) */}
+        {passage && <PassagePanel passage={passage} />}
+
         {/* Question text + optional diagram */}
         <div className="space-y-4">
           <RichContent text={questionText} className="text-base leading-relaxed" />

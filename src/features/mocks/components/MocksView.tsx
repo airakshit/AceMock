@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, RefreshCw, Search, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ClipboardList, History, RefreshCw, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { MockTestCard } from "@/components/patterns/mock-test-card";
 import { SearchInput } from "@/components/patterns/search-input";
@@ -46,6 +47,7 @@ function MockTestsSkeleton() {
 }
 
 export function MocksView({ initialTests = [] }: MocksViewProps) {
+  const router = useRouter();
   const [tests, setTests] = useState<MockTestListItemProjection[]>(initialTests);
   const [isLoading, setIsLoading] = useState(initialTests.length === 0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -85,7 +87,7 @@ export function MocksView({ initialTests = [] }: MocksViewProps) {
   }, [tests, searchQuery]);
 
   const handleStartTest = (testId: string) => {
-    toast.info("Exam taking simulation session is coming up in the next phase!");
+    router.push(`/mocks/${testId}/attempt`);
   };
 
   return (
@@ -101,6 +103,16 @@ export function MocksView({ initialTests = [] }: MocksViewProps) {
         />
 
         <div className="flex items-center justify-between gap-2 sm:justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/mocks/history")}
+            className="h-8 gap-1.5 text-xs"
+          >
+            <History />
+            My History
+          </Button>
+
           <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground tabular-nums">
             {filteredTests.length}{" "}
             {filteredTests.length === 1 ? "test" : "tests"}

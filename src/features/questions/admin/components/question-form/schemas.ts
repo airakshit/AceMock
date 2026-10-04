@@ -77,6 +77,3 @@ export const questionFormSchema = z
       path: ["solution"],
     },
   );
-
-export type QuestionFormData = z.infer<typeof questionFormSchema>;
-export type QuestionImageFile = z.infer<typeof imageFileSchema>;

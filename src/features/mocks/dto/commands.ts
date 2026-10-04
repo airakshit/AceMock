@@ -21,3 +21,20 @@ export interface CreateMockTestQuestionItemCommand {
 export interface DeleteMockTestCommand {
   id: string;
 }
+
+export interface CreateMockAttemptCommand {
+  id: string;
+  userId: string;
+  mockTestId: string;
+}
+
+export interface SubmitAttemptAnswerCommand {
+  id: string;
+  attemptId: string;
+  questionId: string;
+  selectedOption: "A" | "B" | "C" | "D";
+}
+
+export interface CompleteMockAttemptCommand {
+  attemptId: string;
+}

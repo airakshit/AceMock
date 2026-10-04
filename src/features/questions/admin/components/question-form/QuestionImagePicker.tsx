@@ -15,7 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/features/documents/utils";
 import type { QuestionFileItem } from "./types";
-import type { FileProgressState } from "../uploads/upload.types";
+import type { FileProgressState } from "../../../uploads/upload.types";
 
 interface QuestionImagePickerProps {
   id: string;
@@ -227,9 +227,7 @@ export function QuestionImagePicker({
           <div className="space-y-0.5">
             <p className="text-xs font-semibold tracking-tight">{title}</p>
             {description && (
-              <p className="text-[11px] text-muted-foreground">
-                {description}
-              </p>
+              <p className="text-[11px] text-muted-foreground">{description}</p>
             )}
           </div>
 

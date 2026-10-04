@@ -1,4 +1,4 @@
-import { QuestionForm } from "../../components/QuestionForm";
+import { QuestionForm } from "./question-form/QuestionForm";
 
 export function QuestionsAdminView() {
   return (

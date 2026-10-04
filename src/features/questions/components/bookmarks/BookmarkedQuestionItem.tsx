@@ -2,8 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { QuestionCard } from "../question-card/QuestionCard";
-import type { OptionKey, QuestionCardType } from "../question-card/types";
+import { QuestionCard } from "../../../shared/components/question-card/QuestionCard";
+import type {
+  OptionKey,
+  QuestionCardType,
+} from "../../../shared/components/question-card/types";
 import { getQuestionSolutionAction } from "../../actions";
 import type { BookmarkedQuestionProjection } from "../../dto/projections";
 import type { GetQuestionSolutionResult } from "../../dto/results";

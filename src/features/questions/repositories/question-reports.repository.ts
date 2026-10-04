@@ -2,7 +2,7 @@ import { questionReports } from "@/db/schemas";
 import { and, eq } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
 import { CreateQuestionReportItemCommand } from "../dto/commands";
-import { QuestionReportType } from "../types";
+import { QuestionReportType } from "../../shared/components/question-card/types";
 
 /**
  * Read/write access for the `question_reports` table.

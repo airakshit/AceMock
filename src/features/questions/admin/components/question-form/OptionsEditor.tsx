@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { QuestionOption, QuestionOptionKey } from "../types";
+import { QuestionOption, QuestionOptionKey } from "../../../types";
 
 interface OptionsEditorProps {
   options: QuestionOption[];
