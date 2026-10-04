@@ -61,12 +61,6 @@ export interface MockTestDetailsProjection extends MockTestListItemProjection {
   questions: MockTestQuestionItemProjection[];
 }
 
-export interface DocumentOptionForMockProjection {
-  id: string;
-  title: string;
-  createdAt: Date;
-  questionCount: number;
-}
 
 /**
  * Read model for mock test attempt questions with passages.

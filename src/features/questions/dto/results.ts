@@ -4,9 +4,9 @@ import { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import {
   BookmarkedQuestionProjection,
   CurriculumOptionsProjection,
-  DocumentWithQuestionCountProjection,
   QuestionDetailsProjection,
 } from "./projections";
+import { DocumentWithQuestionCountProjection } from "@/features/documents/dto/projections";
 import { QuestionOptionKey, QuestionReportType } from "../types";
 
 /**

@@ -3,13 +3,9 @@ import {
   documents,
   mockTests,
   mockTestsQuestions,
-  mockTestsAttempts,
   mockAttemptAnswers,
   questions,
   passages,
-  subjects,
-  sections,
-  chapters,
   user,
 } from "@/db/schemas";
 import {
@@ -29,99 +25,20 @@ import { DbExecutor } from "@/features/shared/types";
 import {
   CreateMockTestCommand,
   CreateMockTestQuestionItemCommand,
-  CreateMockAttemptCommand,
-  SubmitAttemptAnswerCommand,
-  CompleteMockAttemptCommand,
   SearchMockTestsQuery,
 } from "../dto/commands";
 import {
-  DocumentOptionForMockProjection,
   MockTestDetailsProjection,
   MockTestListItemProjection,
   MockTestQuestionItemProjection,
   MockTestAttemptQuestionsProjection,
   MockAttemptQuestionProjection,
   MockAttemptPassageProjection,
-  MockTestAttemptProjection,
-  MockAttemptAnswerProjection,
-  AttemptMetaProjection,
-  AttemptAnswerRowProjection,
-  AttemptQuestionRowProjection,
-  ReviewQuestionResult,
-  AttemptReviewIndexItem,
+  AttemptQuestionRowProjection
 } from "../dto/projections";
 
+
 export class MockTestsRepository {
-  /**
-   * Retrieves all documents with their question counts to let admins pick from them.
-   */
-  async findDocumentsWithQuestionsCount(
-    db: DbExecutor,
-  ): Promise<DocumentOptionForMockProjection[]> {
-    const records = await db
-      .select({
-        id: documents.id,
-        title: documents.title,
-        createdAt: documents.createdAt,
-        questionCount: count(questions.id),
-      })
-      .from(documents)
-      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
-      .leftJoin(questions, eq(questions.fileId, documentFiles.id))
-      .groupBy(documents.id, documents.title, documents.createdAt)
-      .orderBy(desc(documents.createdAt));
-
-    return records.map((r) => ({
-      id: r.id,
-      title: r.title,
-      createdAt: r.createdAt,
-      questionCount: Number(r.questionCount || 0),
-    }));
-  }
-
-  /**
-   * Finds all questions associated with document files belonging to the given document IDs.
-   */
-  async findQuestionsByDocumentIds(
-    db: DbExecutor,
-    documentIds: string[],
-  ): Promise<
-    Array<{
-      id: string;
-      marks: number;
-      question: string;
-      difficulty: "easy" | "medium" | "hard";
-      documentId: string;
-      documentTitle: string;
-    }>
-  > {
-    if (documentIds.length === 0) return [];
-
-    const records = await db
-      .select({
-        id: questions.id,
-        marks: questions.marks,
-        question: questions.question,
-        difficulty: questions.difficulty,
-        documentId: documentFiles.documentId,
-        documentTitle: documents.title,
-      })
-      .from(questions)
-      .innerJoin(documentFiles, eq(questions.fileId, documentFiles.id))
-      .innerJoin(documents, eq(documentFiles.documentId, documents.id))
-      .where(inArray(documentFiles.documentId, documentIds))
-      .orderBy(asc(documentFiles.documentId), asc(questions.createdAt));
-
-    return records.map((r) => ({
-      id: r.id,
-      marks: r.marks,
-      question: r.question,
-      difficulty: r.difficulty,
-      documentId: r.documentId,
-      documentTitle: r.documentTitle,
-    }));
-  }
-
   /**
    * Inserts the parent mock test record.
    */
@@ -227,7 +144,9 @@ export class MockTestsRepository {
       .orderBy(desc(mockTests.createdAt), desc(mockTests.id));
 
     const records = options?.search?.trim()
-      ? await baseQuery.where(ilike(mockTests.name, `%${options.search.trim()}%`))
+      ? await baseQuery.where(
+          ilike(mockTests.name, `%${options.search.trim()}%`),
+        )
       : await baseQuery;
 
     return records.map((r) => ({
@@ -309,11 +228,7 @@ export class MockTestsRepository {
     }
 
     const orderColumns = hierarchical
-      ? [
-          asc(mockTests.scope),
-          desc(mockTests.createdAt),
-          desc(mockTests.id),
-        ]
+      ? [asc(mockTests.scope), desc(mockTests.createdAt), desc(mockTests.id)]
       : [desc(mockTests.createdAt), desc(mockTests.id)];
 
     const records = await db
@@ -386,56 +301,6 @@ export class MockTestsRepository {
       creatorName: r.creatorName,
       creatorEmail: r.creatorEmail,
     }));
-  }
-
-  /**
-   * Subject lookup used to validate a `scope = subject` creation.
-   */
-  async findSubjectById(
-    db: DbExecutor,
-    id: string,
-  ): Promise<{ id: string } | null> {
-    const [record] = await db
-      .select({ id: subjects.id })
-      .from(subjects)
-      .where(eq(subjects.id, id))
-      .limit(1);
-
-    return record ?? null;
-  }
-
-  /**
-   * Section lookup — also the source of the parent `subjectId` when a
-   * `scope = section` test is created (parents are derived, never trusted).
-   */
-  async findSectionById(
-    db: DbExecutor,
-    id: string,
-  ): Promise<{ id: string; subjectId: string } | null> {
-    const [record] = await db
-      .select({ id: sections.id, subjectId: sections.subjectId })
-      .from(sections)
-      .where(eq(sections.id, id))
-      .limit(1);
-
-    return record ?? null;
-  }
-
-  /**
-   * Chapter lookup — the source of the parent `sectionId` (and, through the
-   * section, the parent `subjectId`) for `scope = chapter` creations.
-   */
-  async findChapterById(
-    db: DbExecutor,
-    id: string,
-  ): Promise<{ id: string; sectionId: string } | null> {
-    const [record] = await db
-      .select({ id: chapters.id, sectionId: chapters.sectionId })
-      .from(chapters)
-      .where(eq(chapters.id, id))
-      .limit(1);
-
-    return record ?? null;
   }
 
   /**
@@ -552,30 +417,10 @@ export class MockTestsRepository {
   }
 
   /**
-   * Creates a new mock test attempt for a user.
-   */
-  async createAttempt(
-    db: DbExecutor,
-    data: CreateMockAttemptCommand,
-  ): Promise<typeof mockTestsAttempts.$inferSelect> {
-    const [record] = await db
-      .insert(mockTestsAttempts)
-      .values({
-        id: data.id,
-        userId: data.userId,
-        mockTestId: data.mockTestId,
-        status: "in_progress",
-      })
-      .returning();
-
-    return record;
-  }
-
-  /**
    * Fetches questions for a mock test attempt with passages grouped.
    * Returns questions with only necessary fields for taking the test (no correct answers, hints, solutions).
    */
-  async findAttemptQuestions(
+  async getMockTestQuestionsForAttempt(
     db: DbExecutor,
     mockTestId: string,
   ): Promise<MockTestAttemptQuestionsProjection> {
@@ -623,9 +468,7 @@ export class MockTestsRepository {
     }
 
     // Build passage map for quick lookup
-    const passageMap = new Map(
-      passageRecords.map((p) => [p.id, p.content]),
-    );
+    const passageMap = new Map(passageRecords.map((p) => [p.id, p.content]));
 
     // Group questions by passage
     const passageQuestionMap = new Map<string, string[]>();
@@ -638,16 +481,17 @@ export class MockTestsRepository {
     }
 
     // Build passages projection
-    const passagesProjection: MockAttemptPassageProjection[] =
-      Array.from(passageQuestionMap.entries()).map(([passageId, questionIds]) => ({
-        id: passageId,
-        content: passageMap.get(passageId) || "",
-        questionIds,
-      }));
+    const passagesProjection: MockAttemptPassageProjection[] = Array.from(
+      passageQuestionMap.entries(),
+    ).map(([passageId, questionIds]) => ({
+      id: passageId,
+      content: passageMap.get(passageId) || "",
+      questionIds,
+    }));
 
     // Build questions projection
-    const questionsProjection: MockAttemptQuestionProjection[] = questionRecords.map(
-      (q) => {
+    const questionsProjection: MockAttemptQuestionProjection[] =
+      questionRecords.map((q) => {
         // Find passage position if this question belongs to a passage
         let passagePosition: number | null = null;
         if (q.passageId) {
@@ -667,169 +511,12 @@ export class MockTestsRepository {
           passageId: q.passageId,
           passagePosition,
         };
-      },
-    );
+      });
 
     return {
       questions: questionsProjection,
       passages: passagesProjection,
     };
-  }
-
-  /**
-   * Fetches an attempt by ID with its mock test metadata.
-   */
-  async findAttemptById(
-    db: DbExecutor,
-    attemptId: string,
-  ): Promise<MockTestAttemptProjection | null> {
-    const [record] = await db
-      .select({
-        id: mockTestsAttempts.id,
-        userId: mockTestsAttempts.userId,
-        mockTestId: mockTestsAttempts.mockTestId,
-        status: mockTestsAttempts.status,
-        submittedAt: mockTestsAttempts.submittedAt,
-        createdAt: mockTestsAttempts.createdAt,
-        updatedAt: mockTestsAttempts.updatedAt,
-      })
-      .from(mockTestsAttempts)
-      .where(eq(mockTestsAttempts.id, attemptId))
-      .limit(1);
-
-    if (!record) return null;
-
-    return {
-      id: record.id,
-      mockTestId: record.mockTestId,
-      userId: record.userId,
-      status: record.status,
-      submittedAt: record.submittedAt,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-    };
-  }
-
-  /**
-   * Submits or updates an answer for a question in an attempt.
-   * Relies on the unique constraint on (attempt_id, question_id):
-   * a repeated submission overwrites the previous answer in place.
-   */
-  async upsertAttemptAnswer(
-    db: DbExecutor,
-    data: SubmitAttemptAnswerCommand,
-  ): Promise<typeof mockAttemptAnswers.$inferSelect> {
-    const [record] = await db
-      .insert(mockAttemptAnswers)
-      .values({
-        id: data.id,
-        attemptId: data.attemptId,
-        questionId: data.questionId,
-        selectedOption: data.selectedOption,
-      })
-      .onConflictDoUpdate({
-        target: [mockAttemptAnswers.attemptId, mockAttemptAnswers.questionId],
-        set: {
-          selectedOption: data.selectedOption,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-
-    return record;
-  }
-
-  /**
-   * Gets all answers for an attempt.
-   */
-  async findAttemptAnswers(
-    db: DbExecutor,
-    attemptId: string,
-  ): Promise<MockAttemptAnswerProjection[]> {
-    const records = await db
-      .select({
-        id: mockAttemptAnswers.id,
-        attemptId: mockAttemptAnswers.attemptId,
-        questionId: mockAttemptAnswers.questionId,
-        selectedOption: mockAttemptAnswers.selectedOption,
-        createdAt: mockAttemptAnswers.createdAt,
-        updatedAt: mockAttemptAnswers.updatedAt,
-      })
-      .from(mockAttemptAnswers)
-      .where(eq(mockAttemptAnswers.attemptId, attemptId));
-
-    return records.map((r) => ({
-      id: r.id,
-      attemptId: r.attemptId,
-      questionId: r.questionId,
-      selectedOption: r.selectedOption as "A" | "B" | "C" | "D",
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    }));
-  }
-
-  /**
-   * All attempts created by a user (newest first) joined with their mock
-   * test configuration — the basis of the My History list. When `mockTestId`
-   * is given, only that test's attempts are returned (per-card history pop-up).
-   */
-  async findUserAttempts(
-    db: DbExecutor,
-    userId: string,
-    mockTestId?: string,
-  ): Promise<AttemptMetaProjection[]> {
-    const records = await db
-      .select({
-        id: mockTestsAttempts.id,
-        mockTestId: mockTestsAttempts.mockTestId,
-        mockTestName: mockTests.name,
-        status: mockTestsAttempts.status,
-        startedAt: mockTestsAttempts.createdAt,
-        submittedAt: mockTestsAttempts.submittedAt,
-        durationSeconds: mockTests.durationSeconds,
-        totalMarks: mockTests.totalMarks,
-        negativePercentagePerQuestion:
-          mockTests.negativePercentagePerQuestion,
-      })
-      .from(mockTestsAttempts)
-      .innerJoin(mockTests, eq(mockTestsAttempts.mockTestId, mockTests.id))
-      .where(
-        mockTestId
-          ? and(
-              eq(mockTestsAttempts.userId, userId),
-              eq(mockTestsAttempts.mockTestId, mockTestId),
-            )
-          : eq(mockTestsAttempts.userId, userId),
-      )
-      .orderBy(desc(mockTestsAttempts.createdAt));
-
-    return records;
-  }
-
-  /**
-   * Batch fetch: answers for several attempts at once (scoring the history
-   * list would otherwise issue one query per attempt).
-   */
-  async findAnswersForAttempts(
-    db: DbExecutor,
-    attemptIds: string[],
-  ): Promise<AttemptAnswerRowProjection[]> {
-    if (attemptIds.length === 0) return [];
-
-    const records = await db
-      .select({
-        attemptId: mockAttemptAnswers.attemptId,
-        questionId: mockAttemptAnswers.questionId,
-        selectedOption: mockAttemptAnswers.selectedOption,
-      })
-      .from(mockAttemptAnswers)
-      .where(inArray(mockAttemptAnswers.attemptId, attemptIds));
-
-    return records.map((r) => ({
-      attemptId: r.attemptId,
-      questionId: r.questionId,
-      selectedOption: r.selectedOption,
-    }));
   }
 
   /**
@@ -986,86 +673,6 @@ export class MockTestsRepository {
       content: passageRecord.content,
       questionIds: siblingRecords.map((r) => r.questionId),
     };
-  }
-
-  /**
-   * Marks an attempt as completed.
-   */
-  async completeAttempt(
-    db: DbExecutor,
-    data: CompleteMockAttemptCommand,
-  ): Promise<void> {
-    await db
-      .update(mockTestsAttempts)
-      .set({
-        status: "completed",
-        submittedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(mockTestsAttempts.id, data.attemptId));
-  }
-
-  /**
-   * Checks if a user has an in-progress attempt for a mock test.
-   */
-  async findInProgressAttempt(
-    db: DbExecutor,
-    userId: string,
-    mockTestId: string,
-  ): Promise<MockTestAttemptProjection | null> {
-    const [record] = await db
-      .select({
-        id: mockTestsAttempts.id,
-        userId: mockTestsAttempts.userId,
-        mockTestId: mockTestsAttempts.mockTestId,
-        status: mockTestsAttempts.status,
-        submittedAt: mockTestsAttempts.submittedAt,
-        createdAt: mockTestsAttempts.createdAt,
-        updatedAt: mockTestsAttempts.updatedAt,
-      })
-      .from(mockTestsAttempts)
-      .where(
-        and(
-          eq(mockTestsAttempts.userId, userId),
-          eq(mockTestsAttempts.mockTestId, mockTestId),
-          eq(mockTestsAttempts.status, "in_progress"),
-        ),
-      )
-      .limit(1);
-
-    if (!record) return null;
-
-    return {
-      id: record.id,
-      mockTestId: record.mockTestId,
-      userId: record.userId,
-      status: record.status,
-      submittedAt: record.submittedAt,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-    };
-  }
-
-  /**
-   * How many attempts (any status) a user has taken for a mock test —
-   * the basis of the `maxAttempts` limit enforced on start.
-   */
-  async countUserAttempts(
-    db: DbExecutor,
-    userId: string,
-    mockTestId: string,
-  ): Promise<number> {
-    const [row] = await db
-      .select({ value: count(mockTestsAttempts.id) })
-      .from(mockTestsAttempts)
-      .where(
-        and(
-          eq(mockTestsAttempts.userId, userId),
-          eq(mockTestsAttempts.mockTestId, mockTestId),
-        ),
-      );
-
-    return Number(row?.value ?? 0);
   }
 }
 

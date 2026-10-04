@@ -33,8 +33,8 @@ import { getRecentQuestionsAction } from "../../actions/get-questions";
 import { getRecentDocumentsForFilterAction } from "../../actions";
 import type {
   QuestionDetailsProjection,
-  DocumentWithQuestionCountProjection,
 } from "../../dto/projections";
+import type { DocumentWithQuestionCountProjection } from "@/features/documents/dto/projections";
 import { cn } from "@/lib/utils";
 
 export function QuestionsAdminTestView() {

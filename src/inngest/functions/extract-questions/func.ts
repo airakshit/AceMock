@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { inngest } from "../../client";
 import { documentQueries } from "@/features/documents/repositories/document-queries";
 import { storagePaths } from "@/lib/supabase/storage-paths";
-import { FullDocumentResult } from "@/features/documents/repositories/types";
+import { DocumentWithFilesProjection } from "@/features/documents/dto/projections";
 import { JsonifyObject } from "inngest/types";
 
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
@@ -15,6 +15,7 @@ import { mergeOcrResults } from "./merge-ocr-results";
 import type { ResolvedQuestion } from "./types";
 import { QuestionPersistError } from "./errors";
 import { ocrPage, OcrPageResult, OcrPageFailedError } from "../ocr-page";
+import { FileProcessingStatus } from "@/features/documents/types";
 
 export interface ExtractDocumentQuestionEventData {
   userId: string;
@@ -39,11 +40,10 @@ export const extractQuestions = inngest.createFunction(
           "Extract questions workflow failed permanently. Marking document as failed.",
         );
         await step.run("mark-document-failed-on-error", async () => {
-          await documentsRepository.updateProcessingStatus(
-            db,
+          await documentsRepository.updateFileProcessingStatus(db, {
             documentId,
-            "failed",
-          );
+            status: "failed" as FileProcessingStatus,
+          });
         });
       }
     },
@@ -54,7 +54,7 @@ export const extractQuestions = inngest.createFunction(
     const { documentId, userId } = eventData;
 
     // 1. Fetch document files and pages metadata from the database
-    const docData: JsonifyObject<FullDocumentResult> = await step.run(
+    const docData: JsonifyObject<DocumentWithFilesProjection> = await step.run(
       "fetch-document-pages",
       async () => {
         return await documentQueries.getDocumentWithPages(
@@ -67,11 +67,10 @@ export const extractQuestions = inngest.createFunction(
 
     if (!docData || !docData.files || docData.files.length === 0) {
       await step.run("mark-document-failed-no-files", async () => {
-        await documentsRepository.updateProcessingStatus(
-          db,
+        await documentsRepository.updateFileProcessingStatus(db, {
           documentId,
-          "failed",
-        );
+          status: "failed" as FileProcessingStatus,
+        });
       });
 
       return {
@@ -100,20 +99,20 @@ export const extractQuestions = inngest.createFunction(
         const pageStoragePath = storagePaths.getDocumentFilePageSourceUrl(
           userId,
           documentId,
-          file.fileId,
-          file.fileName,
+          file.id,
+          file.filename,
           "webp",
           page.pageNo,
         );
         allDocPages.push({
-          fileId: file.fileId,
-          fileName: file.fileName,
+          fileId: file.id,
+          fileName: file.filename,
           pageId: page.id,
           pageNo: page.pageNo,
           ocrStatus: page.ocrStatus,
           ocrText: page.ocrText,
-          survivedValidation: page.survivedValidation,
-          isRelevant: page.isRelevant,
+          survivedValidation: page.survivedValidation ?? false,
+          isRelevant: page.isRelevant ?? true,
           storagePath: pageStoragePath,
         });
       });
@@ -121,11 +120,10 @@ export const extractQuestions = inngest.createFunction(
 
     if (allDocPages.length === 0) {
       await step.run("mark-document-failed-no-pages", async () => {
-        await documentsRepository.updateProcessingStatus(
-          db,
+        await documentsRepository.updateFileProcessingStatus(db, {
           documentId,
-          "failed",
-        );
+          status: "failed" as FileProcessingStatus,
+        });
       });
 
       return {
@@ -169,11 +167,10 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-documents-as-extracting-questions", async () => {
-        await documentsRepository.updateProcessingStatus(
-          db,
+        await documentsRepository.updateFileProcessingStatus(db, {
           documentId,
-          "extracting_questions",
-        );
+          status: "extracting_questions" as FileProcessingStatus,
+        });
       });
 
       // Fan-Out & Fan-In: OCR only the remaining pages
@@ -245,11 +242,10 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-document-failed-incomplete-pages", async () => {
-        await documentsRepository.updateProcessingStatus(
-          db,
+        await documentsRepository.updateFileProcessingStatus(db, {
           documentId,
-          "failed",
-        );
+          status: "failed" as FileProcessingStatus,
+        });
       });
 
       throw new OcrPageFailedError(
@@ -261,11 +257,10 @@ export const extractQuestions = inngest.createFunction(
 
     // 5. All pages are successful! Ensure status is merging_questions and perform merging
     await step.run("mark-document-merging-questions", async () => {
-      await documentsRepository.updateProcessingStatus(
-        db,
+      await documentsRepository.updateFileProcessingStatus(db, {
         documentId,
-        "merging_questions",
-      );
+        status: "merging_questions" as FileProcessingStatus,
+      });
     });
 
     const resolvedQuestions: ResolvedQuestion[] = await step.run(
@@ -291,11 +286,10 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-document-completed-zero-questions", async () => {
-        await documentsRepository.updateProcessingStatus(
-          db,
+        await documentsRepository.updateFileProcessingStatus(db, {
           documentId,
-          "completed",
-        );
+          status: "completed" as FileProcessingStatus,
+        });
       });
 
       return {
@@ -307,44 +301,55 @@ export const extractQuestions = inngest.createFunction(
       };
     }
 
-    // 6. Resolve chapters per subject and persist passages
-    const passageMap = await step.run("create-passages", async () => {
-      const passageMap: Record<string, string> = {};
+    const normalizePassage = (content: string) => content.trim();
 
-      const distinctPassages = Array.from(
-        new Set(
-          resolvedQuestions
-            .map((q) => q.passageContent?.trim())
-            .filter((p): p is string => Boolean(p)),
-        ),
-      );
-      const results = await questionsRepository.createManyPassages(
-        db,
-        distinctPassages,
-      );
-      for (const result of results) {
-        passageMap[result.content] = result.id;
-      }
-      return passageMap;
-    });
+    const distinctPassages = Array.from(
+      new Set(
+        resolvedQuestions
+          .map((q) => q.passageContent)
+          .filter((p): p is string => Boolean(p?.trim()))
+          .map(normalizePassage),
+      ),
+    );
+
+    const passageMap: Record<string, string> =
+      distinctPassages.length > 0
+        ? await step.run("create-passages", async () => {
+            const results = await questionsRepository.createManyPassages(
+              db,
+              distinctPassages,
+            );
+
+            return Object.fromEntries(
+              results.map((result) => [
+                normalizePassage(result.content),
+                result.id,
+              ]),
+            );
+          })
+        : {};
 
     const saveResult = await step.run("save-questions", async () => {
       try {
         const payload: CreateQuestionItem[] = resolvedQuestions.map((q) => {
-          const passageId = q.passageContent
-            ? passageMap[q.passageContent.trim()] || null
+          const passageContent = q.passageContent?.trim() || null;
+
+          const passageId = passageContent
+            ? (passageMap[passageContent] ?? null)
             : null;
 
           return {
             id: generateUUIDv7(),
             chapterId: null,
             passageId,
+
             fileId: q.fileId,
             question: q.question,
             options: q.options,
             correctOption: q.correctOption,
             marks: q.marks,
             difficulty: q.difficulty,
+
             questionDiagram: q.diagram_url ?? null,
             hint: q.hint ?? null,
             solution: q.solution ?? null,
@@ -353,12 +358,16 @@ export const extractQuestions = inngest.createFunction(
         });
 
         const inserted = await questionsRepository.createMany(db, payload);
+
         return {
           savedCount: inserted.length,
           insertedQuestions: inserted.map((q, idx) => ({
             id: q.id,
             question: q.question,
-            options: q.options as Array<{ key: string; text: string }>,
+            options: q.options as Array<{
+              key: string;
+              text: string;
+            }>,
             subject: resolvedQuestions[idx]?.subject || null,
             passageContent: resolvedQuestions[idx]?.passageContent || null,
           })),
@@ -368,19 +377,21 @@ export const extractQuestions = inngest.createFunction(
           { documentId, error: err },
           "Failed to save resolved questions to database.",
         );
+
         throw new QuestionPersistError(
-          `Failed to persist questions to database: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to persist questions to database: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
           err,
         );
       }
     });
 
     await step.run("mark-document-completed", async () => {
-      await documentsRepository.updateProcessingStatus(
-        db,
+      await documentsRepository.updateFileProcessingStatus(db, {
         documentId,
-        "completed",
-      );
+        status: "completed" as FileProcessingStatus,
+      });
     });
   },
 );

@@ -3,11 +3,12 @@
 import { handleActionError } from "@/features/shared/actions/error";
 import { requireAdmin } from "@/features/shared/actions/require-admin";
 import { ServerActionResult } from "@/features/shared/actions/types";
-import { DocumentOptionForMockProjection } from "../dto/projections";
+
 import { mockTestsService } from "../service";
+import { DocumentWithQuestionCountProjection } from "@/features/documents/dto/projections";
 
 export async function getDocumentsForMockCreationAction(): Promise<
-  ServerActionResult<DocumentOptionForMockProjection[]>
+  ServerActionResult<DocumentWithQuestionCountProjection[]>
 > {
   try {
     await requireAdmin();

@@ -55,16 +55,6 @@ export interface QuestionDetailsProjection {
   documentTitle: string | null;
 }
 
-/**
- * Read model projection for documents with aggregated question count.
- * Used by repository read queries such as `findRecentDocumentsWithQuestions`.
- */
-export interface DocumentWithQuestionCountProjection {
-  id: string;
-  title: string;
-  createdAt: Date;
-  questionCount: number;
-}
 
 /**
  * Read model projection representing chapter and its parent curriculum mappings.

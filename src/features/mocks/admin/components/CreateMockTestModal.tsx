@@ -12,8 +12,6 @@ import {
   Repeat2,
   Sparkles,
   Loader2,
-  AlertCircle,
-  HelpCircle,
   Library,
 } from "lucide-react";
 
@@ -35,10 +33,8 @@ import {
 } from "@/components/ui/native-select";
 import { SearchInput } from "@/components/patterns/search-input";
 import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
-import {
-  DocumentOptionForMockProjection,
-  MockTestScope,
-} from "../../dto/projections";
+import type { DocumentOptionForMockProjection } from "@/features/documents/dto/projections";
+import { MockTestScope } from "../../dto/projections";
 import { getDocumentsForMockCreationAction } from "../../actions/get-documents-for-mock-creation";
 import { createMockTestFromDocumentsAction } from "../../actions/create-mock-test-from-documents";
 import { getCurriculumOptionsAction } from "@/features/questions/actions";
@@ -109,10 +105,13 @@ export function CreateMockTestModal({
   onTestCreated,
 }: CreateMockTestModalProps) {
   // Data loading state
-  const [documents, setDocuments] = useState<DocumentOptionForMockProjection[]>([]);
+  const [documents, setDocuments] = useState<DocumentOptionForMockProjection[]>(
+    [],
+  );
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [curriculum, setCurriculum] = useState<CurriculumOptionsProjection | null>(null);
+  const [curriculum, setCurriculum] =
+    useState<CurriculumOptionsProjection | null>(null);
 
   // Form states
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
@@ -213,7 +212,8 @@ export function CreateMockTestModal({
   }, [documents, searchDocQuery]);
 
   // Which curriculum levels the selected scope needs
-  const needsSubject = scope === "subject" || scope === "section" || scope === "chapter";
+  const needsSubject =
+    scope === "subject" || scope === "section" || scope === "chapter";
   const needsSection = scope === "section" || scope === "chapter";
   const needsChapter = scope === "chapter";
 
@@ -289,7 +289,9 @@ export function CreateMockTestModal({
   };
 
   const handleSelectAllDocs = () => {
-    const docsWithQuestions = filteredDocuments.filter((d) => d.questionCount > 0);
+    const docsWithQuestions = filteredDocuments.filter(
+      (d) => d.questionCount > 0,
+    );
     const allIds = docsWithQuestions.map((d) => d.id);
     setSelectedDocIds(allIds);
     if (!testName.trim() && allIds.length > 0) {
@@ -316,7 +318,9 @@ export function CreateMockTestModal({
     }
 
     if (totalSelectedQuestions === 0) {
-      toast.error("The selected document(s) do not have any extracted questions.");
+      toast.error(
+        "The selected document(s) do not have any extracted questions.",
+      );
       return;
     }
 
@@ -340,8 +344,14 @@ export function CreateMockTestModal({
       return;
     }
 
-    if (!Number.isInteger(maxAttempts) || maxAttempts < 0 || maxAttempts > 100) {
-      toast.error("Max attempts must be a whole number between 1 and 100 (0 = unlimited).");
+    if (
+      !Number.isInteger(maxAttempts) ||
+      maxAttempts < 0 ||
+      maxAttempts > 100
+    ) {
+      toast.error(
+        "Max attempts must be a whole number between 1 and 100 (0 = unlimited).",
+      );
       return;
     }
 
@@ -353,7 +363,9 @@ export function CreateMockTestModal({
         durationMinutes,
         negativePercentagePerQuestion: negativePercentage,
         instructions: instructions.trim() || undefined,
-        customTotalMarks: customTotalMarks ? Number(customTotalMarks) : undefined,
+        customTotalMarks: customTotalMarks
+          ? Number(customTotalMarks)
+          : undefined,
         scope,
         // Timing and retake rules enforced by the attempt flow.
         allowUntimed,
@@ -395,13 +407,17 @@ export function CreateMockTestModal({
                 Create Mock Test from Documents
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Assemble a full mock examination using ingested questions from selected documents.
+                Assemble a full mock examination using ingested questions from
+                selected documents.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col flex-1 overflow-hidden"
+        >
           <div className="flex-1 overflow-y-auto p-5 space-y-6">
             {/* Step 1: Document Selection */}
             <div className="space-y-3">
@@ -413,7 +429,8 @@ export function CreateMockTestModal({
                     <span className="text-destructive">*</span>
                   </label>
                   <p className="text-[11px] text-muted-foreground">
-                    All questions mapped to the selected documents will be incorporated into the mock test.
+                    All questions mapped to the selected documents will be
+                    incorporated into the mock test.
                   </p>
                 </div>
 
@@ -481,12 +498,18 @@ export function CreateMockTestModal({
                           <Checkbox
                             checked={isSelected}
                             disabled={!hasQuestions}
-                            onCheckedChange={() => hasQuestions && handleToggleDoc(doc.id)}
+                            onCheckedChange={() =>
+                              hasQuestions && handleToggleDoc(doc.id)
+                            }
                             onClick={(e) => e.stopPropagation()}
                           />
                           <div className="flex items-center gap-2 min-w-0">
-                            <FileText className={`size-3.5 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                            <span className="font-medium truncate">{doc.title}</span>
+                            <FileText
+                              className={`size-3.5 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`}
+                            />
+                            <span className="font-medium truncate">
+                              {doc.title}
+                            </span>
                           </div>
                         </div>
 
@@ -500,7 +523,10 @@ export function CreateMockTestModal({
                                   : "border-border text-muted-foreground"
                               }`}
                             >
-                              {doc.questionCount} {doc.questionCount === 1 ? "question" : "questions"}
+                              {doc.questionCount}{" "}
+                              {doc.questionCount === 1
+                                ? "question"
+                                : "questions"}
                             </Badge>
                           ) : (
                             <span className="text-[10px] text-muted-foreground italic">
@@ -517,10 +543,17 @@ export function CreateMockTestModal({
               {/* Selection Summary Pill */}
               <div className="flex items-center justify-between text-xs px-1">
                 <span className="text-muted-foreground">
-                  <span className="font-semibold text-foreground">{selectedDocIds.length}</span> documents selected
+                  <span className="font-semibold text-foreground">
+                    {selectedDocIds.length}
+                  </span>{" "}
+                  documents selected
                 </span>
                 <span className="text-muted-foreground">
-                  Pool: <span className="font-semibold text-primary">{totalSelectedQuestions}</span> questions available
+                  Pool:{" "}
+                  <span className="font-semibold text-primary">
+                    {totalSelectedQuestions}
+                  </span>{" "}
+                  questions available
                 </span>
               </div>
             </div>
@@ -528,7 +561,7 @@ export function CreateMockTestModal({
             {/* Step 2: Test Scope */}
             <div className="border-t border-border/60 pt-5 space-y-4">
               <div>
-                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Library className="size-3.5 text-primary" />
                   <span>Test Scope</span>
                   <span className="text-destructive">*</span>
@@ -604,7 +637,10 @@ export function CreateMockTestModal({
                               : "Select a section"}
                         </NativeSelectOption>
                         {availableSections.map((section) => (
-                          <NativeSelectOption key={section.id} value={section.id}>
+                          <NativeSelectOption
+                            key={section.id}
+                            value={section.id}
+                          >
                             {section.name}
                           </NativeSelectOption>
                         ))}
@@ -632,7 +668,10 @@ export function CreateMockTestModal({
                               : "Select a chapter"}
                         </NativeSelectOption>
                         {availableChapters.map((chapter) => (
-                          <NativeSelectOption key={chapter.id} value={chapter.id}>
+                          <NativeSelectOption
+                            key={chapter.id}
+                            value={chapter.id}
+                          >
                             {chapter.name}
                           </NativeSelectOption>
                         ))}
@@ -655,14 +694,17 @@ export function CreateMockTestModal({
 
             {/* Step 3: Test Configuration */}
             <div className="border-t border-border/60 pt-5 space-y-4">
-              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">
                 Mock Examination Parameters
               </h3>
 
               {/* Test Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground flex items-center justify-between">
-                  <span>Examination Title <span className="text-destructive">*</span></span>
+                  <span>
+                    Examination Title{" "}
+                    <span className="text-destructive">*</span>
+                  </span>
                   <span className="text-[10px] text-muted-foreground font-normal">
                     Identifies this test in student dashboard
                   </span>
@@ -687,7 +729,9 @@ export function CreateMockTestModal({
                       <span>Duration</span>
                     </label>
                     <span className="text-xs font-semibold text-primary">
-                      {durationMinutes} minutes ({Math.floor(durationMinutes / 60)}h {durationMinutes % 60}m)
+                      {durationMinutes} minutes (
+                      {Math.floor(durationMinutes / 60)}h {durationMinutes % 60}
+                      m)
                     </span>
                   </div>
 
@@ -709,16 +753,22 @@ export function CreateMockTestModal({
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
-                    <span className="text-[11px] text-muted-foreground">Custom:</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Custom:
+                    </span>
                     <input
                       type="number"
                       min={1}
                       max={600}
                       value={durationMinutes}
-                      onChange={(e) => setDurationMinutes(Math.max(1, Number(e.target.value)))}
+                      onChange={(e) =>
+                        setDurationMinutes(Math.max(1, Number(e.target.value)))
+                      }
                       className="h-7 w-20 rounded border border-border bg-background px-2 text-xs text-foreground focus:border-primary/50 focus:outline-none"
                     />
-                    <span className="text-[11px] text-muted-foreground">mins</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      mins
+                    </span>
                   </div>
 
                   {allowUntimed && (
@@ -759,18 +809,24 @@ export function CreateMockTestModal({
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
-                    <span className="text-[11px] text-muted-foreground">Custom:</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Custom:
+                    </span>
                     <input
                       type="number"
                       min={0}
                       max={100}
                       value={negativePercentage}
                       onChange={(e) =>
-                        setNegativePercentage(Math.max(0, Math.min(100, Number(e.target.value))))
+                        setNegativePercentage(
+                          Math.max(0, Math.min(100, Number(e.target.value))),
+                        )
                       }
                       className="h-7 w-20 rounded border border-border bg-background px-2 text-xs text-foreground focus:border-primary/50 focus:outline-none"
                     />
-                    <span className="text-[11px] text-muted-foreground">% per question</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      % per question
+                    </span>
                   </div>
                 </div>
               </div>
@@ -792,7 +848,8 @@ export function CreateMockTestModal({
                     />
                   </div>
                   <p className="text-[10px] text-muted-foreground">
-                    Leave blank to automatically sum all question marks ({totalSelectedQuestions} marks).
+                    Leave blank to automatically sum all question marks (
+                    {totalSelectedQuestions} marks).
                   </p>
                 </div>
 
@@ -813,12 +870,13 @@ export function CreateMockTestModal({
               {/* Step 4: Test Rules */}
               <div className="space-y-3 border-t border-border/60 pt-4">
                 <div>
-                  <h3 className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground">
+                  <h3 className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
                     <Repeat2 className="size-3.5 text-primary" />
                     <span>Test Rules</span>
                   </h3>
                   <p className="text-[11px] text-muted-foreground">
-                    Timing and retake limits — students see these on the instructions screen before they start.
+                    Timing and retake limits — students see these on the
+                    instructions screen before they start.
                   </p>
                 </div>
 
@@ -876,7 +934,9 @@ export function CreateMockTestModal({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted-foreground">Custom:</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Custom:
+                      </span>
                       <input
                         id="mock-max-attempts"
                         type="number"
@@ -910,11 +970,17 @@ export function CreateMockTestModal({
                   </div>
                   <div className="flex items-center gap-3 text-[11px] text-foreground">
                     <span>
-                      <strong className="font-semibold text-primary">{totalSelectedQuestions}</strong> Questions
+                      <strong className="font-semibold text-primary">
+                        {totalSelectedQuestions}
+                      </strong>{" "}
+                      Questions
                     </span>
                     <span>•</span>
                     <span>
-                      <strong className="font-semibold">{customTotalMarks || totalSelectedQuestions}</strong> Total Marks
+                      <strong className="font-semibold">
+                        {customTotalMarks || totalSelectedQuestions}
+                      </strong>{" "}
+                      Total Marks
                     </span>
                     <span>•</span>
                     <span>
@@ -925,7 +991,10 @@ export function CreateMockTestModal({
                     </span>
                     <span>•</span>
                     <span>
-                      <strong className="font-semibold">{negativePercentage}%</strong> Penalty
+                      <strong className="font-semibold">
+                        {negativePercentage}%
+                      </strong>{" "}
+                      Penalty
                     </span>
                     <span>•</span>
                     <span>

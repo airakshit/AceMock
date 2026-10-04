@@ -10,20 +10,16 @@ import {
 import { asc, count, desc, eq, inArray } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
 import { generateUUIDv7 } from "../../shared/utils";
-import {
-  CreateQuestionItemCommand,
-} from "../dto/commands";
+import { CreateQuestionItemCommand } from "../dto/commands";
 import {
   ChapterCurriculumMappingProjection,
   CurriculumOptionsProjection,
-  DocumentWithQuestionCountProjection,
   PassageProjection,
-  QuestionDetailsProjection
+  QuestionDetailsProjection,
 } from "../dto/projections";
 
 // Backward-compatible alias for existing consumers (e.g. inngest)
 export type CreateQuestionItem = CreateQuestionItemCommand;
-
 
 export class QuestionsRepository {
   async findChapterBySlug(db: DbExecutor, slug: string) {
@@ -34,6 +30,49 @@ export class QuestionsRepository {
       .limit(1);
 
     return chapter || null;
+  }
+
+  /**
+   * Finds all questions associated with document files belonging to the given document IDs.
+   */
+  async findQuestionsByDocumentIds(
+    db: DbExecutor,
+    documentIds: string[],
+  ): Promise<
+    Array<{
+      id: string;
+      marks: number;
+      question: string;
+      difficulty: "easy" | "medium" | "hard";
+      documentId: string;
+      documentTitle: string;
+    }>
+  > {
+    if (documentIds.length === 0) return [];
+
+    const records = await db
+      .select({
+        id: questions.id,
+        marks: questions.marks,
+        question: questions.question,
+        difficulty: questions.difficulty,
+        documentId: documentFiles.documentId,
+        documentTitle: documents.title,
+      })
+      .from(questions)
+      .innerJoin(documentFiles, eq(questions.fileId, documentFiles.id))
+      .innerJoin(documents, eq(documentFiles.documentId, documents.id))
+      .where(inArray(documentFiles.documentId, documentIds))
+      .orderBy(asc(documentFiles.documentId), asc(questions.createdAt));
+
+    return records.map((r) => ({
+      id: r.id,
+      marks: r.marks,
+      question: r.question,
+      difficulty: r.difficulty,
+      documentId: r.documentId,
+      documentTitle: r.documentTitle,
+    }));
   }
 
   async create(
@@ -210,32 +249,6 @@ export class QuestionsRepository {
     }
 
     return baseQuery.orderBy(desc(questions.createdAt)).limit(limit);
-  }
-
-  async findRecentDocumentsWithQuestions(
-    db: DbExecutor,
-    limit: number = 20,
-  ): Promise<DocumentWithQuestionCountProjection[]> {
-    const records = await db
-      .select({
-        id: documents.id,
-        title: documents.title,
-        createdAt: documents.createdAt,
-        questionCount: count(questions.id),
-      })
-      .from(documents)
-      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
-      .leftJoin(questions, eq(questions.fileId, documentFiles.id))
-      .groupBy(documents.id, documents.title, documents.createdAt)
-      .orderBy(desc(documents.createdAt))
-      .limit(limit);
-
-    return records.map((record) => ({
-      id: record.id,
-      title: record.title,
-      createdAt: record.createdAt,
-      questionCount: Number(record.questionCount || 0),
-    }));
   }
 
   /**

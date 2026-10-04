@@ -4,15 +4,16 @@ import {
   FinalizeDocumentUploadActionPayload,
 } from "./actions/types";
 import { documentsRepository } from "./repositories/documents.repository";
-import { documentFilesRepository } from "./repositories/document-files.repository";
+import { documentQueries } from "./repositories/document-queries";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
 import { supabaseStorageClient } from "../shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
 import { inngest } from "@/inngest/client";
-import { documentQueries } from "./repositories/document-queries";
-import { filePagesRepository } from "./repositories/file-pages.repository";
 import { EXTRACT_QUESTIONS_EVENT } from "@/inngest/functions/extract-questions/func";
+import { DocumentProcessingStatus, FileUploadStatus, FileProcessingStatus } from "./types";
+import { documentFiles } from "@/db/schemas";
+import { and, eq } from "drizzle-orm";
 
 class DocumentsService {
   async createNewDocument(
@@ -56,19 +57,36 @@ class DocumentsService {
     });
 
     const result = await db.transaction(async (tx) => {
-      const newDoc = await documentsRepository.create(tx, userId, {
+      const newDoc = await documentsRepository.create(tx, {
         documentId: documentId,
+        userId,
         title: payload.title,
         description: payload.description,
       });
 
-      const files = await documentFilesRepository.createMany(tx, newDoc.id, [
-        ...pdfs,
-        ...images,
-      ]);
+      const fileCommands = [
+        ...pdfs.map((f) => ({
+          id: f.serverFileId,
+          documentId,
+          filename: f.filename,
+          mimeType: f.mimeType,
+          fileSize: f.fileSize,
+          storagePath: f.storagePath,
+        })),
+        ...images.map((f) => ({
+          id: f.serverFileId,
+          documentId,
+          filename: f.filename,
+          mimeType: f.mimeType,
+          fileSize: f.fileSize,
+          storagePath: f.storagePath,
+        })),
+      ];
+
+      await documentsRepository.createManyFiles(tx, fileCommands);
+
       return {
         document: newDoc,
-        files: files,
       };
     });
 
@@ -112,15 +130,17 @@ class DocumentsService {
       );
     }
 
-    const updatedFiles = await documentFilesRepository.updateStatusForFiles(
-      db,
-      payload.documentId,
-      payload.fileIds,
-      "uploaded",
-    );
+    // Use the batch update method
+    for (const fileId of payload.fileIds) {
+      await documentsRepository.updateFile(db, {
+        fileId,
+        documentId: payload.documentId,
+        uploadStatus: "uploaded" as FileUploadStatus,
+      });
+    }
 
     return {
-      fileIds: updatedFiles.map((f) => f.id),
+      fileIds: payload.fileIds,
     };
   }
 
@@ -155,11 +175,14 @@ class DocumentsService {
 
     // 2. Delete database record of document.
     // Foreign key cascade (onDelete: "cascade") automatically deletes associated document_files and file_pages.
-    const deletedDocument = await documentsRepository.delete(
-      db,
+    const deletedDocument = await documentsRepository.delete(db, {
       documentId,
       userId,
-    );
+    });
+
+    if (!deletedDocument) {
+      throw new ServerActionError("INTERNAL_ERROR", "Failed to delete document.");
+    }
 
     return {
       documentId: deletedDocument.id,
@@ -180,20 +203,25 @@ class DocumentsService {
       );
     }
 
-    const existingFile = await documentFilesRepository.findByIdForDocument(
-      db,
-      fileId,
-      documentId,
-    );
+    const file = await db
+      .select()
+      .from(documentFiles)
+      .where(
+        and(
+          eq(documentFiles.id, fileId),
+          eq(documentFiles.documentId, documentId),
+        ),
+      )
+      .limit(1);
 
-    if (!existingFile) {
+    if (!file[0]) {
       throw new ServerActionError(
         "NOT_FOUND",
         "File not found or does not belong to this document.",
       );
     }
 
-    // 1. Delete storage folder for this file: user/${userId}/documents/${documentId}/files/${fileId}
+    // 1. Delete storage folder for this file
     const fileStorageFolder = storagePaths._getDocumentFilePath(
       userId,
       documentId,
@@ -209,25 +237,23 @@ class DocumentsService {
     }
 
     // Also ensure direct file storagePath is deleted if still present
-    if (existingFile.storagePath) {
+    if (file[0].storagePath) {
       try {
-        await supabaseStorageClient.deleteFiles([existingFile.storagePath]);
+        await supabaseStorageClient.deleteFiles([file[0].storagePath]);
       } catch (err) {
         // Ignored if already cleaned by deleteFolder
       }
     }
 
     // 2. Delete file record from DB.
-    // Foreign key cascade (onDelete: "cascade") automatically deletes associated file_pages.
-    const deletedFile = await documentFilesRepository.delete(
-      db,
+    await documentsRepository.deleteFile(db, {
       fileId,
       documentId,
-    );
+    });
 
     return {
       documentId,
-      fileId: deletedFile.id,
+      fileId,
     };
   }
 
@@ -257,7 +283,9 @@ class DocumentsService {
       );
     }
 
-    await documentsRepository.update(db, documentId, userId, {
+    await documentsRepository.update(db, {
+      documentId,
+      userId,
       title: trimmedTitle,
       description: payload.description?.trim() || undefined,
     });
@@ -296,13 +324,18 @@ class DocumentsService {
       );
     }
 
-    const existingFile = await documentFilesRepository.findByIdForDocument(
-      db,
-      fileId,
-      documentId,
-    );
+    const file = await db
+      .select()
+      .from(documentFiles)
+      .where(
+        and(
+          eq(documentFiles.id, fileId),
+          eq(documentFiles.documentId, documentId),
+        ),
+      )
+      .limit(1);
 
-    if (!existingFile) {
+    if (!file[0]) {
       throw new ServerActionError(
         "NOT_FOUND",
         "File not found or does not belong to this document.",
@@ -310,15 +343,15 @@ class DocumentsService {
     }
 
     const signedUrl = await supabaseStorageClient.getPageAccessUrl(
-      existingFile.storagePath,
+      file[0].storagePath,
       expiresIn,
     );
 
     return {
-      fileId: existingFile.id,
-      filename: existingFile.filename,
-      mimeType: existingFile.mimeType,
-      fileSize: existingFile.fileSize,
+      fileId: file[0].id,
+      filename: file[0].filename,
+      mimeType: file[0].mimeType,
+      fileSize: file[0].fileSize,
       signedUrl,
     };
   }
@@ -361,11 +394,10 @@ class DocumentsService {
 
     if (totalPages === 0) {
       // Preprocessing needed: convert files into page images, then extract questions
-      await documentsRepository.updateProcessingStatus(
-        db,
+      await documentsRepository.updateFileProcessingStatus(db, {
         documentId,
-        "processing_files",
-      );
+        status: "processing_files" as FileProcessingStatus,
+      });
 
       await inngest.send({
         name: "document/process",
@@ -376,11 +408,10 @@ class DocumentsService {
       });
     } else {
       // Pages already exist; trigger question extraction (which will process only pending/failed pages)
-      await documentsRepository.updateProcessingStatus(
-        db,
+      await documentsRepository.updateFileProcessingStatus(db, {
         documentId,
-        "extracting_questions",
-      );
+        status: "extracting_questions" as FileProcessingStatus,
+      });
 
       await inngest.send({
         name: EXTRACT_QUESTIONS_EVENT,

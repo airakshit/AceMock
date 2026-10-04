@@ -16,7 +16,6 @@ import {
   SearchMockTestsPayload,
 } from "./dto/payloads";
 import {
-  DocumentOptionForMockProjection,
   MockTestDetailsProjection,
   MockTestListItemProjection,
   MockTestAttemptQuestionsProjection,
@@ -49,6 +48,11 @@ import {
   encodeMockTestCursor,
   isMockTestScope,
 } from "./utils";
+import { documentsRepository } from "../documents/repositories/documents.repository";
+import { DocumentWithQuestionCountProjection } from "../documents/dto/projections";
+import { questionsRepository } from "../questions/repositories/questions.repository";
+import { mockTestAttemptRepository } from "./repositories/mock-attempts.repository";
+import { curriculumRepository } from "../questions/repositories/curriculum.repository";
 
 /** Rows returned per mock test search page. */
 const MOCK_TESTS_PAGE_SIZE = 12;
@@ -62,11 +66,10 @@ interface MockTestHierarchy {
 }
 
 export class MockTestsService {
-  /**
-   * Retrieves all documents with their question counts so admin can pick documents to assemble a test.
-   */
-  async getDocumentsForMockCreation(): Promise<DocumentOptionForMockProjection[]> {
-    return await mockTestsRepository.findDocumentsWithQuestionsCount(db);
+  async getDocumentsForMockCreation(): Promise<
+    DocumentWithQuestionCountProjection[]
+  > {
+    return await documentsRepository.findDocumentsWithQuestionsCount(db);
   }
 
   /**
@@ -107,7 +110,11 @@ export class MockTestsService {
     // admin says otherwise) and the retake limit is 0 = unlimited.
     const allowUntimed = payload.allowUntimed === true;
     const maxAttempts = payload.maxAttempts ?? 1;
-    if (!Number.isInteger(maxAttempts) || maxAttempts < 0 || maxAttempts > 100) {
+    if (
+      !Number.isInteger(maxAttempts) ||
+      maxAttempts < 0 ||
+      maxAttempts > 100
+    ) {
       throw new ServerActionError(
         "INVALID_ARGUMENT",
         "Max attempts must be a whole number between 1 and 100 (use 0 for unlimited).",
@@ -117,7 +124,8 @@ export class MockTestsService {
     // Resolve (and validate) the hierarchy before writing anything.
     const hierarchy = await this.resolveHierarchy(payload);
 
-    const durationMinutes = payload.durationMinutes > 0 ? payload.durationMinutes : 60;
+    const durationMinutes =
+      payload.durationMinutes > 0 ? payload.durationMinutes : 60;
     const durationSeconds = durationMinutes * 60;
     const negativePercent = Math.max(
       0,
@@ -125,10 +133,11 @@ export class MockTestsService {
     );
 
     // Fetch all questions originating from the selected documents
-    const matchedQuestions = await mockTestsRepository.findQuestionsByDocumentIds(
-      db,
-      payload.documentIds,
-    );
+    const matchedQuestions =
+      await questionsRepository.findQuestionsByDocumentIds(
+        db,
+        payload.documentIds,
+      );
 
     if (matchedQuestions.length === 0) {
       throw new ServerActionError(
@@ -170,7 +179,10 @@ export class MockTestsService {
     // Atomically persist the test and all question assignments
     await db.transaction(async (tx) => {
       await mockTestsRepository.create(tx, mockTestCommand);
-      await mockTestsRepository.createMockTestQuestions(tx, questionItemsCommand);
+      await mockTestsRepository.createMockTestQuestions(
+        tx,
+        questionItemsCommand,
+      );
     });
 
     return {
@@ -223,7 +235,7 @@ export class MockTestsService {
           );
         }
 
-        const subject = await mockTestsRepository.findSubjectById(
+        const subject = await curriculumRepository.findSubjectById(
           db,
           subjectId,
         );
@@ -252,7 +264,7 @@ export class MockTestsService {
           );
         }
 
-        const section = await mockTestsRepository.findSectionById(
+        const section = await curriculumRepository.findSectionById(
           db,
           sectionId,
         );
@@ -282,7 +294,7 @@ export class MockTestsService {
           );
         }
 
-        const chapter = await mockTestsRepository.findChapterById(
+        const chapter = await curriculumRepository.findChapterById(
           db,
           chapterId,
         );
@@ -293,7 +305,7 @@ export class MockTestsService {
           );
         }
 
-        const section = await mockTestsRepository.findSectionById(
+        const section = await curriculumRepository.findSectionById(
           db,
           chapter.sectionId,
         );
@@ -367,9 +379,7 @@ export class MockTestsService {
       MAX_MOCK_TESTS_PAGE_SIZE,
     );
 
-    const cursor = payload.cursor
-      ? decodeMockTestCursor(payload.cursor)
-      : null;
+    const cursor = payload.cursor ? decodeMockTestCursor(payload.cursor) : null;
 
     // One extra row reveals whether another page exists — no OFFSET needed.
     const rows = await mockTestsRepository.search(db, {
@@ -453,11 +463,12 @@ export class MockTestsService {
     }
 
     // Check if there's already an in-progress attempt
-    const existingAttempt = await mockTestsRepository.findInProgressAttempt(
-      db,
-      userId,
-      mockTestId,
-    );
+    const existingAttempt =
+      await mockTestAttemptRepository.findInProgressAttempt(
+        db,
+        userId,
+        mockTestId,
+      );
 
     let attempt = existingAttempt;
 
@@ -465,7 +476,7 @@ export class MockTestsService {
       // Retake limit — only a brand-new attempt counts against it, so an
       // in-progress attempt can always be resumed. 0 = unlimited.
       if (mockTest.maxAttempts > 0) {
-        const usedAttempts = await mockTestsRepository.countUserAttempts(
+        const usedAttempts = await mockTestAttemptRepository.countUserAttempts(
           db,
           userId,
           mockTestId,
@@ -483,13 +494,13 @@ export class MockTestsService {
 
       // Create new attempt
       const attemptId = generateUUIDv7();
-      await mockTestsRepository.createAttempt(db, {
+      await mockTestAttemptRepository.createAttempt(db, {
         id: attemptId,
         userId,
         mockTestId,
       });
 
-      attempt = await mockTestsRepository.findAttemptById(db, attemptId);
+      attempt = await mockTestAttemptRepository.findAttemptById(db, attemptId);
       if (!attempt) {
         throw new ServerActionError(
           "INTERNAL_ERROR",
@@ -499,14 +510,17 @@ export class MockTestsService {
     }
 
     // Load questions with passages
-    const questions = await mockTestsRepository.findAttemptQuestions(
+    const questions = await mockTestsRepository.getMockTestQuestionsForAttempt(
       db,
       mockTestId,
     );
     await this.signAttemptQuestionDiagrams(questions);
 
     // Load previously saved answers so a resumed attempt keeps its state
-    const answers = await mockTestsRepository.findAttemptAnswers(db, attempt.id);
+    const answers = await mockTestAttemptRepository.findAttemptAnswers(
+      db,
+      attempt.id,
+    );
 
     return {
       attempt,
@@ -526,14 +540,14 @@ export class MockTestsService {
     };
   }
 
-  /**
-   * Gets questions for an existing attempt.
-   */
-  async getAttemptQuestions(
+  async getQuestionsForMockTestAttempt(
     attemptId: string,
     userId: string,
   ): Promise<GetAttemptQuestionsResult> {
-    const attempt = await mockTestsRepository.findAttemptById(db, attemptId);
+    const attempt = await mockTestAttemptRepository.findAttemptById(
+      db,
+      attemptId,
+    );
     if (!attempt) {
       throw new ServerActionError(
         "NOT_FOUND",
@@ -549,7 +563,7 @@ export class MockTestsService {
       );
     }
 
-    const questions = await mockTestsRepository.findAttemptQuestions(
+    const questions = await mockTestsRepository.getMockTestQuestionsForAttempt(
       db,
       attempt.mockTestId,
     );
@@ -596,11 +610,17 @@ export class MockTestsService {
       const urlMap = new Map(signed.map((s) => [s.path, s.signedUrl]));
 
       for (const question of data.questions) {
-        if (question.questionDiagram && !question.questionDiagram.startsWith("http")) {
+        if (
+          question.questionDiagram &&
+          !question.questionDiagram.startsWith("http")
+        ) {
           question.questionDiagram =
             urlMap.get(question.questionDiagram) || question.questionDiagram;
         }
-        if (question.solutionDiagram && !question.solutionDiagram.startsWith("http")) {
+        if (
+          question.solutionDiagram &&
+          !question.solutionDiagram.startsWith("http")
+        ) {
           question.solutionDiagram =
             urlMap.get(question.solutionDiagram) || question.solutionDiagram;
         }
@@ -619,7 +639,10 @@ export class MockTestsService {
     questionId: string,
     selectedOption: "A" | "B" | "C" | "D",
   ): Promise<SubmitAnswerResult> {
-    const attempt = await mockTestsRepository.findAttemptById(db, attemptId);
+    const attempt = await mockTestAttemptRepository.findAttemptById(
+      db,
+      attemptId,
+    );
     if (!attempt) {
       throw new ServerActionError(
         "NOT_FOUND",
@@ -644,7 +667,7 @@ export class MockTestsService {
     }
 
     const answerId = generateUUIDv7();
-    const answer = await mockTestsRepository.upsertAttemptAnswer(db, {
+    const answer = await mockTestAttemptRepository.upsertAttemptAnswer(db, {
       id: answerId,
       attemptId,
       questionId,
@@ -666,11 +689,11 @@ export class MockTestsService {
   /**
    * Completes a mock test attempt.
    */
-  async completeMockAttempt(
-    userId: string,
-    attemptId: string,
-  ): Promise<void> {
-    const attempt = await mockTestsRepository.findAttemptById(db, attemptId);
+  async completeMockAttempt(userId: string, attemptId: string): Promise<void> {
+    const attempt = await mockTestAttemptRepository.findAttemptById(
+      db,
+      attemptId,
+    );
     if (!attempt) {
       throw new ServerActionError(
         "NOT_FOUND",
@@ -694,7 +717,7 @@ export class MockTestsService {
       );
     }
 
-    await mockTestsRepository.completeAttempt(db, { attemptId });
+    await mockTestAttemptRepository.completeAttempt(db, { attemptId });
   }
 
   /**
@@ -704,7 +727,10 @@ export class MockTestsService {
     userId: string,
     attemptId: string,
   ): Promise<GetAttemptResult> {
-    const attempt = await mockTestsRepository.findAttemptById(db, attemptId);
+    const attempt = await mockTestAttemptRepository.findAttemptById(
+      db,
+      attemptId,
+    );
     if (!attempt) {
       throw new ServerActionError(
         "NOT_FOUND",
@@ -812,14 +838,14 @@ export class MockTestsService {
     userId: string,
     mockTestId?: string,
   ): Promise<AttemptHistoryResult> {
-    const attempts = await mockTestsRepository.findUserAttempts(
+    const attempts = await mockTestAttemptRepository.findUserAttempts(
       db,
       userId,
       mockTestId,
     );
     if (attempts.length === 0) return [];
 
-    const answers = await mockTestsRepository.findAnswersForAttempts(
+    const answers = await mockTestAttemptRepository.findAnswersForAttempts(
       db,
       attempts.map((a) => a.id),
     );
@@ -864,8 +890,14 @@ export class MockTestsService {
   private async requireCompletedAttemptForReview(
     userId: string,
     attemptId: string,
-  ): Promise<{ attempt: MockTestAttemptProjection; mockTest: MockTestDetailsProjection }> {
-    const attempt = await mockTestsRepository.findAttemptById(db, attemptId);
+  ): Promise<{
+    attempt: MockTestAttemptProjection;
+    mockTest: MockTestDetailsProjection;
+  }> {
+    const attempt = await mockTestAttemptRepository.findAttemptById(
+      db,
+      attemptId,
+    );
     if (!attempt) {
       throw new ServerActionError(
         "NOT_FOUND",
@@ -915,9 +947,10 @@ export class MockTestsService {
       db,
       [attempt.mockTestId],
     );
-    const answerRows = await mockTestsRepository.findAnswersForAttempts(db, [
-      attempt.id,
-    ]);
+    const answerRows = await mockTestAttemptRepository.findAnswersForAttempts(
+      db,
+      [attempt.id],
+    );
 
     const meta: AttemptMetaProjection = {
       id: attempt.id,
@@ -941,7 +974,8 @@ export class MockTestsService {
       const selected = selectedByQuestion.get(question.questionId) ?? null;
       let status: "correct" | "incorrect" | "unattempted";
       if (!selected) status = "unattempted";
-      else if (selected === question.correctOption.toUpperCase()) status = "correct";
+      else if (selected === question.correctOption.toUpperCase())
+        status = "correct";
       else status = "incorrect";
 
       return {
@@ -1071,7 +1105,9 @@ export class MockTestsService {
 
     // Calculate negative marks (positive value for display)
     const negativeMarks =
-      negativePercent > 0 ? Math.round(record.marks * negativePercent) / 100 : 0;
+      negativePercent > 0
+        ? Math.round(record.marks * negativePercent) / 100
+        : 0;
 
     return {
       ...question,
@@ -1093,7 +1129,10 @@ export class MockTestsService {
   async getAttemptForReview(
     attemptId: string,
   ): Promise<{ id: string; mockTestId: string; status: string } | null> {
-    const attempt = await mockTestsRepository.findAttemptById(db, attemptId);
+    const attempt = await mockTestAttemptRepository.findAttemptById(
+      db,
+      attemptId,
+    );
     if (!attempt) return null;
     if (attempt.status !== "completed") return null;
     return {

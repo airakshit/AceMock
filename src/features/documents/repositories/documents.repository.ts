@@ -1,24 +1,39 @@
-import { documents, documentFiles } from "@/db/schemas";
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { generateUUIDv7 } from "../../shared/utils";
+import { documents, documentFiles, filePages, questions } from "@/db/schemas";
+import { and, desc, eq, inArray, count } from "drizzle-orm";
+import {
+  DocumentProjection,
+  DocumentWithFilesProjection,
+  DocumentWithQuestionCountProjection,
+  DocumentFileProjection,
+  FilePageProjection,
+} from "../dto/projections";
+import {
+  CreateDocumentCommand,
+  CreateDocumentFileCommand,
+  UpdateDocumentCommand,
+  UpdateDocumentFileCommand,
+  UpdateDocumentFileProcessingStatusCommand,
+  DeleteDocumentCommand,
+  DeleteDocumentFileCommand,
+  CreateFilePageCommand,
+  UpdateFilePageCommand,
+  DeleteFilePageCommand,
+} from "../dto/commands";
 import { DbExecutor } from "../../shared/types";
-import { DocumentProcessingStatus } from "../types";
+import { DocumentProcessingStatus, FileProcessingStatus, FilePageOCRStatus } from "../types";
 
 export class DocumentsRepository {
+  // ==================== COMMANDS (writes) ====================
+
   async create(
     db: DbExecutor,
-    userId: string,
-    data: {
-      documentId: string;
-      title: string;
-      description?: string;
-    },
-  ) {
+    data: CreateDocumentCommand,
+  ): Promise<DocumentProjection> {
     const [document] = await db
       .insert(documents)
       .values({
         id: data.documentId,
-        userId: userId,
+        userId: data.userId,
         title: data.title,
         description: data.description,
       })
@@ -27,47 +42,338 @@ export class DocumentsRepository {
     return document;
   }
 
-  async findById(db: DbExecutor, documentId: string) {
+  async createFile(
+    db: DbExecutor,
+    data: CreateDocumentFileCommand,
+  ): Promise<DocumentFileProjection> {
+    const [file] = await db
+      .insert(documentFiles)
+      .values({
+        id: data.id,
+        documentId: data.documentId,
+        filename: data.filename,
+        fileSize: data.fileSize,
+        mimeType: data.mimeType,
+        storagePath: data.storagePath,
+      })
+      .returning();
+
+    return file;
+  }
+
+  async createManyFiles(
+    db: DbExecutor,
+    data: CreateDocumentFileCommand[],
+  ): Promise<DocumentFileProjection[]> {
+    if (data.length === 0) return [];
+
+    const values = data.map((file) => ({
+      id: file.id,
+      documentId: file.documentId,
+      filename: file.filename,
+      fileSize: file.fileSize,
+      mimeType: file.mimeType,
+      storagePath: file.storagePath,
+    }));
+
+    const createdFiles = await db
+      .insert(documentFiles)
+      .values(values)
+      .returning();
+
+    return createdFiles;
+  }
+
+  async createFilePage(
+    db: DbExecutor,
+    data: CreateFilePageCommand,
+  ): Promise<FilePageProjection> {
+    const [page] = await db
+      .insert(filePages)
+      .values({
+        id: data.id,
+        fileId: data.fileId,
+        pageNo: data.pageNo,
+      })
+      .returning();
+
+    return page;
+  }
+
+  async createManyFilePages(
+    db: DbExecutor,
+    data: CreateFilePageCommand[],
+  ): Promise<FilePageProjection[]> {
+    if (data.length === 0) return [];
+
+    const values = data.map((page) => ({
+      id: page.id,
+      fileId: page.fileId,
+      pageNo: page.pageNo,
+    }));
+
+    const createdPages = await db.insert(filePages).values(values).returning();
+
+    return createdPages;
+  }
+
+  async update(
+    db: DbExecutor,
+    data: UpdateDocumentCommand,
+  ): Promise<DocumentProjection | null> {
+    const [document] = await db
+      .update(documents)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(documents.id, data.documentId), eq(documents.userId, data.userId)),
+      )
+      .returning();
+
+    return document || null;
+  }
+
+  async updateFile(
+    db: DbExecutor,
+    data: UpdateDocumentFileCommand,
+  ): Promise<DocumentFileProjection | null> {
+    const [file] = await db
+      .update(documentFiles)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(documentFiles.id, data.fileId),
+          eq(documentFiles.documentId, data.documentId),
+        ),
+      )
+      .returning();
+
+    return file || null;
+  }
+
+  async updateFileProcessingStatus(
+    db: DbExecutor,
+    data: UpdateDocumentFileProcessingStatusCommand,
+  ): Promise<DocumentFileProjection[]> {
+    const files = await db
+      .update(documentFiles)
+      .set({
+        processingStatus: data.status,
+      })
+      .where(eq(documentFiles.documentId, data.documentId))
+      .returning();
+
+    return files;
+  }
+
+  async updateFilePage(
+    db: DbExecutor,
+    data: UpdateFilePageCommand,
+  ): Promise<FilePageProjection | null> {
+    const { ocrModel, survivedValidation, ...rest } = data;
+
+    const updateData = {
+      ...rest,
+      updatedAt: new Date(),
+      ...(ocrModel !== undefined && { ocrModel }),
+      ...(survivedValidation !== undefined && { survivedValidation }),
+    };
+
+    const [page] = await db
+      .update(filePages)
+      .set(updateData)
+      .where(
+        and(eq(filePages.id, data.pageId), eq(filePages.fileId, data.fileId)),
+      )
+      .returning();
+
+    return page || null;
+  }
+
+  async updateFilePageStatus(
+    db: DbExecutor,
+    fileId: string,
+    ocrStatus: FilePageOCRStatus,
+  ): Promise<FilePageProjection[]> {
+    const pages = await db
+      .update(filePages)
+      .set({
+        ocrStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(filePages.fileId, fileId))
+      .returning();
+
+    return pages;
+  }
+
+  async updateFilePageStatusByPageId(
+    db: DbExecutor,
+    pageId: string,
+    ocrStatus: FilePageOCRStatus,
+  ): Promise<FilePageProjection | null> {
+    const [page] = await db
+      .update(filePages)
+      .set({ ocrStatus, updatedAt: new Date() })
+      .where(eq(filePages.id, pageId))
+      .returning();
+
+    return page || null;
+  }
+
+  async updateFilePagesStatus(
+    db: DbExecutor,
+    fileId: string,
+    pageIds: string[],
+    status: FilePageOCRStatus,
+  ): Promise<FilePageProjection[]> {
+    if (pageIds.length === 0) return [];
+
+    return db
+      .update(filePages)
+      .set({
+        ocrStatus: status,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(filePages.fileId, fileId), inArray(filePages.id, pageIds)))
+      .returning();
+  }
+
+  async delete(
+    db: DbExecutor,
+    data: DeleteDocumentCommand,
+  ): Promise<DocumentProjection | null> {
+    const [document] = await db
+      .delete(documents)
+      .where(
+        and(eq(documents.id, data.documentId), eq(documents.userId, data.userId)),
+      )
+      .returning();
+
+    return document || null;
+  }
+
+  async deleteFile(
+    db: DbExecutor,
+    data: DeleteDocumentFileCommand,
+  ): Promise<DocumentFileProjection | null> {
+    const [file] = await db
+      .delete(documentFiles)
+      .where(
+        and(
+          eq(documentFiles.id, data.fileId),
+          eq(documentFiles.documentId, data.documentId),
+        ),
+      )
+      .returning();
+
+    return file || null;
+  }
+
+  async deleteFilePage(
+    db: DbExecutor,
+    data: DeleteFilePageCommand,
+  ): Promise<FilePageProjection | null> {
+    const [page] = await db
+      .delete(filePages)
+      .where(
+        and(eq(filePages.id, data.pageId), eq(filePages.fileId, data.fileId)),
+      )
+      .returning();
+
+    return page || null;
+  }
+
+  // ==================== QUERIES (reads) ====================
+
+  async findById(
+    db: DbExecutor,
+    documentId: string,
+  ): Promise<DocumentProjection | null> {
     const [document] = await db
       .select()
       .from(documents)
       .where(eq(documents.id, documentId))
       .limit(1);
 
-    return document;
+    return document || null;
   }
 
-  async findByIdForUser(db: DbExecutor, documentId: string, userId: string) {
+  async findByIdForUser(
+    db: DbExecutor,
+    documentId: string,
+    userId: string,
+  ): Promise<DocumentProjection | null> {
     const [document] = await db
       .select()
       .from(documents)
       .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
       .limit(1);
 
-    return document;
+    return document || null;
   }
 
   async findByIdForUserWithFiles(
     db: DbExecutor,
     documentId: string,
     userId: string,
-  ) {
+  ): Promise<DocumentWithFilesProjection | null> {
     const document = await this.findByIdForUser(db, documentId, userId);
     if (!document) return null;
 
     const files = await db
-      .select()
+      .select({
+        id: documentFiles.id,
+        documentId: documentFiles.documentId,
+        filename: documentFiles.filename,
+        mimeType: documentFiles.mimeType,
+        fileSize: documentFiles.fileSize,
+        storagePath: documentFiles.storagePath,
+        uploadStatus: documentFiles.uploadStatus,
+        processingStatus: documentFiles.processingStatus,
+        createdAt: documentFiles.createdAt,
+        updatedAt: documentFiles.updatedAt,
+      })
       .from(documentFiles)
       .where(eq(documentFiles.documentId, documentId))
       .orderBy(desc(documentFiles.createdAt));
 
+    const filesWithPages = await Promise.all(
+      files.map(async (file) => {
+        const pages = await db
+          .select()
+          .from(filePages)
+          .where(eq(filePages.fileId, file.id))
+          .orderBy(desc(filePages.createdAt));
+
+        return {
+          ...file,
+          pages: pages as FilePageProjection[],
+        };
+      }),
+    );
+
     return {
-      ...document,
-      files,
+      id: document.id,
+      userId: document.userId,
+      title: document.title,
+      description: document.description,
+      processingStatus: document.processingStatus,
+      createdAt: document.createdAt,
+      updatedAt: document.updatedAt,
+      files: filesWithPages,
     };
   }
 
-  async findByUser(db: DbExecutor, userId: string) {
+  async findByUser(
+    db: DbExecutor,
+    userId: string,
+  ): Promise<DocumentProjection[]> {
     return db
       .select()
       .from(documents)
@@ -75,24 +381,10 @@ export class DocumentsRepository {
       .orderBy(desc(documents.createdAt));
   }
 
-  async findFilesByDocumentId(db: DbExecutor, documentId: string) {
-    const data = await db
-      .select({
-        fileId: documentFiles.id,
-        storagePath: documentFiles.storagePath,
-        mimeType: documentFiles.mimeType,
-        filename: documentFiles.filename,
-        fileSize: documentFiles.fileSize,
-        fileUploadStatus: documentFiles.uploadStatus,
-      })
-      .from(documents)
-      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
-      .where(eq(documents.id, documentId))
-
-    return data;
-  }
-
-  async findByUserWithFiles(db: DbExecutor, userId: string) {
+  async findByUserWithFiles(
+    db: DbExecutor,
+    userId: string,
+  ): Promise<DocumentWithFilesProjection[]> {
     const userDocs = await db
       .select()
       .from(documents)
@@ -103,70 +395,104 @@ export class DocumentsRepository {
 
     const docIds = userDocs.map((d) => d.id);
     const files = await db
-      .select()
+      .select({
+        id: documentFiles.id,
+        documentId: documentFiles.documentId,
+        filename: documentFiles.filename,
+        mimeType: documentFiles.mimeType,
+        fileSize: documentFiles.fileSize,
+        storagePath: documentFiles.storagePath,
+        uploadStatus: documentFiles.uploadStatus,
+        processingStatus: documentFiles.processingStatus,
+        createdAt: documentFiles.createdAt,
+        updatedAt: documentFiles.updatedAt,
+      })
       .from(documentFiles)
       .where(inArray(documentFiles.documentId, docIds))
       .orderBy(desc(documentFiles.createdAt));
 
-    const filesMap = new Map<string, typeof files>();
+    const filesMap = new Map<string, (typeof files)[number] & { pages: FilePageProjection[] }>();
     for (const file of files) {
-      const existing = filesMap.get(file.documentId) || [];
-      existing.push(file);
+      const existing = filesMap.get(file.documentId) || { ...file, pages: [] as FilePageProjection[] };
+      existing.pages = []; // Will be populated below
       filesMap.set(file.documentId, existing);
     }
 
+    // Fetch pages for all files
+    const fileIds = files.map((f) => f.id);
+    const allPages = await db
+      .select()
+      .from(filePages)
+      .where(inArray(filePages.fileId, fileIds))
+      .orderBy(desc(filePages.createdAt));
+
+    for (const page of allPages) {
+      const file = filesMap.get(page.fileId);
+      if (file) {
+        file.pages.push(page as FilePageProjection);
+      }
+    }
+
     return userDocs.map((doc) => ({
-      ...doc,
-      files: filesMap.get(doc.id) || [],
+      id: doc.id,
+      userId: doc.userId,
+      title: doc.title,
+      description: doc.description,
+      processingStatus: doc.processingStatus,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+      files: filesMap.get(doc.id)
+        ? [filesMap.get(doc.id)!]
+        : [],
     }));
   }
 
-  async update(
+  async findFilesByDocumentId(
     db: DbExecutor,
     documentId: string,
-    userId: string,
-    data: {
-      title?: string;
-      description?: string;
-      status?: DocumentProcessingStatus;
-    },
-  ) {
-    const [document] = await db
-      .update(documents)
-      .set({
-        ...data,
-        updatedAt: new Date(),
+  ): Promise<DocumentFileProjection[]> {
+    const data = await db
+      .select({
+        id: documentFiles.id,
+        documentId: documentFiles.documentId,
+        filename: documentFiles.filename,
+        mimeType: documentFiles.mimeType,
+        fileSize: documentFiles.fileSize,
+        storagePath: documentFiles.storagePath,
+        uploadStatus: documentFiles.uploadStatus,
+        processingStatus: documentFiles.processingStatus,
+        createdAt: documentFiles.createdAt,
+        updatedAt: documentFiles.updatedAt,
       })
-      .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
-      .returning();
+      .from(documents)
+      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
+      .where(eq(documents.id, documentId));
 
-    return document;
+    return data as DocumentFileProjection[];
   }
 
-  async updateProcessingStatus(
+  async findDocumentsWithQuestionsCount(
     db: DbExecutor,
-    documentId: string,
-    status: DocumentProcessingStatus,
-  ) {
-    const [document] = await db
-      .update(documents)
-      .set({
-        processingStatus: status,
-        updatedAt: new Date(),
+  ): Promise<DocumentWithQuestionCountProjection[]> {
+    const records = await db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        createdAt: documents.createdAt,
+        questionCount: count(questions.id),
       })
-      .where(eq(documents.id, documentId))
-      .returning();
+      .from(documents)
+      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
+      .leftJoin(questions, eq(questions.fileId, documentFiles.id))
+      .groupBy(documents.id, documents.title, documents.createdAt)
+      .orderBy(desc(documents.createdAt));
 
-    return document;
-  }
-
-  async delete(db: DbExecutor, documentId: string, userId: string) {
-    const [document] = await db
-      .delete(documents)
-      .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
-      .returning();
-
-    return document;
+    return records.map((r) => ({
+      id: r.id,
+      title: r.title,
+      createdAt: r.createdAt,
+      questionCount: Number(r.questionCount || 0),
+    }));
   }
 }
 

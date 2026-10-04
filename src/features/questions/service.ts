@@ -18,12 +18,13 @@ import {
 import {
   BookmarkedQuestionProjection,
   CurriculumOptionsProjection,
-  DocumentWithQuestionCountProjection,
   QuestionDetailsProjection,
 } from "./dto/projections";
+import { DocumentWithQuestionCountProjection } from "@/features/documents/dto/projections";
 import { questionsRepository } from "./repositories/questions.repository";
 import { questionBookmarksRepository } from "./repositories/question-bookmarks.repository";
 import { questionReportsRepository } from "./repositories/question-reports.repository";
+import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { OptionKey } from "../shared/components/question-card";
 import { isQuestionReportType } from "../shared/components/question-card/types";
 import { decodeBookmarkCursor, encodeBookmarkCursor } from "./utils";
@@ -152,7 +153,7 @@ class QuestionsService {
   async getRecentDocumentsForFilter(
     limit: number = 20,
   ): Promise<DocumentWithQuestionCountProjection[]> {
-    return questionsRepository.findRecentDocumentsWithQuestions(db, limit);
+    return documentsRepository.findDocumentsWithQuestionsCount(db);
   }
 
   /**

@@ -5,7 +5,7 @@ import {
   structuredOutputExtractionPromptV2,
   structuredOutputExtractionPromptV3,
 } from "@/services/llm/prompts";
-import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
+import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { db } from "@/db";
 import { OcrPageResult } from "./types";
 import {
@@ -22,6 +22,7 @@ import {
 import { env } from "@/config/env/server";
 import { RateLimitError } from "@/services/llm/errors";
 import { RetryAfterError } from "inngest";
+import { FilePageOCRStatus } from "@/features/documents/types";
 
 export interface OcrPageEventData {
   userId: string;
@@ -51,7 +52,7 @@ export const ocrPage = inngest.createFunction(
 
     // 0. Update file page status to "running"
     await step.run("update-file-ocr-status", async () => {
-      await filePagesRepository.updateStatusByPageId(db, pageId, "running");
+      await documentsRepository.updateFilePageStatusByPageId(db, pageId, "running" as FilePageOCRStatus);
     });
 
     // 1. Generate a signed URL for the page image in Supabase storage
@@ -171,7 +172,9 @@ export const ocrPage = inngest.createFunction(
 
     // 3. Persist the cleaned (not parsed) OCR text & validation result to the database in a dedicated step
     await step.run("update-page-ocr-result", async () => {
-      await filePagesRepository.update(db, pageId, fileId, {
+      await documentsRepository.updateFilePage(db, {
+        pageId,
+        fileId,
         pageNo,
         ocrText: extraction.rawText ?? undefined,
         ocrStatus: extraction.ocrStatus,

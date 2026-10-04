@@ -3,10 +3,12 @@ import { processFileBlob } from "./preprocessing";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
-import { documentFilesRepository } from "@/features/documents/repositories/document-files.repository";
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { performance } from "node:perf_hooks";
-import { filePagesRepository } from "@/features/documents/repositories/file-pages.repository";
+import { FileProcessingStatus } from "@/features/documents/types";
+import { eq } from "drizzle-orm";
+import { documentFiles } from "@/db/schemas";
+import { generateUUIDv7 } from "@/features/shared/utils";
 import { EXTRACT_QUESTIONS_EVENT } from "../extract-questions/func";
 
 export interface ProcessDocumentEventData {
@@ -27,28 +29,33 @@ export const processDocument = inngest.createFunction(
     let start = performance.now();
 
     await step.run(`mark-document-as-processing-files`, async () => {
-      await documentsRepository.updateProcessingStatus(
-        db,
+      await documentsRepository.updateFileProcessingStatus(db, {
         documentId,
-        "processing_files",
-      );
+        status: "processing_files" as FileProcessingStatus,
+      });
     });
 
     const docFiles = await step.run(`mark-files-as-running`, async () => {
-      return await documentFilesRepository.updateStatusByDocumentId(
-        db,
-        documentId,
-        "running",
-      );
+      // Update file processing status to running
+      const files = await db
+        .select()
+        .from((await import("@/db/schemas")).documentFiles)
+        .where(eq((await import("@/db/schemas")).documentFiles.documentId, documentId));
+      for (const file of files) {
+        await documentsRepository.updateFileProcessingStatus(db, {
+          documentId,
+          status: "running" as FileProcessingStatus,
+        });
+      }
+      return files;
     });
 
     if (!docFiles || docFiles.length === 0) {
       await step.run(`mark-document-as-failed-no-files`, async () => {
-        await documentsRepository.updateProcessingStatus(
-          db,
+        await documentsRepository.updateFileProcessingStatus(db, {
           documentId,
-          "failed",
-        );
+          status: "failed" as FileProcessingStatus,
+        });
       });
 
       return {
@@ -154,31 +161,38 @@ export const processDocument = inngest.createFunction(
     );
 
     await step.run(`mark-files-as-completed`, async () => {
-      return await documentFilesRepository.updateStatusByDocumentId(
-        db,
-        documentId,
-        "completed",
-      );
+      // Update file processing status to completed
+      const files = await db
+        .select()
+        .from((await import("@/db/schemas")).documentFiles)
+        .where(eq((await import("@/db/schemas")).documentFiles.documentId, documentId));
+      for (const file of files) {
+        await documentsRepository.updateFileProcessingStatus(db, {
+          documentId,
+          status: "completed" as FileProcessingStatus,
+        });
+      }
+      return files;
     });
 
     start = performance.now();
     const pages = await step.run(`create-ready-pages`, async () => {
-      const data: Array<{ fileId: string; pageNo: number }> = [];
+      const data: Array<{ id: string; fileId: string; pageNo: number }> = [];
 
       processedFiles.forEach((file) => {
         file.pages.forEach((page) => {
           data.push({
+            id: generateUUIDv7(),
             fileId: file.id,
             pageNo: page.pageNumber,
           });
         });
       });
-      const createdPages = await filePagesRepository.createMany(db, data);
-      await documentsRepository.updateProcessingStatus(
-        db,
+      const createdPages = await documentsRepository.createManyFilePages(db, data);
+      await documentsRepository.updateFileProcessingStatus(db, {
         documentId,
-        "extracting_questions",
-      );
+        status: "extracting_questions" as FileProcessingStatus,
+      });
       return createdPages;
     });
     logger.info(
@@ -192,11 +206,10 @@ export const processDocument = inngest.createFunction(
 
     if (pages.length === 0) {
       await step.run("mark-document-as-failed-no-pages", async () => {
-        await documentsRepository.updateProcessingStatus(
-          db,
+        await documentsRepository.updateFileProcessingStatus(db, {
           documentId,
-          "failed",
-        );
+          status: "failed" as FileProcessingStatus,
+        });
       });
 
       return {

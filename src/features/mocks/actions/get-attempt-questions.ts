@@ -12,7 +12,7 @@ export async function getAttemptQuestionsAction(
   try {
     const session = await requireSession();
 
-    const data = await mockTestsService.getAttemptQuestions(
+    const data = await mockTestsService.getQuestionsForMockTestAttempt(
       attemptId,
       session.user.id,
     );
