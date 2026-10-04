@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { ServerActionError } from "@/features/shared/actions/error";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { generateUUIDv7 } from "@/features/shared/utils";
+import { generateUUIDv7, isValidUUID } from "@/features/shared/utils";
 import { chapters } from "@/db/schemas/questions/chapters";
 import { sections } from "@/db/schemas/questions/sections";
 import { subjects } from "@/db/schemas/questions/subjects";
@@ -11,7 +11,10 @@ import {
   CreateMockTestCommand,
   CreateMockTestQuestionItemCommand,
 } from "./dto/commands";
-import { CreateMockTestFromDocumentsPayload } from "./dto/payloads";
+import {
+  CreateMockTestFromDocumentsPayload,
+  SearchMockTestsPayload,
+} from "./dto/payloads";
 import {
   DocumentOptionForMockProjection,
   MockTestDetailsProjection,
@@ -38,8 +41,25 @@ import {
   AttemptHistoryResult,
   AttemptDetailsResult,
   AttemptReviewSummaryResult,
+  MockTestSearchResult,
 } from "./dto/results";
 import { mockTestsRepository } from "./repositories/mock-tests.repository";
+import {
+  decodeMockTestCursor,
+  encodeMockTestCursor,
+  isMockTestScope,
+} from "./utils";
+
+/** Rows returned per mock test search page. */
+const MOCK_TESTS_PAGE_SIZE = 12;
+const MAX_MOCK_TESTS_PAGE_SIZE = 50;
+
+/** Curriculum columns of a newly created mock test. */
+interface MockTestHierarchy {
+  subjectId: string | null;
+  sectionId: string | null;
+  chapterId: string | null;
+}
 
 export class MockTestsService {
   /**
@@ -52,6 +72,10 @@ export class MockTestsService {
   /**
    * Creates a new mock test directly from selected documents.
    * Pulls all questions associated with the chosen documents and links them in sequence.
+   *
+   * Admin-only (the action guarding it calls `requireAdmin()`), so the test is
+   * stored with `byAdmin = true` and the curriculum columns resolved from the
+   * selected entity for the chosen scope.
    */
   async createFromDocuments(
     userId: string,
@@ -65,12 +89,33 @@ export class MockTestsService {
       );
     }
 
+    if (!isMockTestScope(payload.scope)) {
+      throw new ServerActionError(
+        "INVALID_ARGUMENT",
+        "Please select where this mock test belongs (IOE model, subject, section, chapter or miscellaneous).",
+      );
+    }
+
     if (!payload.documentIds || payload.documentIds.length === 0) {
       throw new ServerActionError(
         "INVALID_ARGUMENT",
         "Please select at least one document to generate the mock test from.",
       );
     }
+
+    // Test rules: timing is opt-in untimed (a test stays an exam unless the
+    // admin says otherwise) and the retake limit is 0 = unlimited.
+    const allowUntimed = payload.allowUntimed === true;
+    const maxAttempts = payload.maxAttempts ?? 1;
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 0 || maxAttempts > 100) {
+      throw new ServerActionError(
+        "INVALID_ARGUMENT",
+        "Max attempts must be a whole number between 1 and 100 (use 0 for unlimited).",
+      );
+    }
+
+    // Resolve (and validate) the hierarchy before writing anything.
+    const hierarchy = await this.resolveHierarchy(payload);
 
     const durationMinutes = payload.durationMinutes > 0 ? payload.durationMinutes : 60;
     const durationSeconds = durationMinutes * 60;
@@ -107,6 +152,11 @@ export class MockTestsService {
       negativePercentagePerQuestion: negativePercent,
       durationSeconds,
       instructions: payload.instructions?.trim() || null,
+      byAdmin: true,
+      scope: payload.scope,
+      allowUntimed,
+      maxAttempts,
+      ...hierarchy,
     };
 
     const questionItemsCommand: CreateMockTestQuestionItemCommand[] =
@@ -134,12 +184,221 @@ export class MockTestsService {
   }
 
   /**
+   * Resolves the curriculum columns of a new mock test from the entity that
+   * was actually selected — never from client-supplied parent ids:
+   *
+   *   ioe_model / miscellaneous → all null
+   *   subject                   → the selected subject
+   *   section                   → the section's subject + the section
+   *   chapter                   → the chapter's section + that section's subject
+   *
+   * Guarantees the row satisfies `mock_test_scope_reference_check`.
+   */
+  private async resolveHierarchy(
+    payload: CreateMockTestFromDocumentsPayload,
+  ): Promise<MockTestHierarchy> {
+    const empty: MockTestHierarchy = {
+      subjectId: null,
+      sectionId: null,
+      chapterId: null,
+    };
+
+    switch (payload.scope) {
+      case "ioe_model":
+      case "miscellaneous":
+        return empty;
+
+      case "subject": {
+        const subjectId = payload.subjectId?.trim() || "";
+        if (!subjectId) {
+          throw new ServerActionError(
+            "INVALID_ARGUMENT",
+            "Please select a subject for this mock test.",
+          );
+        }
+        if (!isValidUUID(subjectId)) {
+          throw new ServerActionError(
+            "INVALID_ARGUMENT",
+            "The selected subject is invalid.",
+          );
+        }
+
+        const subject = await mockTestsRepository.findSubjectById(
+          db,
+          subjectId,
+        );
+        if (!subject) {
+          throw new ServerActionError(
+            "NOT_FOUND",
+            "The selected subject no longer exists.",
+          );
+        }
+
+        return { ...empty, subjectId: subject.id };
+      }
+
+      case "section": {
+        const sectionId = payload.sectionId?.trim() || "";
+        if (!sectionId) {
+          throw new ServerActionError(
+            "INVALID_ARGUMENT",
+            "Please select a section for this mock test.",
+          );
+        }
+        if (!isValidUUID(sectionId)) {
+          throw new ServerActionError(
+            "INVALID_ARGUMENT",
+            "The selected section is invalid.",
+          );
+        }
+
+        const section = await mockTestsRepository.findSectionById(
+          db,
+          sectionId,
+        );
+        if (!section) {
+          throw new ServerActionError(
+            "NOT_FOUND",
+            "The selected section no longer exists.",
+          );
+        }
+
+        // Derived from the section itself — the payload's subjectId is ignored.
+        return { ...empty, subjectId: section.subjectId, sectionId };
+      }
+
+      case "chapter": {
+        const chapterId = payload.chapterId?.trim() || "";
+        if (!chapterId) {
+          throw new ServerActionError(
+            "INVALID_ARGUMENT",
+            "Please select a chapter for this mock test.",
+          );
+        }
+        if (!isValidUUID(chapterId)) {
+          throw new ServerActionError(
+            "INVALID_ARGUMENT",
+            "The selected chapter is invalid.",
+          );
+        }
+
+        const chapter = await mockTestsRepository.findChapterById(
+          db,
+          chapterId,
+        );
+        if (!chapter) {
+          throw new ServerActionError(
+            "NOT_FOUND",
+            "The selected chapter no longer exists.",
+          );
+        }
+
+        const section = await mockTestsRepository.findSectionById(
+          db,
+          chapter.sectionId,
+        );
+        if (!section) {
+          throw new ServerActionError(
+            "NOT_FOUND",
+            "The section owning the selected chapter no longer exists.",
+          );
+        }
+
+        // Both parents derived from the chapter — payload ids are ignored.
+        return {
+          subjectId: section.subjectId,
+          sectionId: section.id,
+          chapterId: chapter.id,
+        };
+      }
+
+      default:
+        throw new ServerActionError(
+          "INVALID_ARGUMENT",
+          `Unknown mock test scope: ${String(payload.scope)}.`,
+        );
+    }
+  }
+
+  /**
    * Retrieves all mock tests with stats for admin view.
    */
   async getAllMockTests(options?: {
     search?: string;
   }): Promise<MockTestListItemProjection[]> {
     return await mockTestsRepository.findAll(db, options);
+  }
+
+  /**
+   * Cursor-paginated search over mock tests (scope / hierarchy / creator /
+   * name filters).
+   *
+   * Fetches `pageSize + 1` rows to decide `hasNextPage`, so pages never skip
+   * or duplicate a record: `nextCursor` holds the exact ORDER BY key of the
+   * last returned row and must be replayed with the same filters.
+   */
+  async searchMockTests(
+    payload: SearchMockTestsPayload = {},
+  ): Promise<MockTestSearchResult> {
+    if (payload.scope !== undefined && !isMockTestScope(payload.scope)) {
+      throw new ServerActionError(
+        "INVALID_ARGUMENT",
+        `Unknown mock test scope: ${String(payload.scope)}.`,
+      );
+    }
+
+    const hierarchyFilters = {
+      subjectId: payload.subjectId,
+      sectionId: payload.sectionId,
+      chapterId: payload.chapterId,
+    } as const;
+
+    for (const [key, value] of Object.entries(hierarchyFilters)) {
+      if (value && !isValidUUID(value)) {
+        throw new ServerActionError(
+          "INVALID_ARGUMENT",
+          `Invalid ${key} filter.`,
+        );
+      }
+    }
+
+    const pageSize = Math.min(
+      Math.max(Math.round(payload.pageSize ?? MOCK_TESTS_PAGE_SIZE), 1),
+      MAX_MOCK_TESTS_PAGE_SIZE,
+    );
+
+    const cursor = payload.cursor
+      ? decodeMockTestCursor(payload.cursor)
+      : null;
+
+    // One extra row reveals whether another page exists — no OFFSET needed.
+    const rows = await mockTestsRepository.search(db, {
+      scope: payload.scope,
+      subjectId: hierarchyFilters.subjectId?.trim() || undefined,
+      sectionId: hierarchyFilters.sectionId?.trim() || undefined,
+      chapterId: hierarchyFilters.chapterId?.trim() || undefined,
+      byAdmin: payload.byAdmin,
+      search: payload.search?.trim() || undefined,
+      cursor,
+      limit: pageSize + 1,
+    });
+
+    const hasNextPage = rows.length > pageSize;
+    const items = hasNextPage ? rows.slice(0, pageSize) : rows;
+    const lastItem = items[items.length - 1];
+
+    return {
+      items,
+      hasNextPage,
+      nextCursor:
+        hasNextPage && lastItem
+          ? encodeMockTestCursor({
+              scope: lastItem.scope,
+              createdAt: lastItem.createdAt,
+              id: lastItem.id,
+            })
+          : null,
+    };
   }
 
   /**
@@ -183,6 +442,16 @@ export class MockTestsService {
     userId: string,
     mockTestId: string,
   ): Promise<StartMockAttemptResult> {
+    // Load the test first — it holds the attempt rules and its absence must
+    // not leave an orphaned attempt row behind.
+    const mockTest = await mockTestsRepository.findById(db, mockTestId);
+    if (!mockTest) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        `Mock test with ID ${mockTestId} was not found.`,
+      );
+    }
+
     // Check if there's already an in-progress attempt
     const existingAttempt = await mockTestsRepository.findInProgressAttempt(
       db,
@@ -193,6 +462,25 @@ export class MockTestsService {
     let attempt = existingAttempt;
 
     if (!attempt) {
+      // Retake limit — only a brand-new attempt counts against it, so an
+      // in-progress attempt can always be resumed. 0 = unlimited.
+      if (mockTest.maxAttempts > 0) {
+        const usedAttempts = await mockTestsRepository.countUserAttempts(
+          db,
+          userId,
+          mockTestId,
+        );
+
+        if (usedAttempts >= mockTest.maxAttempts) {
+          throw new ServerActionError(
+            "ATTEMPT_LIMIT_REACHED",
+            mockTest.maxAttempts === 1
+              ? "You have already used your only attempt for this test."
+              : `You have used all ${mockTest.maxAttempts} attempts allowed for this test.`,
+          );
+        }
+      }
+
       // Create new attempt
       const attemptId = generateUUIDv7();
       await mockTestsRepository.createAttempt(db, {
@@ -220,15 +508,6 @@ export class MockTestsService {
     // Load previously saved answers so a resumed attempt keeps its state
     const answers = await mockTestsRepository.findAttemptAnswers(db, attempt.id);
 
-    // Get mock test metadata for instructions
-    const mockTest = await mockTestsRepository.findById(db, mockTestId);
-    if (!mockTest) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        `Mock test with ID ${mockTestId} was not found.`,
-      );
-    }
-
     return {
       attempt,
       questions,
@@ -239,6 +518,8 @@ export class MockTestsService {
         totalMarks: mockTest.totalMarks,
         totalQuestions: mockTest.questionCount,
         durationSeconds: mockTest.durationSeconds,
+        maxAttempts: mockTest.maxAttempts,
+        allowUntimed: mockTest.allowUntimed,
         negativePercentagePerQuestion: mockTest.negativePercentagePerQuestion,
         instructions: mockTest.instructions,
       },
@@ -455,6 +736,8 @@ export class MockTestsService {
         totalMarks: mockTest.totalMarks,
         totalQuestions: mockTest.questionCount,
         durationSeconds: mockTest.durationSeconds,
+        maxAttempts: mockTest.maxAttempts,
+        allowUntimed: mockTest.allowUntimed,
         negativePercentagePerQuestion: mockTest.negativePercentagePerQuestion,
         instructions: mockTest.instructions,
       },

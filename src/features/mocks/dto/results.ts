@@ -25,9 +25,38 @@ export type MockTestDetailsResult = MockTestDetailsProjection;
 
 export type MockTestListResult = MockTestListItemProjection[];
 
+/**
+ * One cursor-paginated page of mock tests.
+ * `nextCursor` is null once the list is exhausted and must be passed back
+ * verbatim (together with the same filters) to fetch the following page.
+ */
+export interface MockTestSearchResult {
+  items: MockTestListItemProjection[];
+  nextCursor: string | null;
+  hasNextPage: boolean;
+}
+
 export interface DeleteMockTestResult {
   deletedId: string;
   success: boolean;
+}
+
+/**
+ * Test metadata handed to the exam UI for one attempt. Mirrors
+ * `MockTestAttemptMeta` on the client.
+ */
+export interface AttemptMockTestMeta {
+  id: string;
+  name: string;
+  totalMarks: number;
+  totalQuestions: number;
+  durationSeconds: number;
+  /** Attempts a student may take; 0 = unlimited. */
+  maxAttempts: number;
+  /** True when the attempt runs without a countdown or auto-submit. */
+  allowUntimed: boolean;
+  negativePercentagePerQuestion: number;
+  instructions: string | null;
 }
 
 export interface StartMockAttemptResult {
@@ -35,15 +64,7 @@ export interface StartMockAttemptResult {
   questions: MockTestAttemptQuestionsProjection;
   /** Previously saved answers — used to resume an in-progress attempt. */
   answers: MockAttemptAnswerProjection[];
-  mockTest: {
-    id: string;
-    name: string;
-    totalMarks: number;
-    totalQuestions: number;
-    durationSeconds: number;
-    negativePercentagePerQuestion: number;
-    instructions: string | null;
-  };
+  mockTest: AttemptMockTestMeta;
 }
 
 export interface SubmitAnswerResult {
@@ -57,15 +78,7 @@ export interface GetAttemptQuestionsResult {
 
 export interface GetAttemptResult {
   attempt: MockTestAttemptProjection;
-  mockTest: {
-    id: string;
-    name: string;
-    totalMarks: number;
-    totalQuestions: number;
-    durationSeconds: number;
-    negativePercentagePerQuestion: number;
-    instructions: string | null;
-  };
+  mockTest: AttemptMockTestMeta;
 }
 
 /** Scored summary of every attempt made by the current user. */

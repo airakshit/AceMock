@@ -7,6 +7,7 @@ import {
   Clock,
   Award,
   Percent,
+  Repeat2,
   CheckCircle2,
   FileText,
   AlertCircle,
@@ -95,7 +96,9 @@ export function MockTestQuestionsModal({
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="outline" className="text-xs font-medium border-border">
                   <Clock className="size-3 mr-1 text-muted-foreground" />
-                  {Math.round(details.durationSeconds / 60)} mins
+                  {details.allowUntimed
+                    ? "Untimed"
+                    : `${Math.round(details.durationSeconds / 60)} mins`}
                 </Badge>
                 <Badge variant="outline" className="text-xs font-medium border-border">
                   <Award className="size-3 mr-1 text-muted-foreground" />
@@ -104,6 +107,14 @@ export function MockTestQuestionsModal({
                 <Badge variant="outline" className="text-xs font-medium border-border">
                   <Percent className="size-3 mr-1 text-muted-foreground" />
                   -{details.negativePercentagePerQuestion}% Penalty
+                </Badge>
+                <Badge variant="outline" className="text-xs font-medium border-border">
+                  <Repeat2 className="size-3 mr-1 text-muted-foreground" />
+                  {details.maxAttempts === 0
+                    ? "Unlimited attempts"
+                    : `${details.maxAttempts} ${
+                        details.maxAttempts === 1 ? "attempt" : "attempts"
+                      }`}
                 </Badge>
               </div>
             )}

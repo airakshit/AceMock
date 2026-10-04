@@ -17,6 +17,7 @@ import {
 } from "./dto/results";
 import {
   BookmarkedQuestionProjection,
+  CurriculumOptionsProjection,
   DocumentWithQuestionCountProjection,
   QuestionDetailsProjection,
 } from "./dto/projections";
@@ -152,6 +153,13 @@ class QuestionsService {
     limit: number = 20,
   ): Promise<DocumentWithQuestionCountProjection[]> {
     return questionsRepository.findRecentDocumentsWithQuestions(db, limit);
+  }
+
+  /**
+   * Whole curriculum for cascading subject → section → chapter pickers.
+   */
+  async getCurriculumOptions(): Promise<CurriculumOptionsProjection> {
+    return questionsRepository.findCurriculumOptions(db);
   }
 
   /**

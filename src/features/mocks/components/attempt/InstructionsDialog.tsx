@@ -6,6 +6,7 @@ import {
   Loader2,
   MinusCircle,
   Percent,
+  Repeat2,
   Timer,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const instructionIcons: Record<
   negative: Percent,
   options: ListChecks,
   partial: MinusCircle,
+  attempts: Repeat2,
   timer: Timer,
 };
 
@@ -53,7 +55,12 @@ export function InstructionsDialog({
   const stats = [
     { label: "Questions", value: String(mockTest.totalQuestions) },
     { label: "Total marks", value: String(mockTest.totalMarks) },
-    { label: "Duration", value: formatDuration(mockTest.durationSeconds) },
+    {
+      label: "Duration",
+      value: mockTest.allowUntimed
+        ? "Untimed"
+        : formatDuration(mockTest.durationSeconds),
+    },
     {
       label: "Negative marking",
       value:
@@ -122,7 +129,11 @@ export function InstructionsDialog({
                       {item.key === "negative" && "Negative marking"}
                       {item.key === "options" && "Single correct option"}
                       {item.key === "partial" && "Skipping"}
-                      {item.key === "timer" && "Auto submission"}
+                      {item.key === "attempts" && "Attempts"}
+                      {item.key === "timer" &&
+                        (mockTest.allowUntimed
+                          ? "Time limit"
+                          : "Auto submission")}
                     </p>
                     <p className="mt-1 text-[15px] leading-relaxed font-medium text-foreground">
                       {item.text}

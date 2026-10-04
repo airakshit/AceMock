@@ -9,10 +9,12 @@ import {
   Percent,
   Award,
   Layers,
+  Repeat2,
   Sparkles,
   Loader2,
   AlertCircle,
   HelpCircle,
+  Library,
 } from "lucide-react";
 
 import {
@@ -26,16 +28,53 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { SearchInput } from "@/components/patterns/search-input";
-import { DocumentOptionForMockProjection } from "../../dto/projections";
+import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
+import {
+  DocumentOptionForMockProjection,
+  MockTestScope,
+} from "../../dto/projections";
 import { getDocumentsForMockCreationAction } from "../../actions/get-documents-for-mock-creation";
 import { createMockTestFromDocumentsAction } from "../../actions/create-mock-test-from-documents";
+import { getCurriculumOptionsAction } from "@/features/questions/actions";
 
 interface CreateMockTestModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTestCreated: () => void;
 }
+
+/** The mock test scope options, mirroring the `mock_test_scope` enum. */
+const SCOPE_OPTIONS: Array<{
+  value: MockTestScope;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "ioe_model",
+    label: "IOE Model",
+    hint: "Full IOE entrance model test",
+  },
+  { value: "subject", label: "Subject", hint: "Everything in one subject" },
+  { value: "section", label: "Section", hint: "One section of a subject" },
+  { value: "chapter", label: "Chapter", hint: "A single chapter" },
+  {
+    value: "miscellaneous",
+    label: "Miscellaneous",
+    hint: "Unscoped practice set",
+  },
+];
+
+const EMPTY_CURRICULUM: CurriculumOptionsProjection = {
+  subjects: [],
+  sections: [],
+  chapters: [],
+};
 
 const DURATION_PRESETS = [
   { label: "30 mins", value: 30 },
@@ -54,6 +93,16 @@ const NEGATIVE_PRESETS = [
   { label: "50% (1/2)", value: 50 },
 ];
 
+/** Retake limits — `0` means unlimited. */
+const MAX_ATTEMPT_PRESETS = [
+  { label: "Unlimited", value: 0 },
+  { label: "1", value: 1 },
+  { label: "2", value: 2 },
+  { label: "3", value: 3 },
+  { label: "5", value: 5 },
+  { label: "10", value: 10 },
+];
+
 export function CreateMockTestModal({
   open,
   onOpenChange,
@@ -61,24 +110,31 @@ export function CreateMockTestModal({
 }: CreateMockTestModalProps) {
   // Data loading state
   const [documents, setDocuments] = useState<DocumentOptionForMockProjection[]>([]);
-  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [curriculum, setCurriculum] = useState<CurriculumOptionsProjection | null>(null);
 
   // Form states
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [searchDocQuery, setSearchDocQuery] = useState("");
   const [testName, setTestName] = useState("");
+  const [scope, setScope] = useState<MockTestScope>("miscellaneous");
+  const [subjectId, setSubjectId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+  const [chapterId, setChapterId] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [negativePercentage, setNegativePercentage] = useState(25);
   const [instructions, setInstructions] = useState("");
   const [customTotalMarks, setCustomTotalMarks] = useState<string>("");
+  // Test rules — timed by default, one attempt by default (0 = unlimited).
+  const [allowUntimed, setAllowUntimed] = useState(false);
+  const [maxAttempts, setMaxAttempts] = useState(1);
 
   // Load available documents when modal opens
   useEffect(() => {
     if (!open) return;
 
     let isMounted = true;
-    setIsLoadingDocs(true);
 
     getDocumentsForMockCreationAction()
       .then((res) => {
@@ -102,16 +158,49 @@ export function CreateMockTestModal({
     };
   }, [open]);
 
+  // Load the curriculum (subjects → sections → chapters) for the scope picker
+  useEffect(() => {
+    if (!open) return;
+
+    let isMounted = true;
+
+    getCurriculumOptionsAction()
+      .then((res) => {
+        if (!isMounted) return;
+        if (res.success) {
+          setCurriculum(res.data.curriculum);
+        } else {
+          setCurriculum(EMPTY_CURRICULUM);
+          toast.error(res.error.message || "Failed to load curriculum");
+        }
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setCurriculum(EMPTY_CURRICULUM);
+        toast.error("An error occurred while loading the curriculum.");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open]);
+
   // Reset form when modal closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setSelectedDocIds([]);
       setSearchDocQuery("");
       setTestName("");
+      setScope("miscellaneous");
+      setSubjectId("");
+      setSectionId("");
+      setChapterId("");
       setDurationMinutes(60);
       setNegativePercentage(25);
       setInstructions("");
       setCustomTotalMarks("");
+      setAllowUntimed(false);
+      setMaxAttempts(1);
     }
     onOpenChange(newOpen);
   };
@@ -122,6 +211,55 @@ export function CreateMockTestModal({
       doc.title.toLowerCase().includes(searchDocQuery.toLowerCase().trim()),
     );
   }, [documents, searchDocQuery]);
+
+  // Which curriculum levels the selected scope needs
+  const needsSubject = scope === "subject" || scope === "section" || scope === "chapter";
+  const needsSection = scope === "section" || scope === "chapter";
+  const needsChapter = scope === "chapter";
+
+  // Cascading curriculum options — children only appear once their parent is chosen
+  const availableSections = useMemo(
+    () =>
+      subjectId
+        ? (curriculum?.sections ?? []).filter((s) => s.subjectId === subjectId)
+        : [],
+    [curriculum, subjectId],
+  );
+
+  const availableChapters = useMemo(
+    () =>
+      sectionId
+        ? (curriculum?.chapters ?? []).filter((c) => c.sectionId === sectionId)
+        : [],
+    [curriculum, sectionId],
+  );
+
+  const handleScopeChange = (next: MockTestScope) => {
+    setScope(next);
+
+    if (next === "ioe_model" || next === "miscellaneous") {
+      setSubjectId("");
+      setSectionId("");
+      setChapterId("");
+    } else if (next === "subject") {
+      setSectionId("");
+      setChapterId("");
+    } else if (next === "section") {
+      setChapterId("");
+    }
+  };
+
+  // Picking a parent always invalidates the children below it
+  const handleSubjectChange = (value: string) => {
+    setSubjectId(value);
+    setSectionId("");
+    setChapterId("");
+  };
+
+  const handleSectionChange = (value: string) => {
+    setSectionId(value);
+    setChapterId("");
+  };
 
   // Total questions from selected documents
   const totalSelectedQuestions = useMemo(() => {
@@ -182,8 +320,28 @@ export function CreateMockTestModal({
       return;
     }
 
+    if (needsSubject && !subjectId) {
+      toast.error("Please select a subject for this mock test.");
+      return;
+    }
+
+    if (needsSection && !sectionId) {
+      toast.error("Please select a section for this mock test.");
+      return;
+    }
+
+    if (needsChapter && !chapterId) {
+      toast.error("Please select a chapter for this mock test.");
+      return;
+    }
+
     if (durationMinutes <= 0) {
       toast.error("Please specify a valid test duration in minutes.");
+      return;
+    }
+
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 0 || maxAttempts > 100) {
+      toast.error("Max attempts must be a whole number between 1 and 100 (0 = unlimited).");
       return;
     }
 
@@ -196,6 +354,15 @@ export function CreateMockTestModal({
         negativePercentagePerQuestion: negativePercentage,
         instructions: instructions.trim() || undefined,
         customTotalMarks: customTotalMarks ? Number(customTotalMarks) : undefined,
+        scope,
+        // Timing and retake rules enforced by the attempt flow.
+        allowUntimed,
+        maxAttempts,
+        // Only the leaf selection travels to the server — it derives the
+        // parent ids from that entity itself.
+        subjectId: scope === "subject" ? subjectId : undefined,
+        sectionId: scope === "section" ? sectionId : undefined,
+        chapterId: scope === "chapter" ? chapterId : undefined,
       });
 
       if (!res.success) {
@@ -358,7 +525,135 @@ export function CreateMockTestModal({
               </div>
             </div>
 
-            {/* Step 2: Test Configuration */}
+            {/* Step 2: Test Scope */}
+            <div className="border-t border-border/60 pt-5 space-y-4">
+              <div>
+                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Library className="size-3.5 text-primary" />
+                  <span>Test Scope</span>
+                  <span className="text-destructive">*</span>
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Decides how the test is classified and how students browse it.
+                </p>
+              </div>
+
+              {/* Scope chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {SCOPE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    title={option.hint}
+                    onClick={() => handleScopeChange(option.value)}
+                    className={`text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
+                      scope === option.value
+                        ? "border-primary bg-primary text-primary-foreground font-medium shadow-2xs"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Cascading subject → section → chapter pickers */}
+              {needsSubject && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">
+                      Subject <span className="text-destructive">*</span>
+                    </label>
+                    <NativeSelect
+                      size="sm"
+                      value={subjectId}
+                      onChange={(e) => handleSubjectChange(e.target.value)}
+                      disabled={curriculum === null}
+                      className="w-full"
+                    >
+                      <NativeSelectOption value="">
+                        {curriculum === null
+                          ? "Loading subjects..."
+                          : "Select a subject"}
+                      </NativeSelectOption>
+                      {(curriculum?.subjects ?? []).map((subject) => (
+                        <NativeSelectOption key={subject.id} value={subject.id}>
+                          {subject.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </div>
+
+                  {needsSection && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">
+                        Section <span className="text-destructive">*</span>
+                      </label>
+                      <NativeSelect
+                        size="sm"
+                        value={sectionId}
+                        onChange={(e) => handleSectionChange(e.target.value)}
+                        disabled={!subjectId}
+                        className="w-full"
+                      >
+                        <NativeSelectOption value="">
+                          {!subjectId
+                            ? "Pick a subject first"
+                            : availableSections.length === 0
+                              ? "No sections in this subject"
+                              : "Select a section"}
+                        </NativeSelectOption>
+                        {availableSections.map((section) => (
+                          <NativeSelectOption key={section.id} value={section.id}>
+                            {section.name}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                  )}
+
+                  {needsChapter && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">
+                        Chapter <span className="text-destructive">*</span>
+                      </label>
+                      <NativeSelect
+                        size="sm"
+                        value={chapterId}
+                        onChange={(e) => setChapterId(e.target.value)}
+                        disabled={!sectionId}
+                        className="w-full"
+                      >
+                        <NativeSelectOption value="">
+                          {!sectionId
+                            ? "Pick a section first"
+                            : availableChapters.length === 0
+                              ? "No chapters in this section"
+                              : "Select a chapter"}
+                        </NativeSelectOption>
+                        {availableChapters.map((chapter) => (
+                          <NativeSelectOption key={chapter.id} value={chapter.id}>
+                            {chapter.name}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="text-[11px] text-muted-foreground">
+                {scope === "ioe_model" || scope === "miscellaneous"
+                  ? "No curriculum ids are stored for this scope."
+                  : needsChapter
+                    ? "Only the chapter is submitted — its section and subject are derived from it."
+                    : needsSection
+                      ? "Only the section is submitted — its subject is derived from it."
+                      : "The whole subject is stored for this test."}
+              </p>
+            </div>
+
+            {/* Step 3: Test Configuration */}
             <div className="border-t border-border/60 pt-5 space-y-4">
               <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground">
                 Mock Examination Parameters
@@ -425,6 +720,13 @@ export function CreateMockTestModal({
                     />
                     <span className="text-[11px] text-muted-foreground">mins</span>
                   </div>
+
+                  {allowUntimed && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Not enforced — this test is untimed. Duration is kept as a
+                      suggested time only.
+                    </p>
+                  )}
                 </div>
 
                 {/* Negative Marking */}
@@ -508,6 +810,97 @@ export function CreateMockTestModal({
                 </div>
               </div>
 
+              {/* Step 4: Test Rules */}
+              <div className="space-y-3 border-t border-border/60 pt-4">
+                <div>
+                  <h3 className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground">
+                    <Repeat2 className="size-3.5 text-primary" />
+                    <span>Test Rules</span>
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Timing and retake limits — students see these on the instructions screen before they start.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {/* Allow untimed test */}
+                  <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-foreground">
+                        Allow untimed test
+                      </span>
+                      <Switch
+                        checked={allowUntimed}
+                        onCheckedChange={(next) => setAllowUntimed(next)}
+                        aria-label="Allow untimed test"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {allowUntimed
+                        ? "No countdown and no auto-submit — students finish whenever they are ready."
+                        : "The countdown runs and the test auto-submits when the timer hits 00:00."}
+                    </p>
+                  </div>
+
+                  {/* Max attempts */}
+                  <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <label
+                        htmlFor="mock-max-attempts"
+                        className="text-xs font-medium text-foreground"
+                      >
+                        Max attempts
+                      </label>
+                      <span className="text-xs font-semibold text-primary">
+                        {maxAttempts === 0
+                          ? "Unlimited"
+                          : `${maxAttempts} ${maxAttempts === 1 ? "attempt" : "attempts"}`}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {MAX_ATTEMPT_PRESETS.map((preset) => (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          onClick={() => setMaxAttempts(preset.value)}
+                          className={`text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
+                            maxAttempts === preset.value
+                              ? "border-primary bg-primary text-primary-foreground font-medium shadow-2xs"
+                              : "border-border bg-card text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-muted-foreground">Custom:</span>
+                      <input
+                        id="mock-max-attempts"
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={maxAttempts}
+                        onChange={(e) => {
+                          const parsed = Number(e.target.value);
+                          setMaxAttempts(
+                            Number.isFinite(parsed)
+                              ? Math.max(0, Math.min(100, Math.round(parsed)))
+                              : 0,
+                          );
+                        }}
+                        className="h-7 w-20 rounded border border-border bg-background px-2 text-xs text-foreground focus:border-primary/50 focus:outline-none"
+                      />
+                      <span className="text-[11px] text-muted-foreground">
+                        attempts (0 = unlimited)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Review Summary Card */}
               {selectedDocIds.length > 0 && totalSelectedQuestions > 0 && (
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -525,11 +918,21 @@ export function CreateMockTestModal({
                     </span>
                     <span>•</span>
                     <span>
-                      <strong className="font-semibold">{durationMinutes}m</strong> Limit
+                      <strong className="font-semibold">
+                        {allowUntimed ? "Untimed" : `${durationMinutes}m`}
+                      </strong>{" "}
+                      {allowUntimed ? "Practice" : "Limit"}
                     </span>
                     <span>•</span>
                     <span>
                       <strong className="font-semibold">{negativePercentage}%</strong> Penalty
+                    </span>
+                    <span>•</span>
+                    <span>
+                      <strong className="font-semibold">
+                        {maxAttempts === 0 ? "Unlimited" : maxAttempts}
+                      </strong>{" "}
+                      {maxAttempts === 1 ? "Attempt" : "Attempts"}
                     </span>
                   </div>
                 </div>

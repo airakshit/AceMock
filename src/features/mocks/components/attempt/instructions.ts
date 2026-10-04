@@ -1,6 +1,11 @@
 import type { MockTestAttemptMeta } from "./types";
 
-export type InstructionKey = "negative" | "options" | "partial" | "timer";
+export type InstructionKey =
+  | "negative"
+  | "options"
+  | "partial"
+  | "attempts"
+  | "timer";
 
 export interface InstructionItem {
   key: InstructionKey;
@@ -54,11 +59,25 @@ export function buildInstructions(
       key: "partial",
       text: "Unanswered questions score zero — skipping a question carries no penalty.",
     },
-    {
-      key: "timer",
-      text: "The test is submitted automatically the moment the timer reaches zero.",
-    },
   );
+
+  // Retake limit — only mentioned when one actually applies (0 = unlimited).
+  if (meta.maxAttempts > 0) {
+    items.push({
+      key: "attempts",
+      text:
+        meta.maxAttempts === 1
+          ? "This test allows a single attempt — once submitted, it cannot be retaken."
+          : `This test allows at most ${meta.maxAttempts} attempts in total.`,
+    });
+  }
+
+  items.push({
+    key: "timer",
+    text: meta.allowUntimed
+      ? "This test has no time limit — submit whenever you are ready."
+      : "The test is submitted automatically the moment the timer reaches zero.",
+  });
 
   return items;
 }

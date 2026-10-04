@@ -59,6 +59,9 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isFinishOpen, setIsFinishOpen] = useState(false);
   const [finishReason, setFinishReason] = useState<FinishReason>("manual");
+  // Wall-clock moment the attempt was submitted — the summary's "time used"
+  // for an untimed test. Captured here (an event handler) so render stays pure.
+  const [finishedAtMs, setFinishedAtMs] = useState<number | null>(null);
 
   // Guards against double-submission (manual + timer racing together).
   const finishStartedRef = useRef(false);
@@ -136,7 +139,8 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
   const remainingSeconds = useAttemptTimer({
     startedAt: session?.attempt.createdAt ?? null,
     durationSeconds: mockTest.durationSeconds,
-    active: phase === "exam",
+    // An untimed test never arms the countdown — no expiry, no auto-submit.
+    active: phase === "exam" && !mockTest.allowUntimed,
     onExpire: handleTimeUp,
   });
 
@@ -197,6 +201,7 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
       }
     }
 
+    setFinishedAtMs(Date.now());
     setPhase("finished");
   };
 
@@ -224,6 +229,7 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
       }
 
       finishStartedRef.current = false;
+      setFinishedAtMs(null);
       saveChainsRef.current.clear();
       setSession(res.data);
       setSelections(savedSelections);
@@ -373,8 +379,16 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
   // ------------------------------------------------------------------
   if (phase === "finished") {
     const unansweredCount = unansweredNumbers.length;
-    const timeUsedSeconds =
-      remainingSeconds !== null
+    // Untimed attempts have no countdown, so "time used" is the real time
+    // spent between starting and submitting.
+    const startedAtMs = session?.attempt.createdAt
+      ? new Date(session.attempt.createdAt).getTime()
+      : null;
+    const timeUsedSeconds = mockTest.allowUntimed
+      ? startedAtMs !== null && finishedAtMs !== null
+        ? Math.max(0, Math.floor((finishedAtMs - startedAtMs) / 1000))
+        : 0
+      : remainingSeconds !== null
         ? Math.max(0, mockTest.durationSeconds - remainingSeconds)
         : mockTest.durationSeconds;
 
@@ -504,25 +518,35 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
             <LayoutGrid />
           </Button>
 
-          {/* Timer */}
-          <div
-            role="timer"
-            aria-live="off"
-            title="Time remaining"
-            className={cn(
-              "flex h-8 items-center gap-1.5 rounded-lg border px-2 text-sm font-semibold tabular-nums transition-colors",
-              isCriticalTime &&
-                "animate-pulse border-destructive/50 bg-destructive/10 text-destructive",
-              isLowTime &&
-                "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-              !isLowTime &&
-                !isCriticalTime &&
-                "border-border/70 bg-muted/40 text-foreground",
-            )}
-          >
-            <AlarmClock className="size-4" />
-            {formatClock(remainingSeconds ?? mockTest.durationSeconds)}
-          </div>
+          {/* Timer — an untimed test shows a static chip instead of a clock */}
+          {mockTest.allowUntimed ? (
+            <div
+              title="No time limit"
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2 text-sm font-semibold text-muted-foreground"
+            >
+              <AlarmClock className="size-4" />
+              <span>Untimed</span>
+            </div>
+          ) : (
+            <div
+              role="timer"
+              aria-live="off"
+              title="Time remaining"
+              className={cn(
+                "flex h-8 items-center gap-1.5 rounded-lg border px-2 text-sm font-semibold tabular-nums transition-colors",
+                isCriticalTime &&
+                  "animate-pulse border-destructive/50 bg-destructive/10 text-destructive",
+                isLowTime &&
+                  "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                !isLowTime &&
+                  !isCriticalTime &&
+                  "border-border/70 bg-muted/40 text-foreground",
+              )}
+            >
+              <AlarmClock className="size-4" />
+              {formatClock(remainingSeconds ?? mockTest.durationSeconds)}
+            </div>
+          )}
 
           <Button
             type="button"

@@ -7,9 +7,24 @@ import {
   mockAttemptAnswers,
   questions,
   passages,
+  subjects,
+  sections,
+  chapters,
   user,
 } from "@/db/schemas";
-import { asc, count, desc, eq, ilike, inArray, and } from "drizzle-orm";
+import {
+  SQL,
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  lt,
+  or,
+} from "drizzle-orm";
 import { DbExecutor } from "@/features/shared/types";
 import {
   CreateMockTestCommand,
@@ -17,6 +32,7 @@ import {
   CreateMockAttemptCommand,
   SubmitAttemptAnswerCommand,
   CompleteMockAttemptCommand,
+  SearchMockTestsQuery,
 } from "../dto/commands";
 import {
   DocumentOptionForMockProjection,
@@ -121,8 +137,15 @@ export class MockTestsRepository {
         name: data.name,
         totalMarks: data.totalMarks,
         negativePercentagePerQuestion: data.negativePercentagePerQuestion,
-        duration_seconds: data.durationSeconds,
+        durationSeconds: data.durationSeconds,
+        maxAttempts: data.maxAttempts,
+        allowUntimed: data.allowUntimed,
         instructions: data.instructions ?? null,
+        byAdmin: data.byAdmin,
+        scope: data.scope,
+        subjectId: data.subjectId,
+        sectionId: data.sectionId,
+        chapterId: data.chapterId,
       })
       .returning();
 
@@ -161,8 +184,15 @@ export class MockTestsRepository {
         name: mockTests.name,
         totalMarks: mockTests.totalMarks,
         negativePercentagePerQuestion: mockTests.negativePercentagePerQuestion,
-        durationSeconds: mockTests.duration_seconds,
+        durationSeconds: mockTests.durationSeconds,
+        maxAttempts: mockTests.maxAttempts,
+        allowUntimed: mockTests.allowUntimed,
         instructions: mockTests.instructions,
+        byAdmin: mockTests.byAdmin,
+        scope: mockTests.scope,
+        subjectId: mockTests.subjectId,
+        sectionId: mockTests.sectionId,
+        chapterId: mockTests.chapterId,
         createdAt: mockTests.createdAt,
         updatedAt: mockTests.updatedAt,
         creatorName: user.name,
@@ -180,14 +210,21 @@ export class MockTestsRepository {
         mockTests.name,
         mockTests.totalMarks,
         mockTests.negativePercentagePerQuestion,
-        mockTests.duration_seconds,
+        mockTests.durationSeconds,
+        mockTests.maxAttempts,
+        mockTests.allowUntimed,
         mockTests.instructions,
+        mockTests.byAdmin,
+        mockTests.scope,
+        mockTests.subjectId,
+        mockTests.sectionId,
+        mockTests.chapterId,
         mockTests.createdAt,
         mockTests.updatedAt,
         user.name,
         user.email,
       )
-      .orderBy(desc(mockTests.createdAt));
+      .orderBy(desc(mockTests.createdAt), desc(mockTests.id));
 
     const records = options?.search?.trim()
       ? await baseQuery.where(ilike(mockTests.name, `%${options.search.trim()}%`))
@@ -199,13 +236,206 @@ export class MockTestsRepository {
       totalMarks: r.totalMarks,
       negativePercentagePerQuestion: r.negativePercentagePerQuestion,
       durationSeconds: r.durationSeconds,
+      maxAttempts: r.maxAttempts,
+      allowUntimed: r.allowUntimed,
       instructions: r.instructions,
       questionCount: Number(r.questionCount || 0),
+      byAdmin: r.byAdmin,
+      scope: r.scope,
+      subjectId: r.subjectId,
+      sectionId: r.sectionId,
+      chapterId: r.chapterId,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
       creatorName: r.creatorName,
       creatorEmail: r.creatorEmail,
     }));
+  }
+
+  /**
+   * Keyset-paginated search over mock tests — every filter is optional and
+   * they combine with AND.
+   *
+   * Ordering is `created_at DESC, id DESC`. When a hierarchy filter is set
+   * (subject / section / chapter) `scope` leads the ordering, so a section's
+   * own tests are listed before its chapters' tests — and a subject's tests
+   * before its sections' and chapters'. The `mock_test_scope` enum is
+   * declared in hierarchy order (ioe_model < subject < section < chapter <
+   * miscellaneous) and a hierarchy filter can only match subject/section/
+   * chapter rows (CHECK constraint), so `scope ASC` puts parents first.
+   *
+   * The matching keyset predicate carries `scope` whenever it leads the
+   * ordering, which keeps pages gap-free and duplicate-free.
+   */
+  async search(
+    db: DbExecutor,
+    query: SearchMockTestsQuery,
+  ): Promise<MockTestListItemProjection[]> {
+    const conditions: SQL[] = [];
+
+    if (query.scope) conditions.push(eq(mockTests.scope, query.scope));
+    if (query.subjectId)
+      conditions.push(eq(mockTests.subjectId, query.subjectId));
+    if (query.sectionId)
+      conditions.push(eq(mockTests.sectionId, query.sectionId));
+    if (query.chapterId)
+      conditions.push(eq(mockTests.chapterId, query.chapterId));
+    if (query.byAdmin !== undefined)
+      conditions.push(eq(mockTests.byAdmin, query.byAdmin));
+    if (query.search?.trim())
+      conditions.push(ilike(mockTests.name, `%${query.search.trim()}%`));
+
+    const hierarchical = Boolean(
+      query.subjectId || query.sectionId || query.chapterId,
+    );
+
+    if (query.cursor) {
+      const withinScope = or(
+        lt(mockTests.createdAt, query.cursor.createdAt),
+        and(
+          eq(mockTests.createdAt, query.cursor.createdAt),
+          lt(mockTests.id, query.cursor.id),
+        ),
+      );
+
+      conditions.push(
+        (hierarchical
+          ? or(
+              gt(mockTests.scope, query.cursor.scope),
+              and(eq(mockTests.scope, query.cursor.scope), withinScope),
+            )
+          : withinScope) as SQL,
+      );
+    }
+
+    const orderColumns = hierarchical
+      ? [
+          asc(mockTests.scope),
+          desc(mockTests.createdAt),
+          desc(mockTests.id),
+        ]
+      : [desc(mockTests.createdAt), desc(mockTests.id)];
+
+    const records = await db
+      .select({
+        id: mockTests.id,
+        name: mockTests.name,
+        totalMarks: mockTests.totalMarks,
+        negativePercentagePerQuestion: mockTests.negativePercentagePerQuestion,
+        durationSeconds: mockTests.durationSeconds,
+        maxAttempts: mockTests.maxAttempts,
+        allowUntimed: mockTests.allowUntimed,
+        instructions: mockTests.instructions,
+        byAdmin: mockTests.byAdmin,
+        scope: mockTests.scope,
+        subjectId: mockTests.subjectId,
+        sectionId: mockTests.sectionId,
+        chapterId: mockTests.chapterId,
+        createdAt: mockTests.createdAt,
+        updatedAt: mockTests.updatedAt,
+        creatorName: user.name,
+        creatorEmail: user.email,
+        questionCount: count(mockTestsQuestions.id),
+      })
+      .from(mockTests)
+      .leftJoin(user, eq(mockTests.userId, user.id))
+      .leftJoin(
+        mockTestsQuestions,
+        eq(mockTests.id, mockTestsQuestions.mockTestId),
+      )
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .groupBy(
+        mockTests.id,
+        mockTests.name,
+        mockTests.totalMarks,
+        mockTests.negativePercentagePerQuestion,
+        mockTests.durationSeconds,
+        mockTests.maxAttempts,
+        mockTests.allowUntimed,
+        mockTests.instructions,
+        mockTests.byAdmin,
+        mockTests.scope,
+        mockTests.subjectId,
+        mockTests.sectionId,
+        mockTests.chapterId,
+        mockTests.createdAt,
+        mockTests.updatedAt,
+        user.name,
+        user.email,
+      )
+      .orderBy(...orderColumns)
+      .limit(query.limit);
+
+    return records.map((r) => ({
+      id: r.id,
+      name: r.name,
+      totalMarks: r.totalMarks,
+      negativePercentagePerQuestion: r.negativePercentagePerQuestion,
+      durationSeconds: r.durationSeconds,
+      maxAttempts: r.maxAttempts,
+      allowUntimed: r.allowUntimed,
+      instructions: r.instructions,
+      questionCount: Number(r.questionCount || 0),
+      byAdmin: r.byAdmin,
+      scope: r.scope,
+      subjectId: r.subjectId,
+      sectionId: r.sectionId,
+      chapterId: r.chapterId,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      creatorName: r.creatorName,
+      creatorEmail: r.creatorEmail,
+    }));
+  }
+
+  /**
+   * Subject lookup used to validate a `scope = subject` creation.
+   */
+  async findSubjectById(
+    db: DbExecutor,
+    id: string,
+  ): Promise<{ id: string } | null> {
+    const [record] = await db
+      .select({ id: subjects.id })
+      .from(subjects)
+      .where(eq(subjects.id, id))
+      .limit(1);
+
+    return record ?? null;
+  }
+
+  /**
+   * Section lookup — also the source of the parent `subjectId` when a
+   * `scope = section` test is created (parents are derived, never trusted).
+   */
+  async findSectionById(
+    db: DbExecutor,
+    id: string,
+  ): Promise<{ id: string; subjectId: string } | null> {
+    const [record] = await db
+      .select({ id: sections.id, subjectId: sections.subjectId })
+      .from(sections)
+      .where(eq(sections.id, id))
+      .limit(1);
+
+    return record ?? null;
+  }
+
+  /**
+   * Chapter lookup — the source of the parent `sectionId` (and, through the
+   * section, the parent `subjectId`) for `scope = chapter` creations.
+   */
+  async findChapterById(
+    db: DbExecutor,
+    id: string,
+  ): Promise<{ id: string; sectionId: string } | null> {
+    const [record] = await db
+      .select({ id: chapters.id, sectionId: chapters.sectionId })
+      .from(chapters)
+      .where(eq(chapters.id, id))
+      .limit(1);
+
+    return record ?? null;
   }
 
   /**
@@ -221,8 +451,15 @@ export class MockTestsRepository {
         name: mockTests.name,
         totalMarks: mockTests.totalMarks,
         negativePercentagePerQuestion: mockTests.negativePercentagePerQuestion,
-        durationSeconds: mockTests.duration_seconds,
+        durationSeconds: mockTests.durationSeconds,
+        maxAttempts: mockTests.maxAttempts,
+        allowUntimed: mockTests.allowUntimed,
         instructions: mockTests.instructions,
+        byAdmin: mockTests.byAdmin,
+        scope: mockTests.scope,
+        subjectId: mockTests.subjectId,
+        sectionId: mockTests.sectionId,
+        chapterId: mockTests.chapterId,
         createdAt: mockTests.createdAt,
         updatedAt: mockTests.updatedAt,
         creatorName: user.name,
@@ -281,8 +518,15 @@ export class MockTestsRepository {
       totalMarks: test.totalMarks,
       negativePercentagePerQuestion: test.negativePercentagePerQuestion,
       durationSeconds: test.durationSeconds,
+      maxAttempts: test.maxAttempts,
+      allowUntimed: test.allowUntimed,
       instructions: test.instructions,
       questionCount: mappedQuestions.length,
+      byAdmin: test.byAdmin,
+      scope: test.scope,
+      subjectId: test.subjectId,
+      sectionId: test.sectionId,
+      chapterId: test.chapterId,
       createdAt: test.createdAt,
       updatedAt: test.updatedAt,
       creatorName: test.creatorName,
@@ -542,7 +786,7 @@ export class MockTestsRepository {
         status: mockTestsAttempts.status,
         startedAt: mockTestsAttempts.createdAt,
         submittedAt: mockTestsAttempts.submittedAt,
-        durationSeconds: mockTests.duration_seconds,
+        durationSeconds: mockTests.durationSeconds,
         totalMarks: mockTests.totalMarks,
         negativePercentagePerQuestion:
           mockTests.negativePercentagePerQuestion,
@@ -800,6 +1044,28 @@ export class MockTestsRepository {
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
+  }
+
+  /**
+   * How many attempts (any status) a user has taken for a mock test —
+   * the basis of the `maxAttempts` limit enforced on start.
+   */
+  async countUserAttempts(
+    db: DbExecutor,
+    userId: string,
+    mockTestId: string,
+  ): Promise<number> {
+    const [row] = await db
+      .select({ value: count(mockTestsAttempts.id) })
+      .from(mockTestsAttempts)
+      .where(
+        and(
+          eq(mockTestsAttempts.userId, userId),
+          eq(mockTestsAttempts.mockTestId, mockTestId),
+        ),
+      );
+
+    return Number(row?.value ?? 0);
   }
 }
 

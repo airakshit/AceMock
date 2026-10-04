@@ -1,14 +1,37 @@
 // Read models returned by repositories for queries
 // Accessed by: repositories and services
 
+/**
+ * What a mock test is scoped to. Mirrors the `mock_test_scope` PG enum and
+ * the hierarchy rules enforced by `mock_test_scope_reference_check`:
+ * `ioe_model` / `miscellaneous` carry no curriculum ids, `subject` adds the
+ * subject, `section` adds subject + section, `chapter` adds all three.
+ */
+export type MockTestScope =
+  | "ioe_model"
+  | "subject"
+  | "section"
+  | "chapter"
+  | "miscellaneous";
+
 export interface MockTestListItemProjection {
   id: string;
   name: string;
   totalMarks: number;
   negativePercentagePerQuestion: number;
   durationSeconds: number;
+  /** Attempts a student may take; 0 = unlimited. */
+  maxAttempts: number;
+  /** True when the attempt runs without a countdown or auto-submit. */
+  allowUntimed: boolean;
   instructions: string | null;
   questionCount: number;
+  /** True when the test was assembled through the admin panel. */
+  byAdmin: boolean;
+  scope: MockTestScope;
+  subjectId: string | null;
+  sectionId: string | null;
+  chapterId: string | null;
   createdAt: Date;
   updatedAt: Date;
   creatorName?: string | null;

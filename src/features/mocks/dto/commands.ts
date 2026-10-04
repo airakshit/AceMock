@@ -1,5 +1,8 @@
-// Database write models consumed by repository insert/update operations
+// Database write models consumed by repository insert/update operations,
+// plus the keyset (cursor) read model consumed by repository searches
 // Accessed by: services and repositories
+
+import type { MockTestScope } from "./projections";
 
 export interface CreateMockTestCommand {
   id: string;
@@ -9,6 +12,41 @@ export interface CreateMockTestCommand {
   negativePercentagePerQuestion: number;
   durationSeconds: number;
   instructions?: string | null;
+  /** Admin panel creations always store `true`. */
+  byAdmin: boolean;
+  scope: MockTestScope;
+  subjectId: string | null;
+  sectionId: string | null;
+  chapterId: string | null;
+  /** Normalized: `true` only when the admin explicitly opted in. */
+  allowUntimed: boolean;
+  /** Normalized: whole number, `0` = unlimited. */
+  maxAttempts: number;
+}
+
+/**
+ * Keyset position of one mock test inside a search result. Carries every
+ * value the ORDER BY uses — `scope` participates whenever the result is
+ * hierarchically ordered (parent tests before child tests), so pagination
+ * stays deterministic without OFFSET.
+ */
+export interface MockTestCursor {
+  scope: MockTestScope;
+  createdAt: Date;
+  id: string;
+}
+
+/** Normalized, already-validated input of `MockTestsRepository.search`. */
+export interface SearchMockTestsQuery {
+  scope?: MockTestScope;
+  subjectId?: string;
+  sectionId?: string;
+  chapterId?: string;
+  byAdmin?: boolean;
+  search?: string;
+  cursor?: MockTestCursor | null;
+  /** Rows to fetch — the service requests `pageSize + 1` to detect the end. */
+  limit: number;
 }
 
 export interface CreateMockTestQuestionItemCommand {

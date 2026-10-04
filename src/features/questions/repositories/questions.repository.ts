@@ -15,6 +15,7 @@ import {
 } from "../dto/commands";
 import {
   ChapterCurriculumMappingProjection,
+  CurriculumOptionsProjection,
   DocumentWithQuestionCountProjection,
   PassageProjection,
   QuestionDetailsProjection
@@ -235,6 +236,43 @@ export class QuestionsRepository {
       createdAt: record.createdAt,
       questionCount: Number(record.questionCount || 0),
     }));
+  }
+
+  /**
+   * Whole curriculum as flat id lists (subjects / sections / chapters), each
+   * carrying its parent id — feeds cascading pickers and hierarchy filters.
+   */
+  async findCurriculumOptions(
+    db: DbExecutor,
+  ): Promise<CurriculumOptionsProjection> {
+    const [subjectRows, sectionRows, chapterRows] = await Promise.all([
+      db
+        .select({ id: subjects.id, name: subjects.name })
+        .from(subjects)
+        .orderBy(asc(subjects.name)),
+      db
+        .select({
+          id: sections.id,
+          subjectId: sections.subjectId,
+          name: sections.name,
+        })
+        .from(sections)
+        .orderBy(asc(sections.name)),
+      db
+        .select({
+          id: chapters.id,
+          sectionId: chapters.sectionId,
+          name: chapters.name,
+        })
+        .from(chapters)
+        .orderBy(asc(chapters.name)),
+    ]);
+
+    return {
+      subjects: subjectRows,
+      sections: sectionRows,
+      chapters: chapterRows,
+    };
   }
 
   async getAllChaptersMap(

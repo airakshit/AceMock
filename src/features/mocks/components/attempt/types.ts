@@ -9,6 +9,10 @@ export interface MockTestAttemptMeta {
   totalMarks: number;
   totalQuestions: number;
   durationSeconds: number;
+  /** Attempts a student may take; 0 = unlimited. */
+  maxAttempts: number;
+  /** True when the attempt runs without a countdown or auto-submit. */
+  allowUntimed: boolean;
   negativePercentagePerQuestion: number;
 }
 

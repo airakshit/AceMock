@@ -79,6 +79,16 @@ export interface ChapterCurriculumMappingProjection {
 }
 
 /**
+ * Read model of the whole curriculum as flat lists that carry their parent
+ * id — the data source of cascading subject → section → chapter pickers.
+ */
+export interface CurriculumOptionsProjection {
+  subjects: Array<{ id: string; name: string }>;
+  sections: Array<{ id: string; subjectId: string; name: string }>;
+  chapters: Array<{ id: string; sectionId: string; name: string }>;
+}
+
+/**
  * Read model projection for a single chapter record lookup.
  */
 export interface ChapterLookupProjection {

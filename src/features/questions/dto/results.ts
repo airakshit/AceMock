@@ -3,6 +3,7 @@
 import { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import {
   BookmarkedQuestionProjection,
+  CurriculumOptionsProjection,
   DocumentWithQuestionCountProjection,
   QuestionDetailsProjection,
 } from "./projections";
@@ -29,6 +30,14 @@ export interface GetRecentQuestionsResult {
  */
 export interface GetRecentDocumentsResult {
   documents: DocumentWithQuestionCountProjection[]
+}
+
+/**
+ * Action / service envelope result for the curriculum used by cascading
+ * subject → section → chapter selectors (mock test scope picker & filters).
+ */
+export interface GetCurriculumOptionsResult {
+  curriculum: CurriculumOptionsProjection;
 }
 
 /**

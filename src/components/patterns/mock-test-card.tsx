@@ -1,4 +1,4 @@
-import { ArrowRight, Clock3, FileText, Award, Percent } from "lucide-react";
+import { ArrowRight, Clock3, FileText, Award, History, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { colors, type DifficultyLevel, typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,11 @@ interface MockTestCardProps {
   test: MockTestCardData;
   actionLabel?: string;
   onAction?: (testId: string) => void;
+  /**
+   * Shows a small history button in the card's top-right corner which opens
+   * this test's attempt history. Omit it to hide the button (dashboard).
+   */
+  onShowHistory?: (testId: string) => void;
   className?: string;
 }
 
@@ -26,6 +31,7 @@ export function MockTestCard({
   test,
   actionLabel = "Start Test",
   onAction,
+  onShowHistory,
   className,
 }: MockTestCardProps) {
   const diffConfig = test.difficulty
@@ -86,15 +92,29 @@ export function MockTestCard({
           ) : null}
         </div>
 
-        {/* Title */}
-        <h4
-          className={cn(
-            typography.cardTitle,
-            "line-clamp-2 min-h-10 text-[15px] font-semibold tracking-tight text-foreground transition-colors group-hover:text-brand",
-          )}
-        >
-          {test.title}
-        </h4>
+        {/* Title + per-test attempt history trigger (same row) */}
+        <div className="flex items-start gap-2">
+          <h4
+            className={cn(
+              typography.cardTitle,
+              "line-clamp-2 min-h-10 min-w-0 flex-1 text-[15px] font-semibold tracking-tight text-foreground transition-colors group-hover:text-brand",
+            )}
+          >
+            {test.title}
+          </h4>
+
+          {onShowHistory ? (
+            <button
+              type="button"
+              onClick={() => onShowHistory(test.id)}
+              aria-label={`View attempt history for ${test.title}`}
+              title="Attempt history"
+              className="-mt-1.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border/70 bg-muted/50 text-muted-foreground transition-colors hover:border-brand/40 hover:bg-brand-muted hover:text-brand focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none sm:-mt-1 sm:size-7"
+            >
+              <History className="size-4 sm:size-3.5" />
+            </button>
+          ) : null}
+        </div>
 
         {/* Specs */}
         <dl className="mt-4 grid grid-cols-2 gap-2">

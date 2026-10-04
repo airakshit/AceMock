@@ -31,6 +31,8 @@ export default async function MockAttemptPage({
       totalMarks: test.totalMarks,
       totalQuestions: test.questionCount,
       durationSeconds: test.durationSeconds,
+      maxAttempts: test.maxAttempts,
+      allowUntimed: test.allowUntimed,
       negativePercentagePerQuestion: test.negativePercentagePerQuestion,
     };
   } catch {
