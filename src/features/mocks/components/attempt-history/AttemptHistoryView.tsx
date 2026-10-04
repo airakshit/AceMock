@@ -107,7 +107,7 @@ export function AttemptHistoryView() {
   }, [retryNonce]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       {/* Toolbar */}
       <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-card sm:flex-row sm:items-center sm:justify-between">
         <Button

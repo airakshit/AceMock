@@ -64,6 +64,8 @@ export type QuestionCardProps = {
   mode: QuestionMode;
   /** Parent owns selected-answer state — fully controlled */
   selectedAnswer: OptionKey | null;
+  /** Optimistic selection (exam mode) — shown immediately before server confirmation */
+  pendingAnswer?: OptionKey | null;
   onAnswerChange: (key: OptionKey) => void;
   /**
    * Whether the question is already bookmarked. Controls the bookmark

@@ -82,6 +82,7 @@ export function QuestionCard({
   questionNumber,
   mode,
   selectedAnswer,
+  pendingAnswer,
   onAnswerChange,
   isBookmarked = false,
   solutionControls,
@@ -167,7 +168,7 @@ export function QuestionCard({
           options={options}
           correctOption={correctOption}
           mode={mode}
-          selectedAnswer={selectedAnswer}
+          selectedAnswer={mode === "exam" && pendingAnswer ? pendingAnswer : selectedAnswer}
           onAnswerChange={onAnswerChange}
         />
 

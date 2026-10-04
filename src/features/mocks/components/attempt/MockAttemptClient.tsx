@@ -585,6 +585,7 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
               questionNumber={currentIndex + 1}
               mode="exam"
               selectedAnswer={savedOption as OptionKey | null}
+              pendingAnswer={pendingOption as OptionKey | null}
               onAnswerChange={(key) => {
                 if (phase === "exam") setPendingOption(key);
               }}

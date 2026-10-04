@@ -101,7 +101,7 @@ export function BookmarksView() {
   const handleRetry = () => setReloadKey((key) => key + 1);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-16">
+    <div className="mx-auto max-w-4xl space-y-6 pb-16 overflow-x-hidden">
       {/* ─── Controls (subject + solution) ─── */}
       <BookmarkFilters
         subjectSlug={subjectSlug}
