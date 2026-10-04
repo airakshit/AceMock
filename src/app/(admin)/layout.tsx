@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/auth";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/layouts/components/AdminSidebar";
+import { QuestionInteractionsProvider } from "@/features/shared/components/question-card/QuestionInteractionsContext";
 
 export default async function AdminLayout({
   children,
@@ -22,10 +23,12 @@ export default async function AdminLayout({
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <AdminSidebar />
-      <SidebarInset className="h-svh overflow-y-auto">
-        <div className="flex min-h-full flex-1 flex-col">{children}</div>
-      </SidebarInset>
+      <QuestionInteractionsProvider>
+        <AdminSidebar />
+        <SidebarInset className="h-svh overflow-y-auto">
+          <div className="flex min-h-full flex-1 flex-col">{children}</div>
+        </SidebarInset>
+      </QuestionInteractionsProvider>
     </SidebarProvider>
   );
 }
