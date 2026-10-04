@@ -13,6 +13,10 @@ import { layout } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import { MockTestListItemProjection } from "../dto/projections";
 import { getMockTestsAction } from "../actions/get-mock-tests";
+import {
+  MockTestHistoryDialog,
+  type MockTestHistoryTarget,
+} from "./attempt-history/MockTestHistoryDialog";
 
 interface MocksViewProps {
   initialTests?: MockTestListItemProjection[];
@@ -52,6 +56,10 @@ export function MocksView({ initialTests = [] }: MocksViewProps) {
   const [isLoading, setIsLoading] = useState(initialTests.length === 0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  /** Test whose attempt history pop-up is open, if any. */
+  const [historyTest, setHistoryTest] = useState<MockTestHistoryTarget | null>(
+    null,
+  );
 
   const fetchTests = async (showRefreshSpinner = false) => {
     try {
@@ -176,10 +184,21 @@ export function MocksView({ initialTests = [] }: MocksViewProps) {
                 negativePercentage: test.negativePercentagePerQuestion,
               }}
               onAction={handleStartTest}
+              onShowHistory={(testId) =>
+                setHistoryTest({ id: testId, name: test.name })
+              }
             />
           ))}
         </div>
       )}
+
+      {/* Attempt history of a single mock test, shown as a pop-up */}
+      <MockTestHistoryDialog
+        mockTest={historyTest}
+        onOpenChange={(open) => {
+          if (!open) setHistoryTest(null);
+        }}
+      />
     </div>
   );
 }

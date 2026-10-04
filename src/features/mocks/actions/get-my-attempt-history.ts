@@ -9,14 +9,18 @@ import { mockTestsService } from "../service";
 /**
  * Returns every attempt made by the current user with its score summary
  * (attempted / unattempted / correct / incorrect, earned marks, accuracy).
+ * Pass `mockTestId` to narrow the list to a single test (history pop-up).
  */
-export async function getMyAttemptHistoryAction(): Promise<
-  ServerActionResult<AttemptHistoryResult>
-> {
+export async function getMyAttemptHistoryAction(
+  mockTestId?: string,
+): Promise<ServerActionResult<AttemptHistoryResult>> {
   try {
     const session = await requireSession();
 
-    const data = await mockTestsService.getMyAttemptHistory(session.user.id);
+    const data = await mockTestsService.getMyAttemptHistory(
+      session.user.id,
+      mockTestId,
+    );
 
     return {
       success: true,

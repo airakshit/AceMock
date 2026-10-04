@@ -526,11 +526,13 @@ export class MockTestsRepository {
 
   /**
    * All attempts created by a user (newest first) joined with their mock
-   * test configuration — the basis of the My History list.
+   * test configuration — the basis of the My History list. When `mockTestId`
+   * is given, only that test's attempts are returned (per-card history pop-up).
    */
   async findUserAttempts(
     db: DbExecutor,
     userId: string,
+    mockTestId?: string,
   ): Promise<AttemptMetaProjection[]> {
     const records = await db
       .select({
@@ -547,7 +549,14 @@ export class MockTestsRepository {
       })
       .from(mockTestsAttempts)
       .innerJoin(mockTests, eq(mockTestsAttempts.mockTestId, mockTests.id))
-      .where(eq(mockTestsAttempts.userId, userId))
+      .where(
+        mockTestId
+          ? and(
+              eq(mockTestsAttempts.userId, userId),
+              eq(mockTestsAttempts.mockTestId, mockTestId),
+            )
+          : eq(mockTestsAttempts.userId, userId),
+      )
       .orderBy(desc(mockTestsAttempts.createdAt));
 
     return records;

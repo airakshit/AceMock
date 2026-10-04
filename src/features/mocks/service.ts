@@ -523,9 +523,17 @@ export class MockTestsService {
 
   /**
    * Scored summary of every attempt made by the current user, newest first.
+   * When `mockTestId` is given, only that test's attempts are returned.
    */
-  async getMyAttemptHistory(userId: string): Promise<AttemptHistoryResult> {
-    const attempts = await mockTestsRepository.findUserAttempts(db, userId);
+  async getMyAttemptHistory(
+    userId: string,
+    mockTestId?: string,
+  ): Promise<AttemptHistoryResult> {
+    const attempts = await mockTestsRepository.findUserAttempts(
+      db,
+      userId,
+      mockTestId,
+    );
     if (attempts.length === 0) return [];
 
     const answers = await mockTestsRepository.findAnswersForAttempts(
