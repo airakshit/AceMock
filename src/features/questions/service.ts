@@ -23,10 +23,8 @@ import {
 import { questionsRepository } from "./repositories/questions.repository";
 import { questionBookmarksRepository } from "./repositories/question-bookmarks.repository";
 import { questionReportsRepository } from "./repositories/question-reports.repository";
-import {
-  isQuestionReportType,
-  QuestionOptionKey,
-} from "./types";
+import { OptionKey } from "../shared/components/question-card";
+import { isQuestionReportType } from "../shared/components/question-card/types";
 import { decodeBookmarkCursor, encodeBookmarkCursor } from "./utils";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7, isValidUUID } from "../shared/utils";
@@ -35,7 +33,6 @@ import { ServerActionError } from "../shared/actions/error";
 
 const MAX_REPORT_DESCRIPTION_LENGTH = 2000;
 const BOOKMARKS_PAGE_SIZE = 20;
-
 
 class QuestionsService {
   async createNewQuestion(
@@ -63,18 +60,18 @@ class QuestionsService {
 
     const diagramStoragePath = diagramFile
       ? storagePaths.getQuestionDiagramPath(
-        userId,
-        questionId,
-        diagramFile.name,
-      )
+          userId,
+          questionId,
+          diagramFile.name,
+        )
       : null;
 
     const solutionDiagramStoragePath = solutionDiagramFile
       ? storagePaths.getQuestionSolutionDiagramPath(
-        userId,
-        questionId,
-        solutionDiagramFile.name,
-      )
+          userId,
+          questionId,
+          solutionDiagramFile.name,
+        )
       : null;
 
     await questionsRepository.create(db, {
@@ -154,10 +151,7 @@ class QuestionsService {
   async getRecentDocumentsForFilter(
     limit: number = 20,
   ): Promise<DocumentWithQuestionCountProjection[]> {
-    return questionsRepository.findRecentDocumentsWithQuestions(
-      db,
-      limit,
-    );
+    return questionsRepository.findRecentDocumentsWithQuestions(db, limit);
   }
 
   /**
@@ -367,7 +361,7 @@ class QuestionsService {
 
       return {
         ...base,
-        correctOption: q.correctOption as QuestionOptionKey,
+        correctOption: q.correctOption as OptionKey,
         solution: q.solution,
         solutionDiagramUrl: q.solutionDiagram
           ? urlMap.get(q.solutionDiagram) || q.solutionDiagram
@@ -425,7 +419,7 @@ class QuestionsService {
 
     return {
       questionId: question.id,
-      correctOption: question.correctOption as QuestionOptionKey,
+      correctOption: question.correctOption as OptionKey,
       solution: question.solution,
       solutionDiagramUrl,
     };
