@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronRight, History, RefreshCw } from "lucide-react";
+import { ChevronRight, History } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import { getMyAttemptHistoryAction } from "../../actions/get-my-attempt-history";
 import type { AttemptHistoryItemProjection } from "../../dto/projections";
 import type { AttemptGroup } from "./MockTestHistory";
@@ -40,7 +39,6 @@ export function AttemptHistoryView() {
   const [items, setItems] = useState<AttemptHistoryItemProjection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [retryNonce, setRetryNonce] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   /**
    * Attempts grouped by mock test: newest attempt first within each test,
@@ -92,13 +90,11 @@ export function AttemptHistoryView() {
           toast.error(res.error.message || "Failed to load your attempt history.");
         }
         setIsLoading(false);
-        setIsRefreshing(false);
       })
       .catch(() => {
         if (!isMounted) return;
         toast.error("An error occurred while fetching your attempt history.");
         setIsLoading(false);
-        setIsRefreshing(false);
       });
 
     return () => {
@@ -106,46 +102,26 @@ export function AttemptHistoryView() {
     };
   }, [retryNonce]);
 
+  // The section-level refresh button (in MocksNav) re-runs the fetch in place.
+  useEffect(() => {
+    const handleSectionRefresh = () => {
+      setIsLoading(true);
+      setRetryNonce((n) => n + 1);
+    };
+    window.addEventListener("mocks:refresh", handleSectionRefresh);
+    return () => window.removeEventListener("mocks:refresh", handleSectionRefresh);
+  }, []);
+
   return (
     <div className="space-y-4 overflow-x-hidden">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-card sm:flex-row sm:items-center sm:justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 self-start text-xs"
-          onClick={() => router.push("/mocks")}
-        >
-          <ArrowLeft />
-          All mock tests
-        </Button>
-
-        <div className="flex items-center gap-2">
-          {!isLoading && (
-            <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground tabular-nums">
-              {items.length} {items.length === 1 ? "attempt" : "attempts"}
-            </span>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              setIsRefreshing(true);
-              setRetryNonce((n) => n + 1);
-            }}
-            disabled={isLoading || isRefreshing}
-            aria-label="Refresh attempt history"
-          >
-            <RefreshCw
-              className={cn("size-4", (isLoading || isRefreshing) && "animate-spin")}
-            />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
+      {/* Attempt count */}
+      {!isLoading && (
+        <div className="flex justify-end">
+          <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-muted-foreground tabular-nums">
+            {items.length} {items.length === 1 ? "attempt" : "attempts"}
+          </span>
         </div>
-      </div>
+      )}
 
       {/* Content */}
       {isLoading ? (

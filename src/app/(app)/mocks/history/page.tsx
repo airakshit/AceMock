@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/patterns/page-header";
+import { MocksNav } from "@/features/mocks/components/MocksNav";
 import { AttemptHistoryView } from "@/features/mocks/components/attempt-history/AttemptHistoryView";
 
 export const metadata = {
@@ -13,6 +14,7 @@ export default function AttemptHistoryPage() {
         title="My History"
         description="Scores and answer breakdowns for every attempt."
       />
+      <MocksNav active="history" />
       <AttemptHistoryView />
     </div>
   );

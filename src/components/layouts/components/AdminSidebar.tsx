@@ -68,7 +68,7 @@ export function AdminSidebar() {
                 {APP_NAME}
               </span>
             </span>
-            <span className="truncate text-[10px] font-medium tracking-wide text-sidebar-foreground/75">
+            <span className="truncate text-[10px] font-medium tracking-wide text-sidebar-foreground/85">
               Control Console
             </span>
           </div>
@@ -92,7 +92,7 @@ export function AdminSidebar() {
                 "group relative flex h-10 w-full items-center rounded-lg text-sm font-medium transition-colors duration-150",
                 isActive
                   ? "bg-white/20 font-semibold text-white"
-                  : "text-white/75 hover:bg-white/10 hover:text-white",
+                  : "text-white/85 hover:bg-white/10 hover:text-white",
               )}
             >
               {isActive ? (
@@ -146,7 +146,7 @@ export function AdminSidebar() {
               <Link
                 href="/dashboard"
                 onClick={handleNavClick}
-                className="group flex h-9 w-full items-center rounded-lg text-xs font-medium text-white/75 hover:bg-white/10 hover:text-white transition-colors duration-150"
+                className="group flex h-9 w-full items-center rounded-lg text-xs font-medium text-white/85 hover:bg-white/10 hover:text-white transition-colors duration-150"
               >
                 <div className="flex size-10 shrink-0 items-center justify-center">
                   <ArrowLeft className="size-3.5 shrink-0 text-white/70 group-hover:text-white transition-colors" />

@@ -65,7 +65,7 @@ export function AppSidebar() {
             <span className="truncate font-heading text-sm font-bold tracking-tight text-sidebar-foreground">
               {APP_NAME}
             </span>
-            <span className="truncate text-[10px] font-medium tracking-wide text-sidebar-foreground/75">
+            <span className="truncate text-[10px] font-medium tracking-wide text-sidebar-foreground/85">
               Test &amp; Analytics
             </span>
           </div>
@@ -87,7 +87,7 @@ export function AppSidebar() {
                 "group relative flex h-10 w-full items-center rounded-lg text-sm font-medium transition-colors duration-150",
                 isActive
                   ? "bg-white/20 font-semibold text-white"
-                  : "text-white/75 hover:bg-white/10 hover:text-white",
+                  : "text-white/85 hover:bg-white/10 hover:text-white",
               )}
             >
               {/* Active accent bar */}

@@ -56,11 +56,11 @@ export function SidebarThemeToggle() {
   return (
     <div className="space-y-1.5 px-1 py-1 transition-opacity duration-150">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/85">
           Theme
         </span>
         {mounted && (
-          <span className="text-[10px] font-medium capitalize text-white/70">
+          <span className="text-[10px] font-medium capitalize text-white/85">
             {theme}
           </span>
         )}
@@ -86,7 +86,7 @@ export function SidebarThemeToggle() {
                 "h-6.5 flex-1 gap-1.5 rounded-md text-[11px] font-medium transition-all duration-150",
                 isSelected
                   ? "bg-sidebar-foreground font-semibold text-sidebar"
-                  : "text-white/70 hover:bg-white/10 hover:text-white",
+                  : "text-white/85 hover:bg-white/10 hover:text-white",
               )}
             >
               <Icon className="size-3" />
