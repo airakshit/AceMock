@@ -52,19 +52,19 @@ const STATE_STYLES: Record<OptionState, string> = {
   selected:
     "border-primary bg-primary/5 ring-1 ring-primary/30",
   correct:
-    "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/30",
+    "border-success bg-success/10 ring-1 ring-success/30",
   "incorrect-selected":
-    "border-red-500 bg-red-500/10 ring-1 ring-red-500/30",
+    "border-danger bg-danger/10 ring-1 ring-danger/30",
   "correct-unselected":
-    "border-emerald-500/50 bg-emerald-500/5",
+    "border-success/50 bg-success/5",
 };
 
 const BADGE_STYLES: Record<OptionState, string> = {
   default: "bg-muted text-muted-foreground",
   selected: "bg-primary text-primary-foreground shadow-xs",
-  correct: "bg-emerald-500 text-white shadow-xs",
-  "incorrect-selected": "bg-red-500 text-white shadow-xs",
-  "correct-unselected": "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400",
+  correct: "bg-success text-success-foreground shadow-xs",
+  "incorrect-selected": "bg-danger text-danger-foreground shadow-xs",
+  "correct-unselected": "bg-success/20 text-success",
 };
 
 const OPTION_KEYS: OptionKey[] = ["A", "B", "C", "D"];
@@ -182,19 +182,19 @@ export function OptionsList({
             {/* Review mode indicators */}
             {isReview && state === "correct" && (
               <Check
-                className="size-5 shrink-0 text-emerald-500 mt-1"
+                className="size-5 shrink-0 text-success mt-1"
                 aria-label="Correct answer"
               />
             )}
             {isReview && state === "incorrect-selected" && (
               <X
-                className="size-5 shrink-0 text-red-500 mt-1"
+                className="size-5 shrink-0 text-danger mt-1"
                 aria-label="Incorrect answer"
               />
             )}
             {isReview && state === "correct-unselected" && (
               <Check
-                className="size-5 shrink-0 text-emerald-400 mt-1 opacity-60"
+                className="size-5 shrink-0 text-success mt-1 opacity-60"
                 aria-label="This was the correct answer"
               />
             )}

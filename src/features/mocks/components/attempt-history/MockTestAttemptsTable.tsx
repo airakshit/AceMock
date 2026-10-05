@@ -167,10 +167,10 @@ export function MockTestAttemptsTable({
                   <td className="px-4 py-3 text-right align-middle text-sm font-medium text-primary tabular-nums">
                     {attempt.attemptedCount}/{attempt.totalQuestions}
                   </td>
-                  <td className="px-4 py-3 text-right align-middle text-sm font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+                  <td className="px-4 py-3 text-right align-middle text-sm font-semibold text-success tabular-nums">
                     {attempt.correctCount}
                   </td>
-                  <td className="px-4 py-3 text-right align-middle text-sm font-semibold text-rose-600 tabular-nums dark:text-rose-400">
+                  <td className="px-4 py-3 text-right align-middle text-sm font-semibold text-danger tabular-nums">
                     {attempt.incorrectCount}
                   </td>
                   <td className="px-4 py-3 text-right align-middle text-sm font-medium text-muted-foreground tabular-nums">
@@ -202,7 +202,7 @@ export function MockTestAttemptsTable({
                         "h-7 gap-1 px-2.5 text-xs whitespace-nowrap",
                         isCompleted
                           ? null
-                          : "border-amber-500/40 text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300",
+                          : "border-warning/40 text-warning hover:border-warning/60",
                       )}
                       onClick={() =>
                         isCompleted

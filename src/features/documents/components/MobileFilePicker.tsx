@@ -96,7 +96,7 @@ export function MobileFilePicker({
             onClick={() => photosInputRef.current?.click()}
             className="h-9 gap-1.5 text-xs shadow-2xs sm:flex-1"
           >
-            <ImageIcon className="size-3.5 text-blue-500" />
+            <ImageIcon className="size-3.5 text-info" />
             <span>Photos</span>
           </Button>
         )}
@@ -113,7 +113,7 @@ export function MobileFilePicker({
               isPdfOnly ? "col-span-2 w-full" : "col-span-2 sm:col-span-1",
             )}
           >
-            <FileText className="size-3.5 text-emerald-500" />
+            <FileText className="size-3.5 text-success" />
             <span>Browse Files</span>
           </Button>
         )}

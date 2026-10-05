@@ -405,7 +405,7 @@ export function QuestionForm({
         <section className="rounded-xl border bg-background/50 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <Lightbulb className="size-4 text-amber-500" />
+              <Lightbulb className="size-4 text-warning" />
               <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 Hint & Solution
               </p>

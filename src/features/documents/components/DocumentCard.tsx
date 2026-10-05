@@ -112,8 +112,8 @@ export function DocumentCard({
       return {
         label: "Uploading Files",
         icon: Loader2,
-        className: "border-sky-500/30 bg-sky-500/10 text-sky-400",
-        dot: "bg-sky-400",
+        className: "border-info/30 bg-info/10 text-info",
+        dot: "bg-info",
         spin: true,
       };
     }
@@ -123,8 +123,8 @@ export function DocumentCard({
       return {
         label: "Upload Failed",
         icon: AlertTriangle,
-        className: "border-rose-500/30 bg-rose-500/10 text-rose-400",
-        dot: "bg-rose-400",
+        className: "border-danger/30 bg-danger/10 text-danger",
+        dot: "bg-danger",
         spin: false,
       };
     }
@@ -134,9 +134,8 @@ export function DocumentCard({
       return {
         label: "Processing Files...",
         icon: Loader2,
-        className:
-          "border-sky-500/40 bg-sky-500/15 text-sky-300 font-medium",
-        dot: "bg-sky-400",
+        className: "border-info/40 bg-info/15 text-info font-medium",
+        dot: "bg-info",
         spin: true,
       };
     }
@@ -146,8 +145,8 @@ export function DocumentCard({
         label: "Extracting Questions...",
         icon: Sparkles,
         className:
-          "border-purple-500/40 bg-purple-500/15 text-purple-300 font-medium animate-pulse",
-        dot: "bg-purple-400",
+          "border-brand/40 bg-brand/15 text-brand font-medium animate-pulse",
+        dot: "bg-brand",
         spin: true,
       };
     }
@@ -157,8 +156,8 @@ export function DocumentCard({
         label: "Merging Questions...",
         icon: Layers,
         className:
-          "border-indigo-500/40 bg-indigo-500/15 text-indigo-300 font-medium animate-pulse",
-        dot: "bg-indigo-400",
+          "border-brand/40 bg-brand/15 text-brand font-medium animate-pulse",
+        dot: "bg-brand",
         spin: true,
       };
     }
@@ -167,9 +166,8 @@ export function DocumentCard({
       return {
         label: "Completed",
         icon: CheckCircle2,
-        className:
-          "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-medium",
-        dot: "bg-emerald-400",
+        className: "border-success/30 bg-success/10 text-success font-medium",
+        dot: "bg-success",
         spin: false,
       };
     }
@@ -178,9 +176,8 @@ export function DocumentCard({
       return {
         label: "Processing Failed",
         icon: AlertTriangle,
-        className:
-          "border-rose-500/30 bg-rose-500/10 text-rose-400 font-medium",
-        dot: "bg-rose-400",
+        className: "border-danger/30 bg-danger/10 text-danger font-medium",
+        dot: "bg-danger",
         spin: false,
       };
     }
@@ -188,8 +185,8 @@ export function DocumentCard({
     return {
       label: "Pending",
       icon: Clock,
-      className: "border-amber-500/30 bg-amber-500/10 text-amber-400 font-medium",
-      dot: "bg-amber-400",
+      className: "border-warning/30 bg-warning/10 text-warning font-medium",
+      dot: "bg-warning",
       spin: false,
     };
   };
@@ -510,7 +507,7 @@ export function DocumentCard({
             <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs text-muted-foreground">
               {pdfCount > 0 && (
                 <span className="inline-flex items-center gap-1 bg-muted/60 px-2 py-0.5 rounded-md">
-                  <FileText className="size-3.5 text-rose-500" />
+                  <FileText className="size-3.5 text-danger" />
                   <span>
                     {pdfCount} {pdfCount === 1 ? "PDF" : "PDFs"}
                   </span>
@@ -519,7 +516,7 @@ export function DocumentCard({
 
               {imageCount > 0 && (
                 <span className="inline-flex items-center gap-1 bg-muted/60 px-2 py-0.5 rounded-md">
-                  <ImageIcon className="size-3.5 text-sky-500" />
+                  <ImageIcon className="size-3.5 text-info" />
                   <span>
                     {imageCount} {imageCount === 1 ? "Image" : "Images"}
                   </span>
@@ -596,7 +593,7 @@ export function DocumentCard({
                     processingStatus === "pending" &&
                     "bg-brand hover:bg-brand/90 text-primary-foreground",
                     processingStatus === "completed" &&
-                    "border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400",
+                    "border-success/30 text-success hover:bg-success/10",
                   )}
                   title={
                     files.length === 0
@@ -622,7 +619,7 @@ export function DocumentCard({
                     </>
                   ) : processingStatus === "completed" ? (
                     <>
-                      <Sparkles className="size-3.5 text-emerald-500" />
+                      <Sparkles className="size-3.5 text-success" />
                       <span>Re-process</span>
                     </>
                   ) : processingStatus === "failed" ? (
@@ -632,7 +629,7 @@ export function DocumentCard({
                     </>
                   ) : (
                     <>
-                      <Sparkles className="size-3.5 text-amber-300" />
+                      <Sparkles className="size-3.5 text-warning" />
                       <span>Process</span>
                     </>
                   )}
@@ -720,7 +717,7 @@ export function DocumentCard({
                         <FileIcon
                           className={cn(
                             "size-3.5",
-                            isPdf ? "text-rose-500" : "text-sky-500",
+                            isPdf ? "text-danger" : "text-info",
                           )}
                         />
                       </div>

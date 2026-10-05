@@ -49,7 +49,7 @@ export function AuthBrandPanel() {
           <br />
           Score higher.
         </h1>
-        <p className="text-sm leading-relaxed text-white/75">
+        <p className="text-sm leading-relaxed text-white/85">
           Ace Mock turns your study material into targeted mock tests and
           performance insights — so every session moves the needle.
         </p>
@@ -62,7 +62,7 @@ export function AuthBrandPanel() {
               </span>
               <div>
                 <p className="text-sm font-semibold text-white">{item.title}</p>
-                <p className="text-xs leading-relaxed text-white/65">
+                <p className="text-xs leading-relaxed text-white/80">
                   {item.description}
                 </p>
               </div>
@@ -72,7 +72,7 @@ export function AuthBrandPanel() {
       </div>
 
       {/* Footer */}
-      <p className="relative z-10 text-xs text-white/55">
+      <p className="relative z-10 text-xs text-white/70">
         Trusted by serious aspirants preparing for competitive exams.
       </p>
     </aside>

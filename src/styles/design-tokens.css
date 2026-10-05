@@ -67,16 +67,29 @@
         oklch(0.62 0.15 220 / 6%) 100%
     );
 
-    /* Semantic Test Difficulty Accents */
-    --diff-easy: oklch(0.62 0.17 145);
-    --diff-easy-bg: oklch(0.62 0.17 145 / 12%);
-    --diff-easy-border: oklch(0.62 0.17 145 / 25%);
-    --diff-medium: oklch(0.68 0.18 68);
-    --diff-medium-bg: oklch(0.68 0.18 68 / 12%);
-    --diff-medium-border: oklch(0.68 0.18 68 / 25%);
-    --diff-hard: oklch(0.58 0.22 27);
-    --diff-hard-bg: oklch(0.58 0.22 27 / 12%);
-    --diff-hard-border: oklch(0.58 0.22 27 / 25%);
+    /* ─────────────────────────────────────────────────────────────────────
+     * Semantic Role Palette — the Ace Mock color scheme.
+     * One token per role, tuned for light backgrounds. Dark mode re-tunes
+     * them in `.dark` below, so `text-success` etc. work without `dark:`
+     * variants anywhere in the app.
+     *   success · correct answers, Easy, uploaded, positive trends
+     *   warning · Medium, pending, uploads, hints & time pressure
+     *   danger  · incorrect answers, Hard, failed, destructive actions
+     *   info    · processing, documents, tips (cyan, echoes brand accent)
+     * ───────────────────────────────────────────────────────────────────── */
+    --success: oklch(0.55 0.14 163);
+    --warning: oklch(0.57 0.13 70);
+    --danger: oklch(0.51 0.18 22);
+    --info: oklch(0.52 0.13 226);
+
+    /* Text/icon color for solid fills of these roles (bg-success + …) */
+    --success-foreground: oklch(0.99 0 0);
+    --danger-foreground: oklch(0.99 0 0);
+
+    /* Category accents (subject tags) — siblings of the semantic hues */
+    --cat-physics: oklch(0.52 0.14 248);
+    --cat-math: oklch(0.52 0.16 300);
+    --cat-general: oklch(0.50 0.01 260);
 
     /* Elevation & Depth Shadows — layered, crisp, low-haze */
     --shadow-subtle: 0 1px 2px 0 oklch(0 0 0 / 0.03);
@@ -88,43 +101,49 @@
 }
 
 .dark {
-    /* Dark Theme Adjustments */
-    --brand: oklch(0.70 0.18 264);
-    --brand-hover: oklch(0.76 0.16 264);
-    --brand-foreground: oklch(0.12 0.02 264);
-    --brand-muted: oklch(0.68 0.20 264 / 16%);
-    --brand-subtle: oklch(0.68 0.20 264 / 8%);
-    --brand-glow: 0 0 28px -4px oklch(0.68 0.20 264 / 35%);
+    /* Soft Dark Theme — muted celestial palette for study comfort.
+       Chroma is pulled down and shadows stay low-contrast so long study
+       sessions never feel harsh. */
+    --brand: oklch(0.66 0.13 264);
+    --brand-hover: oklch(0.72 0.12 264);
+    --brand-foreground: oklch(0.13 0.03 264);
+    --brand-muted: oklch(0.66 0.16 264 / 14%);
+    --brand-subtle: oklch(0.66 0.16 264 / 6%);
+    --brand-glow: 0 0 18px -6px oklch(0.66 0.16 264 / 18%);
 
-    --brand-accent: oklch(0.74 0.13 215);
-    --brand-accent-foreground: oklch(0.12 0.02 264);
+    --brand-accent: oklch(0.72 0.10 220);
+    --brand-accent-foreground: oklch(0.14 0.03 220);
+
+    /* Semantic roles — lighter so they stay legible on faded surfaces */
+    --success: oklch(0.73 0.13 163);
+    --warning: oklch(0.80 0.13 82);
+    --danger: oklch(0.71 0.15 20);
+    --info: oklch(0.74 0.11 226);
+
+    /* Solid fills invert in dark mode: the fill is light, so the ink is dark */
+    --success-foreground: oklch(0.18 0.04 163);
+    --danger-foreground: oklch(0.2 0.05 22);
+
+    --cat-physics: oklch(0.74 0.11 244);
+    --cat-math: oklch(0.75 0.13 300);
+    --cat-general: oklch(0.76 0.01 260);
 
     --gradient-brand: linear-gradient(
         135deg,
-        oklch(0.62 0.20 264) 0%,
-        oklch(0.64 0.18 285) 48%,
-        oklch(0.70 0.14 215) 100%
+        oklch(0.55 0.16 264) 0%,
+        oklch(0.58 0.14 285) 48%,
+        oklch(0.63 0.11 220) 100%
     );
     --gradient-brand-soft: linear-gradient(
         135deg,
-        oklch(0.68 0.20 264 / 18%) 0%,
-        oklch(0.70 0.14 215 / 10%) 100%
+        oklch(0.64 0.16 264 / 12%) 0%,
+        oklch(0.70 0.11 220 / 5%) 100%
     );
 
-    --diff-easy: oklch(0.74 0.16 145);
-    --diff-easy-bg: oklch(0.74 0.16 145 / 16%);
-    --diff-easy-border: oklch(0.74 0.16 145 / 30%);
-    --diff-medium: oklch(0.76 0.16 68);
-    --diff-medium-bg: oklch(0.76 0.16 68 / 16%);
-    --diff-medium-border: oklch(0.76 0.16 68 / 30%);
-    --diff-hard: oklch(0.68 0.20 27);
-    --diff-hard-bg: oklch(0.68 0.20 27 / 16%);
-    --diff-hard-border: oklch(0.68 0.20 27 / 30%);
-
-    --shadow-subtle: 0 1px 2px 0 oklch(0 0 0 / 0.2);
-    --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.35), 0 2px 8px -1px oklch(0 0 0 / 0.25),
-        0 0 0 1px oklch(1 0 0 / 0.04);
-    --shadow-card-hover: 0 2px 6px -1px oklch(0 0 0 / 0.4), 0 16px 32px -8px oklch(0.68 0.20 264 / 0.22);
-    --shadow-popover: 0 12px 36px -6px oklch(0 0 0 / 0.5);
-    --shadow-focus: 0 0 0 3px oklch(0.68 0.20 264 / 35%);
+    --shadow-subtle: 0 1px 2px 0 oklch(0 0 0 / 0.08);
+    --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.12), 0 2px 6px -1px oklch(0 0 0 / 0.08),
+        0 0 0 1px oklch(1 0 0 / 0.035);
+    --shadow-card-hover: 0 2px 4px -1px oklch(0 0 0 / 0.16), 0 8px 16px -4px oklch(0.52 0.14 264 / 0.07);
+    --shadow-popover: 0 6px 18px -4px oklch(0 0 0 / 0.22);
+    --shadow-focus: 0 0 0 3px oklch(0.66 0.13 264 / 18%);
 }

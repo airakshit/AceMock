@@ -494,7 +494,7 @@ export function DocumentForm({
                 className="h-10 w-full font-medium"
                 onClick={handleReset}
               >
-                <CheckCircle2 className="mr-2 size-4 text-emerald-500" />
+                <CheckCircle2 className="mr-2 size-4 text-success" />
                 Start New Document Upload
               </Button>
             )}

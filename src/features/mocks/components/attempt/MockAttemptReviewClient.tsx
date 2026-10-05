@@ -317,13 +317,13 @@ export function MockAttemptReviewClient({
           </Button>
 
           {/* Score chip instead of timer */}
-          <div className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+          <div className="flex h-8 items-center gap-1.5 rounded-lg border border-success/40 bg-success/10 px-2 text-sm font-semibold text-success tabular-nums">
             <CheckCircle2 className="size-4" />
             {scoreMarks > 0 ? `+${scoreMarks}` : String(scoreMarks)}
-            <span className="text-sm font-medium text-emerald-600/70">
+            <span className="text-sm font-medium text-success/70">
               /{totalMarks}
             </span>
-            <span className="ml-1.5 text-[11px] font-medium text-emerald-600/70">
+            <span className="ml-1.5 text-[11px] font-medium text-success/70">
               {accuracyPercent}%
             </span>
           </div>
@@ -338,7 +338,7 @@ export function MockAttemptReviewClient({
           aria-valuenow={correctCount}
         >
           <div
-            className="h-full bg-emerald-500 transition-all duration-300"
+            className="h-full bg-success transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -464,10 +464,10 @@ export function MockAttemptReviewClient({
               className={cn(
                 "flex h-9 min-w-28 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm font-semibold tabular-nums",
                 currentQuestion.isCorrect
-                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  ? "border-success/40 bg-success/10 text-success"
                   : currentQuestion.selectedOption === null
                     ? "border-muted/70 bg-muted/40 text-muted-foreground"
-                    : "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-400",
+                    : "border-danger/40 bg-danger/10 text-danger",
               )}
             >
               {currentQuestion.isCorrect ? (

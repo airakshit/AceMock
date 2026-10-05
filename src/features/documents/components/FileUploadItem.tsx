@@ -90,7 +90,7 @@ export function FileUploadItem({
         </div>
 
         {isComplete && (
-          <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
+          <CheckCircle2 className="size-4 shrink-0 text-success" />
         )}
 
         {hasError && (

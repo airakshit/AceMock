@@ -57,9 +57,9 @@ export function FilePreviewDialog({
                 className={cn(
                   "size-4",
                   isPdf
-                    ? "text-rose-500"
+                    ? "text-danger"
                     : isImage
-                      ? "text-sky-500"
+                      ? "text-info"
                       : "text-muted-foreground",
                 )}
               />

@@ -51,7 +51,7 @@ export function OptionsEditor({
               className={cn(
                 "flex items-center gap-2.5 rounded-xl border p-2.5 transition-all bg-card/60",
                 isCorrect
-                  ? "border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/20"
+                  ? "border-success/60 bg-success/5 ring-1 ring-success/20"
                   : "border-border hover:border-primary/40",
                 errorMessage && "border-destructive/60 bg-destructive/5",
               )}
@@ -61,7 +61,7 @@ export function OptionsEditor({
                 className={cn(
                   "flex size-8 shrink-0 items-center justify-center rounded-lg font-bold text-sm font-mono transition-colors",
                   isCorrect
-                    ? "bg-emerald-500 text-white shadow-xs"
+                    ? "bg-success text-success-foreground shadow-xs"
                     : "bg-muted text-muted-foreground",
                 )}
               >
@@ -113,8 +113,8 @@ export function OptionsEditor({
                   className={cn(
                     "inline-flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-all",
                     isCorrect
-                      ? "border-emerald-500 bg-emerald-500"
-                      : "border-muted-foreground/40 bg-background group-hover:border-emerald-400",
+                      ? "border-success bg-success"
+                      : "border-muted-foreground/40 bg-background group-hover:border-success",
                   )}
                 >
                   {isCorrect && (
@@ -125,7 +125,7 @@ export function OptionsEditor({
                   className={cn(
                     "text-sm font-mono font-semibold transition-colors",
                     isCorrect
-                      ? "text-emerald-600 dark:text-emerald-400"
+                      ? "text-success"
                       : "text-muted-foreground group-hover:text-foreground",
                   )}
                 >

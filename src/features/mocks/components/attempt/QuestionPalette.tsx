@@ -96,7 +96,7 @@ export function QuestionPalette({
           style={{
             width: `${progressPercent}%`,
             backgroundColor: isReview
-              ? "var(--color-emerald-500)"
+              ? "var(--success)"
               : "var(--color-primary)",
           }}
         />
@@ -121,17 +121,17 @@ export function QuestionPalette({
               className={cn(
                 "flex h-9 items-center justify-center rounded-md border text-xs font-semibold tabular-nums transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                 isCurrent && isReview && isCorrect
-                  ? "ring-2 ring-primary ring-offset-1 ring-offset-card border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  ? "ring-2 ring-primary ring-offset-1 ring-offset-card border-success/60 bg-success/10 text-success"
                   : isCurrent && isReview && isIncorrect
-                    ? "ring-2 ring-primary ring-offset-1 ring-offset-card border-rose-500/60 bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                    ? "ring-2 ring-primary ring-offset-1 ring-offset-card border-danger/60 bg-danger/10 text-danger"
                     : isCurrent && isReview
                       ? "ring-2 ring-primary ring-offset-1 ring-offset-card border-muted/70 bg-muted/40 text-muted-foreground"
                       : isCurrent
                         ? "border-primary bg-primary text-primary-foreground shadow-sm"
                         : isCorrect
-                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:border-emerald-500/60 dark:text-emerald-400"
+                          ? "border-success/40 bg-success/10 text-success hover:border-success/60"
                           : isIncorrect
-                            ? "border-rose-500/40 bg-rose-500/10 text-rose-700 hover:border-rose-500/60 dark:text-rose-400"
+                            ? "border-danger/40 bg-danger/10 text-danger hover:border-danger/60"
                             : isAnswered || isReview
                               ? "border-border/70 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
                               : "border-border/70 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground",
@@ -159,11 +159,11 @@ export function QuestionPalette({
         {isReview ? (
           <>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-emerald-500/70" />
+              <span className="size-2.5 rounded-sm bg-success/70" />
               Correct
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-rose-500/70" />
+              <span className="size-2.5 rounded-sm bg-danger/70" />
               Incorrect
             </li>
             <li className="flex items-center gap-1.5">
@@ -174,7 +174,7 @@ export function QuestionPalette({
         ) : (
           <>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-emerald-500/70" />
+              <span className="size-2.5 rounded-sm bg-success/70" />
               Answered
             </li>
             <li className="flex items-center gap-1.5">

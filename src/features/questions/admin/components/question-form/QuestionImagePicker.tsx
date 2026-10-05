@@ -126,7 +126,7 @@ export function QuestionImagePicker({
           className={cn(
             "relative flex items-center gap-3 rounded-xl border bg-card p-3 transition-all",
             isUploading && "border-primary/40 bg-primary/5",
-            isComplete && "border-emerald-500/30 bg-emerald-500/5",
+            isComplete && "border-success/30 bg-success/5",
             hasError && "border-destructive/50 bg-destructive/5",
           )}
         >
@@ -159,7 +159,7 @@ export function QuestionImagePicker({
               {isComplete && (
                 <Badge
                   variant="outline"
-                  className="gap-1 text-[10px] py-0 px-1.5 h-5 text-emerald-600 border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400 shrink-0"
+                  className="gap-1 text-[10px] py-0 px-1.5 h-5 text-success border-success/30 bg-success/10 shrink-0"
                 >
                   <CheckCircle2 className="size-3" />
                   Uploaded

@@ -162,7 +162,7 @@ export function QuestionCardActions({
                     {option.label}
                     {alreadyReported && (
                       <Check
-                        className="size-3.5 text-emerald-500"
+                        className="size-3.5 text-success"
                         aria-label="Already reported"
                       />
                     )}

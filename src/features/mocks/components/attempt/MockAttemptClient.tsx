@@ -399,8 +399,8 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
             className={cn(
               "mx-auto flex size-14 items-center justify-center rounded-full",
               finishReason === "time-up"
-                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                ? "bg-warning/10 text-warning"
+                : "bg-success/10 text-success",
             )}
           >
             <CheckCircle2 className="size-7" />
@@ -421,7 +421,7 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
 
           <dl className="grid grid-cols-3 gap-2">
             <div className="rounded-lg border border-border/60 bg-muted/30 px-2 py-2.5">
-              <dd className="text-lg font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+              <dd className="text-lg font-semibold text-success tabular-nums">
                 {answeredCount}
               </dd>
               <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -537,7 +537,7 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
                 isCriticalTime &&
                   "animate-pulse border-destructive/50 bg-destructive/10 text-destructive",
                 isLowTime &&
-                  "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                  "border-warning/50 bg-warning/10 text-warning",
                 !isLowTime &&
                   !isCriticalTime &&
                   "border-border/70 bg-muted/40 text-foreground",
@@ -666,7 +666,7 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
             className={cn(
               "h-9 min-w-32 gap-1.5 px-4 sm:h-8 sm:min-w-40",
               isAlreadySaved || (!pendingOption && savedOption)
-                ? "pointer-events-none border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                ? "pointer-events-none border border-success/40 bg-success/10 text-success"
                 : "",
             )}
             disabled={!canConfirm || isFinishing}

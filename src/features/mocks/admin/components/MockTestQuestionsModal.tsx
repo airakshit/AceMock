@@ -176,10 +176,10 @@ export function MockTestQuestionsModal({
                         variant="secondary"
                         className={`text-[10px] uppercase font-semibold tracking-wide ${
                           q.difficulty === "easy"
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            ? "bg-success/10 text-success"
                             : q.difficulty === "hard"
-                              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                              : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              ? "bg-danger/10 text-danger"
+                              : "bg-warning/10 text-warning"
                         }`}
                       >
                         {q.difficulty}
@@ -200,7 +200,7 @@ export function MockTestQuestionsModal({
                           key={opt.key}
                           className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors ${
                             isCorrect
-                              ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-900 dark:text-emerald-200 font-medium"
+                              ? "border-success/40 bg-success/5 text-success font-medium"
                               : "border-border/60 bg-muted/20 text-muted-foreground"
                           }`}
                         >
@@ -208,7 +208,7 @@ export function MockTestQuestionsModal({
                             <span
                               className={`size-5 rounded flex items-center justify-center text-[10px] font-bold ${
                                 isCorrect
-                                  ? "bg-emerald-500 text-white"
+                                  ? "bg-success text-success-foreground"
                                   : "bg-muted text-muted-foreground border border-border/80"
                               }`}
                             >
@@ -218,7 +218,7 @@ export function MockTestQuestionsModal({
                           </div>
 
                           {isCorrect && (
-                            <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                            <CheckCircle2 className="size-4 text-success shrink-0" />
                           )}
                         </div>
                       );

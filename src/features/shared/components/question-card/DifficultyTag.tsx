@@ -9,15 +9,15 @@ const DIFFICULTY_STYLES: Record<
 > = {
   easy: {
     label: "Easy",
-    className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    className: "bg-success/10 text-success",
   },
   medium: {
     label: "Medium",
-    className: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    className: "bg-warning/10 text-warning",
   },
   hard: {
     label: "Hard",
-    className: "bg-red-500/10 text-red-700 dark:text-red-400",
+    className: "bg-danger/10 text-danger",
   },
 };
 

@@ -75,7 +75,7 @@ function MathRenderer({
       return katex.renderToString(upgraded, {
         displayMode: isDisplay,
         throwOnError: false,
-        errorColor: "#ef4444",
+        errorColor: "var(--danger)",
         // Security hardening (no behavior change for normal math/chemistry
         // content): blocks \href/\includegraphics-style trust-gated
         // commands so untrusted OCR text can't inject links or resources.

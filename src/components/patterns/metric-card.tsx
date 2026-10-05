@@ -37,9 +37,9 @@ export function MetricCard({
         className={cn(
           "absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-current to-transparent opacity-60",
           accent === "brand" && "text-brand",
-          accent === "success" && "text-emerald-500",
-          accent === "info" && "text-sky-500",
-          accent === "warning" && "text-amber-500",
+          accent === "success" && "text-success",
+          accent === "info" && "text-info",
+          accent === "warning" && "text-warning",
           accent === "default" && "opacity-0",
         )}
         aria-hidden="true"
@@ -65,8 +65,8 @@ export function MetricCard({
                 className={cn(
                   "text-xs font-semibold tabular-nums",
                   trend.isPositive
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-rose-600 dark:text-rose-400",
+                    ? "text-success"
+                    : "text-danger",
                 )}
               >
                 {trend.isPositive ? "↑" : "↓"} {trend.value}

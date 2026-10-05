@@ -73,9 +73,36 @@ import { cn } from "@/lib/utils";
 
 Colors are calibrated in **OKLCH** color space for perceptual uniformity between Light and Dark modes.
 
+### The Ace Mock color scheme
+
+Every color in the app rolls up to one of these roles. Prefer the semantic
+token over a raw palette class — it is already tuned for both modes, so no
+`dark:` variants are needed:
+
+| Role | Token | Hue | Use for |
+|---|---|---|---|
+| Brand | `text-brand`, `bg-brand-gradient` | Indigo 264 | identity, primary actions, focus, active nav |
+| Success | `text-success`, `bg-success/10`, `border-success/25` | Emerald 163 | correct answers, Easy, uploaded, positive trends |
+| Warning | `text-warning`, `bg-warning/10`, `border-warning/25` | Amber 70 | Medium, pending, uploads, hints, time pressure |
+| Danger | `text-danger`, `bg-danger/10`, `border-danger/25` | Rose 22 | incorrect answers, Hard, failed, destructive |
+| Info | `text-info`, `bg-info/10`, `border-info/25` | Cyan 226 | processing, documents, tips (echoes brand accent) |
+
+Category accents for subject tags: `cat-physics` (blue), `cat-math` (violet),
+`cat-general` (neutral). Chemistry and English intentionally reuse
+`success`/`warning` so the tag row stays inside the scheme.
+
+Raw palette classes (`emerald-*`, `amber-*`, `rose-*`, `sky-*`) are overridden
+in `globals.css` to sit on the same muted scale — they are a fallback for
+one-off tints, not the default. `red-*` is aliased onto the rose family so the
+app only ever ships one danger hue.
+
+**Dark mode is deliberately faded**: surfaces sit at oklch 0.175–0.225 with
+low chroma, shadows stay under 0.22 alpha, and the palette loses ~20% chroma
+versus stock, so long study sessions stay comfortable.
+
 ### Brand Palette:
-- **Light Mode Brand**: Electric Indigo `oklch(0.56 0.22 264)`
-- **Dark Mode Brand**: Radiant Iris `oklch(0.68 0.20 264)`
+- **Light Mode Brand**: Electric Indigo `oklch(0.54 0.22 264)`
+- **Dark Mode Brand**: Soft Iris `oklch(0.66 0.13 264)`
 
 ### Difficulty Badges:
 ```tsx
@@ -87,9 +114,9 @@ const diff = colors.difficulty[difficulty as DifficultyLevel];
   {diff.label}
 </span>
 ```
-- **Easy**: Emerald `bg-emerald-500/10 text-emerald-700`
-- **Medium**: Amber `bg-amber-500/10 text-amber-700`
-- **Hard**: Rose `bg-rose-500/10 text-rose-700`
+- **Easy**: `bg-success/10 text-success border-success/25`
+- **Medium**: `bg-warning/10 text-warning border-warning/25`
+- **Hard**: `bg-danger/10 text-danger border-danger/25`
 
 ### Metric Card Accents:
 - `colors.metricAccent.default`

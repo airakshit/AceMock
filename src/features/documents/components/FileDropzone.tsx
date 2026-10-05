@@ -296,7 +296,7 @@ export function FileDropzone({
               className={cn(
                 "group relative flex flex-col gap-2 rounded-lg border bg-background p-3 transition-all",
                 isUploading && "border-primary/40 bg-primary/5",
-                isComplete && "border-emerald-500/30 bg-emerald-500/5",
+                isComplete && "border-success/30 bg-success/5",
                 hasError && "border-destructive/50 bg-destructive/5",
               )}
             >
@@ -337,7 +337,7 @@ export function FileDropzone({
                     {status === "preparing" && (
                       <Badge
                         variant="outline"
-                        className="gap-1 text-[10px] py-0 px-1.5 h-5 text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-400"
+                        className="gap-1 text-[10px] py-0 px-1.5 h-5 text-info border-info/30 bg-info/10"
                       >
                         <Loader2 className="size-3 animate-spin" />
                         Preparing
@@ -357,7 +357,7 @@ export function FileDropzone({
                     {isPaused && (
                       <Badge
                         variant="secondary"
-                        className="gap-1 text-[10px] py-0 px-1.5 h-5 text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400"
+                        className="gap-1 text-[10px] py-0 px-1.5 h-5 text-warning bg-warning/10"
                       >
                         <Pause className="size-2.5" />
                         Paused
@@ -367,7 +367,7 @@ export function FileDropzone({
                     {isComplete && (
                       <Badge
                         variant="outline"
-                        className="gap-1 text-[10px] py-0 px-1.5 h-5 text-emerald-600 border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
+                        className="gap-1 text-[10px] py-0 px-1.5 h-5 text-success border-success/30 bg-success/10"
                       >
                         <CheckCircle2 className="size-3" />
                         Done

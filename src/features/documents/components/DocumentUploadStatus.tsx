@@ -77,9 +77,9 @@ export function DocumentUploadStatus({ uppy }: DocumentUploadStatusProps) {
           return (
             <div key={file.id} className="flex items-center gap-3">
               {complete ? (
-                <CheckCircle2 className="size-4 shrink-0" />
+                <CheckCircle2 className="size-4 shrink-0 text-success" />
               ) : error ? (
-                <CircleAlert className="size-4 shrink-0 text-destructive" />
+                <CircleAlert className="size-4 shrink-0 text-danger" />
               ) : (
                 <Loader2 className="size-4 shrink-0 animate-spin" />
               )}

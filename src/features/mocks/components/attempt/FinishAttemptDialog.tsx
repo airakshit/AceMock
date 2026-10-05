@@ -68,8 +68,8 @@ export function FinishAttemptDialog({
         </AlertDialogHeader>
 
         {unansweredCount > 0 && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-            <p className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+          <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
               <AlertTriangle className="size-3.5 shrink-0" />
               Unanswered questions
             </p>
@@ -77,7 +77,7 @@ export function FinishAttemptDialog({
               {unansweredNumbers.map((num) => (
                 <span
                   key={num}
-                  className="flex size-6 items-center justify-center rounded-md border border-amber-500/40 bg-background/60 text-[11px] font-semibold tabular-nums text-foreground"
+                  className="flex size-6 items-center justify-center rounded-md border border-warning/40 bg-background/60 text-[11px] font-semibold tabular-nums text-foreground"
                 >
                   {num}
                 </span>

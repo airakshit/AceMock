@@ -127,12 +127,12 @@ export function QuestionCard({
           {hasMarks && (
             <div className="flex items-center gap-1 font-mono text-xs">
               {marks != null && marks > 0 && (
-                <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 font-semibold text-emerald-700 dark:text-emerald-400">
+                <span className="rounded-md bg-success/10 px-1.5 py-0.5 font-semibold text-success">
                   +{marks}
                 </span>
               )}
               {negativeMarks != null && negativeMarks > 0 && (
-                <span className="rounded-md bg-red-500/10 px-1.5 py-0.5 font-semibold text-red-700 dark:text-red-400">
+                <span className="rounded-md bg-danger/10 px-1.5 py-0.5 font-semibold text-danger">
                   −{negativeMarks}
                 </span>
               )}
@@ -177,10 +177,10 @@ export function QuestionCard({
             silently hiding the section (bookmarks page). */}
         {mode === "review" &&
           (explanation || solutionDiagramUrl || solutionControls?.isLoaded) && (
-            <section className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <section className="space-y-3 rounded-xl border border-warning/30 bg-warning/5 p-4">
               <div className="flex items-center gap-1.5">
-                <Lightbulb className="size-4 text-amber-500" />
-                <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                <Lightbulb className="size-4 text-warning" />
+                <h4 className="text-sm font-semibold text-warning">
                   {explanation ? "Explanation" : "Solution"}
                 </h4>
               </div>
@@ -215,7 +215,7 @@ export function QuestionCard({
               {solutionControls.isLoading ? (
                 <Loader2 className="animate-spin" />
               ) : (
-                <Lightbulb className="size-3.5 text-amber-500" />
+                <Lightbulb className="size-3.5 text-warning" />
               )}
               {solutionControls.isLoading
                 ? "Loading solution..."
