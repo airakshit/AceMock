@@ -1,8 +1,8 @@
 export { createMockTestFromDocumentsAction } from "./actions/create-mock-test-from-documents";
+export { createCustomMockTestAction } from "./actions/create-custom-mock-test";
 export { getAdminMockTestsAction } from "./actions/get-admin-mock-tests";
 export { searchMockTestsAction } from "./actions/search-mock-tests";
 export { getMockTestsAction } from "./actions/get-mock-tests";
-export { getDocumentsForMockCreationAction } from "./actions/get-documents-for-mock-creation";
 export { getAdminMockTestDetailsAction } from "./actions/get-admin-mock-test-details";
 export { deleteMockTestAction } from "./actions/delete-mock-test";
 export { getMyAttemptHistoryAction } from "./actions/get-my-attempt-history";

@@ -4,6 +4,7 @@ import {
   FinalizeDocumentUploadActionPayload,
 } from "./actions/types";
 import { documentsRepository } from "./repositories/documents.repository";
+import type { DocumentWithQuestionCountProjection } from "./dto/projections";
 import { documentQueries } from "./repositories/document-queries";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
@@ -146,6 +147,20 @@ class DocumentsService {
 
   async getUserDocuments(userId: string) {
     return documentsRepository.findByUserWithFiles(db, userId);
+  }
+
+  /**
+   * Lightweight picker list: the user's own documents with how many questions
+   * each one has contributed. Shared by the admin and student mock-creation
+   * flows — the admin simply sees their own documents.
+   */
+  async getDocumentsSummary(
+    userId: string,
+  ): Promise<DocumentWithQuestionCountProjection[]> {
+    return documentsRepository.findDocumentsWithQuestionsCountForUser(
+      db,
+      userId,
+    );
   }
 
   async deleteDocument(userId: string, documentId: string) {

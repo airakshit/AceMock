@@ -35,7 +35,7 @@ import { SearchInput } from "@/components/patterns/search-input";
 import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
 import type { DocumentOptionForMockProjection } from "@/features/documents/dto/projections";
 import { MockTestScope } from "../../dto/projections";
-import { getDocumentsForMockCreationAction } from "../../actions/get-documents-for-mock-creation";
+import { getDocumentsSummaryAction } from "@/features/documents/actions/get-documents-summary";
 import { createMockTestFromDocumentsAction } from "../../actions/create-mock-test-from-documents";
 import { getCurriculumOptionsAction } from "@/features/questions/actions";
 
@@ -135,7 +135,7 @@ export function CreateMockTestModal({
 
     let isMounted = true;
 
-    getDocumentsForMockCreationAction()
+    getDocumentsSummaryAction()
       .then((res) => {
         if (!isMounted) return;
         if (res.success) {

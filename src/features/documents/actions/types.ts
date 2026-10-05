@@ -1,5 +1,6 @@
 import { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import { DocumentProcessingStatus, FileUploadStatus } from "../types";
+import type { DocumentWithQuestionCountProjection } from "../dto/projections";
 
 interface UserIdInterface {
   userId: string;
@@ -58,6 +59,14 @@ export interface DocumentItemDTO {
 }
 
 export type GetUserDocumentsActionResponse = DocumentItemDTO[];
+
+/**
+ * Picker list of the caller's own documents with per-document question counts.
+ * Returned by `getDocumentsSummaryAction` for both admin and student
+ * mock-test creation.
+ */
+export type GetDocumentsSummaryActionResponse =
+  DocumentWithQuestionCountProjection[];
 
 export interface ProcessDocumentActionPayload {
   documentId: string;

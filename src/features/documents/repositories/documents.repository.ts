@@ -494,6 +494,57 @@ export class DocumentsRepository {
       questionCount: Number(r.questionCount || 0),
     }));
   }
+
+  /**
+   * Same summary as above, restricted to one user's documents.
+   * Source for the mock-creation document picker (admin sees their own
+   * documents, a student sees theirs).
+   */
+  async findDocumentsWithQuestionsCountForUser(
+    db: DbExecutor,
+    userId: string,
+  ): Promise<DocumentWithQuestionCountProjection[]> {
+    const records = await db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        createdAt: documents.createdAt,
+        questionCount: count(questions.id),
+      })
+      .from(documents)
+      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
+      .leftJoin(questions, eq(questions.fileId, documentFiles.id))
+      .where(eq(documents.userId, userId))
+      .groupBy(documents.id, documents.title, documents.createdAt)
+      .orderBy(desc(documents.createdAt));
+
+    return records.map((r) => ({
+      id: r.id,
+      title: r.title,
+      createdAt: r.createdAt,
+      questionCount: Number(r.questionCount || 0),
+    }));
+  }
+
+  /**
+   * Of the given ids, the subset that exists AND belongs to `userId`.
+   * Lets a caller prove ownership of a client-supplied id list without
+   * leaking whether an unowned id exists at all.
+   */
+  async findByIdsForUser(
+    db: DbExecutor,
+    userId: string,
+    documentIds: string[],
+  ): Promise<string[]> {
+    if (documentIds.length === 0) return [];
+
+    const rows = await db
+      .select({ id: documents.id })
+      .from(documents)
+      .where(and(eq(documents.userId, userId), inArray(documents.id, documentIds)));
+
+    return rows.map((r) => r.id);
+  }
 }
 
 export const documentsRepository = new DocumentsRepository();

@@ -12,6 +12,8 @@ import {
   CreateMockTestQuestionItemCommand,
 } from "./dto/commands";
 import {
+  CreateCustomMockTestPayload,
+  CreateMockTestBasePayload,
   CreateMockTestFromDocumentsPayload,
   SearchMockTestsPayload,
 } from "./dto/payloads";
@@ -49,7 +51,6 @@ import {
   isMockTestScope,
 } from "./utils";
 import { documentsRepository } from "../documents/repositories/documents.repository";
-import { DocumentWithQuestionCountProjection } from "../documents/dto/projections";
 import { questionsRepository } from "../questions/repositories/questions.repository";
 import { mockTestAttemptRepository } from "./repositories/mock-attempts.repository";
 import { curriculumRepository } from "../questions/repositories/curriculum.repository";
@@ -66,23 +67,58 @@ interface MockTestHierarchy {
 }
 
 export class MockTestsService {
-  async getDocumentsForMockCreation(): Promise<
-    DocumentWithQuestionCountProjection[]
-  > {
-    return await documentsRepository.findDocumentsWithQuestionsCount(db);
-  }
-
   /**
    * Creates a new mock test directly from selected documents.
    * Pulls all questions associated with the chosen documents and links them in sequence.
    *
-   * Admin-only (the action guarding it calls `requireAdmin()`), so the test is
-   * stored with `byAdmin = true` and the curriculum columns resolved from the
-   * selected entity for the chosen scope.
+   * Admin path: the action guarding it calls `requireAdmin()`, so the test is
+   * stored with `byAdmin = true`, may override the summed marks, and is not
+   * restricted to documents the caller owns.
    */
   async createFromDocuments(
     userId: string,
     payload: CreateMockTestFromDocumentsPayload,
+  ): Promise<CreateMockTestResult> {
+    return this.buildMockTestFromDocuments(userId, payload, {
+      byAdmin: true,
+      requireOwnedDocuments: false,
+      totalMarksOverride: payload.customTotalMarks,
+    });
+  }
+
+  /**
+   * Creates a custom mock test for the signed-in student from documents they
+   * uploaded themselves. Every question belonging to the selected documents
+   * is included — there is no question-level selection.
+   *
+   * `totalMarks` is never accepted from the client here: it is always the sum
+   * of the selected questions' marks, computed in the builder below.
+   */
+  async createCustomMockTest(
+    userId: string,
+    payload: CreateCustomMockTestPayload,
+  ): Promise<CreateMockTestResult> {
+    return this.buildMockTestFromDocuments(userId, payload, {
+      byAdmin: false,
+      requireOwnedDocuments: true,
+    });
+  }
+
+  /**
+   * Shared builder behind both creation paths.
+   *
+   * `totalMarksOverride` only ever reaches the builder from the admin action,
+   * so a student-created test can never carry an arbitrary marks value.
+   */
+  private async buildMockTestFromDocuments(
+    userId: string,
+    payload: CreateMockTestBasePayload,
+    options: {
+      byAdmin: boolean;
+      requireOwnedDocuments: boolean;
+      /** Admin-only override for the summed question marks. */
+      totalMarksOverride?: number;
+    },
   ): Promise<CreateMockTestResult> {
     const trimmedName = payload.name?.trim();
     if (!trimmedName) {
@@ -104,6 +140,32 @@ export class MockTestsService {
         "INVALID_ARGUMENT",
         "Please select at least one document to generate the mock test from.",
       );
+    }
+
+    if (payload.documentIds.some((id) => !isValidUUID(id))) {
+      throw new ServerActionError(
+        "INVALID_ARGUMENT",
+        "One or more of the selected documents is invalid.",
+      );
+    }
+
+    // A student may only assemble a test from their own uploads. The
+    // ownership set is computed from ids the caller provably owns, so a
+    // foreign id is rejected without confirming whether it exists.
+    if (options.requireOwnedDocuments) {
+      const ownedIds = await documentsRepository.findByIdsForUser(
+        db,
+        userId,
+        payload.documentIds,
+      );
+      const owned = new Set(ownedIds);
+
+      if (payload.documentIds.some((id) => !owned.has(id))) {
+        throw new ServerActionError(
+          "FORBIDDEN",
+          "You can only create a mock test from documents you uploaded.",
+        );
+      }
     }
 
     // Test rules: timing is opt-in untimed (a test stays an exam unless the
@@ -146,9 +208,11 @@ export class MockTestsService {
       );
     }
 
+    // Inferred from the selected questions — every question in the chosen
+    // documents is taken, so their marks are the test's marks.
     const totalMarks =
-      payload.customTotalMarks && payload.customTotalMarks > 0
-        ? payload.customTotalMarks
+      options.totalMarksOverride && options.totalMarksOverride > 0
+        ? options.totalMarksOverride
         : matchedQuestions.reduce((acc, q) => acc + (q.marks || 1), 0);
 
     const mockTestId = generateUUIDv7();
@@ -161,7 +225,7 @@ export class MockTestsService {
       negativePercentagePerQuestion: negativePercent,
       durationSeconds,
       instructions: payload.instructions?.trim() || null,
-      byAdmin: true,
+      byAdmin: options.byAdmin,
       scope: payload.scope,
       allowUntimed,
       maxAttempts,
@@ -207,7 +271,7 @@ export class MockTestsService {
    * Guarantees the row satisfies `mock_test_scope_reference_check`.
    */
   private async resolveHierarchy(
-    payload: CreateMockTestFromDocumentsPayload,
+    payload: CreateMockTestBasePayload,
   ): Promise<MockTestHierarchy> {
     const empty: MockTestHierarchy = {
       subjectId: null,

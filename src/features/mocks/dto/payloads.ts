@@ -3,13 +3,12 @@
 
 import type { MockTestScope } from "./projections";
 
-export interface CreateMockTestFromDocumentsPayload {
+export interface CreateMockTestBasePayload {
   name: string;
   documentIds: string[];
   durationMinutes: number;
   negativePercentagePerQuestion: number;
   instructions?: string;
-  customTotalMarks?: number;
   /** Classification of the test — decides which curriculum ids are stored. */
   scope: MockTestScope;
   /**
@@ -31,6 +30,20 @@ export interface CreateMockTestFromDocumentsPayload {
    */
   maxAttempts?: number;
 }
+
+/** Admin creation: the summed question marks may be overridden. */
+export interface CreateMockTestFromDocumentsPayload
+  extends CreateMockTestBasePayload {
+  customTotalMarks?: number;
+}
+
+/**
+ * Student-authored custom test.
+ *
+ * Deliberately carries no marks field — `totalMarks` is always inferred in
+ * the service layer as the sum of the selected questions' marks.
+ */
+export type CreateCustomMockTestPayload = CreateMockTestBasePayload;
 
 /**
  * Server-side search over mock tests. Every filter is optional and combined
