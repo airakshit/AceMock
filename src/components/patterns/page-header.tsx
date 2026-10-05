@@ -19,7 +19,7 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between pb-1",
+        "flex flex-col gap-2.5 pt-10 pb-1 sm:flex-row sm:items-center sm:justify-between md:pt-0",
         className,
       )}
     >
@@ -27,9 +27,9 @@ export function PageHeader({
         {eyebrow ? (
           <p className={typography.eyebrow}>{eyebrow}</p>
         ) : null}
-        <h2 className={cn(typography.pageTitle, "text-xl md:text-2xl font-semibold tracking-tight")}>
+        <h1 className={cn(typography.pageTitle, "text-xl md:text-2xl font-semibold tracking-tight")}>
           {title}
-        </h2>
+        </h1>
         {description ? (
           <p className={cn(typography.pageSubtitle, "text-xs md:text-sm text-muted-foreground")}>
             {description}

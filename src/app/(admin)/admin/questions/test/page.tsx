@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { PlusCircle } from "lucide-react";
 import { QuestionsAdminTestView } from "@/features/questions/admin";
-import { AppHeader } from "@/components/layouts/components/AppHeader";
+import { PageHeader } from "@/components/patterns/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,11 +14,12 @@ export const metadata = {
 
 export default function AdminQuestionsTestPage() {
   return (
-    <>
-      <AppHeader
+    <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <PageHeader
         title="Questions Database Inspector"
-        description="Live testing view for questions saved in the database via the OCR and ingestion pipeline."
-        actions={
+        description="Query questions saved by the OCR and ingestion pipeline."
+        className="mx-auto mb-5 w-full max-w-6xl"
+        action={
           <Link
             href="/admin/questions"
             className={cn(
@@ -32,8 +33,7 @@ export default function AdminQuestionsTestPage() {
           </Link>
         }
       />
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <Suspense
+      <Suspense
           fallback={
             <div
               role="status"
@@ -50,7 +50,6 @@ export default function AdminQuestionsTestPage() {
         >
           <QuestionsAdminTestView />
         </Suspense>
-      </div>
-    </>
+    </div>
   );
 }

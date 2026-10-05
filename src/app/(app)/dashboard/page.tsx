@@ -1,16 +1,11 @@
 import { DashboardView } from "@/features/dashboard/components/DashboardView";
-import { AppHeader } from "@/components/layouts/components/AppHeader";
 
 export default function DashboardPage() {
+  // No PageHeader here: DashboardHero is the page's editorial intro.
+  // pt-14 clears the floating mobile menu trigger.
   return (
-    <>
-      <AppHeader
-        title="Dashboard"
-        description="Track your progress and jump into popular mock tests."
-      />
-      <div className="flex-1 p-4 md:p-6">
-        <DashboardView />
-      </div>
-    </>
+    <div className="flex-1 p-4 pt-14 md:p-6 md:pt-6">
+      <DashboardView />
+    </div>
   );
 }

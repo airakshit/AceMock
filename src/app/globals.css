@@ -183,14 +183,15 @@
 
     --radius: 0.65rem;
 
-    --sidebar: oklch(0.99 0.002 250);
-    --sidebar-foreground: oklch(0.20 0.02 260);
-    --sidebar-primary: oklch(0.52 0.22 264);
-    --sidebar-primary-foreground: oklch(0.99 0 0);
-    --sidebar-accent: oklch(0.945 0.015 264);
-    --sidebar-accent-foreground: oklch(0.24 0.14 264);
-    --sidebar-border: oklch(0.915 0.008 250);
-    --sidebar-ring: oklch(0.54 0.22 264 / 35%);
+    /* Sidebar — one solid brand-indigo panel (white text/overlays on top). */
+    --sidebar: oklch(0.42 0.17 264);
+    --sidebar-foreground: oklch(0.98 0 0);
+    --sidebar-primary: oklch(0.98 0 0);
+    --sidebar-primary-foreground: oklch(0.42 0.17 264);
+    --sidebar-accent: oklch(1 0 0 / 14%);
+    --sidebar-accent-foreground: oklch(0.99 0 0);
+    --sidebar-border: oklch(1 0 0 / 18%);
+    --sidebar-ring: oklch(1 0 0 / 45%);
 
     color-scheme: light;
 }
@@ -223,14 +224,15 @@
     --chart-4: oklch(0.72 0.14 300);
     --chart-5: oklch(0.74 0.11 226);
 
-    --sidebar: oklch(0.195 0.015 260);
-    --sidebar-foreground: oklch(0.95 0.005 250);
-    --sidebar-primary: oklch(0.66 0.13 264);
-    --sidebar-primary-foreground: oklch(0.13 0.03 264);
-    --sidebar-accent: oklch(0.27 0.025 264);
-    --sidebar-accent-foreground: oklch(0.95 0.01 264);
-    --sidebar-border: oklch(1 0 0 / 13%);
-    --sidebar-ring: oklch(0.66 0.13 264 / 32%);
+    /* Sidebar — same brand indigo, deepened for the faded dark theme. */
+    --sidebar: oklch(0.28 0.07 264);
+    --sidebar-foreground: oklch(0.97 0.01 260);
+    --sidebar-primary: oklch(0.72 0.14 264);
+    --sidebar-primary-foreground: oklch(0.98 0 0);
+    --sidebar-accent: oklch(1 0 0 / 12%);
+    --sidebar-accent-foreground: oklch(0.99 0 0);
+    --sidebar-border: oklch(1 0 0 / 14%);
+    --sidebar-ring: oklch(1 0 0 / 40%);
 
     color-scheme: dark;
 }

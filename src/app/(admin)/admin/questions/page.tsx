@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Database } from "lucide-react";
 import { QuestionsAdminView } from "@/features/questions/admin";
-import { AppHeader } from "@/components/layouts/components/AppHeader";
+import { PageHeader } from "@/components/patterns/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,11 +12,12 @@ export const metadata = {
 
 export default function AdminQuestionsPage() {
   return (
-    <>
-      <AppHeader
+    <div className="flex-1 space-y-5 p-4 md:p-6">
+      <PageHeader
         title="Questions Management"
-        description="Author questions with rich LaTeX, options, hints, and explanations."
-        actions={
+        description="Author questions with LaTeX, options, hints, and explanations."
+        className="mx-auto w-full max-w-7xl"
+        action={
           <Link
             href="/admin/questions/test"
             className={cn(
@@ -30,9 +31,7 @@ export default function AdminQuestionsPage() {
           </Link>
         }
       />
-      <div className="flex-1 p-4 md:p-6">
-        <QuestionsAdminView />
-      </div>
-    </>
+      <QuestionsAdminView />
+    </div>
   );
 }

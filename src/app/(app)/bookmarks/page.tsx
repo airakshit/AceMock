@@ -1,4 +1,4 @@
-import { AppHeader } from "@/components/layouts/components/AppHeader";
+import { PageHeader } from "@/components/patterns/page-header";
 import { BookmarksView } from "@/features/questions/components/bookmarks";
 
 export const metadata = {
@@ -8,14 +8,12 @@ export const metadata = {
 
 export default function BookmarksPage() {
   return (
-    <>
-      <AppHeader
+    <div className="flex-1 space-y-5 p-4 md:p-6">
+      <PageHeader
         title="Bookmarks"
-        description="Questions you've saved for later review."
+        description="Drill saved questions by subject, with or without solutions."
       />
-      <div className="flex-1 p-4 md:p-6">
-        <BookmarksView />
-      </div>
-    </>
+      <BookmarksView />
+    </div>
   );
 }

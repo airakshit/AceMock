@@ -1,4 +1,4 @@
-import { AppHeader } from "@/components/layouts/components/AppHeader";
+import { PageHeader } from "@/components/patterns/page-header";
 import { AttemptHistoryView } from "@/features/mocks/components/attempt-history/AttemptHistoryView";
 
 export const metadata = {
@@ -8,14 +8,12 @@ export const metadata = {
 
 export default function AttemptHistoryPage() {
   return (
-    <>
-      <AppHeader
+    <div className="flex-1 space-y-5 p-4 md:p-6">
+      <PageHeader
         title="My History"
-        description="Your past mock test attempts, scores and answer breakdowns."
+        description="Scores and answer breakdowns for every attempt."
       />
-      <div className="flex-1 p-4 md:p-6">
-        <AttemptHistoryView />
-      </div>
-    </>
+      <AttemptHistoryView />
+    </div>
   );
 }

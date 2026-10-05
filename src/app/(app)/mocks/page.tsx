@@ -1,5 +1,5 @@
+import { PageHeader } from "@/components/patterns/page-header";
 import { MocksView } from "@/features/mocks/components/MocksView";
-import { AppHeader } from "@/components/layouts/components/AppHeader";
 import { mockTestsService } from "@/features/mocks/service";
 
 export const metadata = {
@@ -11,14 +11,16 @@ export default async function MocksPage() {
   const initialTests = await mockTestsService.getAllMockTests();
 
   return (
-    <>
-      <AppHeader
+    <div className="flex-1 space-y-5 p-4 md:p-6">
+      <PageHeader
         title="Mock Tests"
-        description="Full-length and practice examinations."
+        description={
+          initialTests.length > 0
+            ? `${initialTests.length} tests · full-length and chapter practice`
+            : "Full-length and chapter practice tests"
+        }
       />
-      <div className="flex-1 p-4 md:p-6">
-        <MocksView initialTests={initialTests} />
-      </div>
-    </>
+      <MocksView initialTests={initialTests} />
+    </div>
   );
 }

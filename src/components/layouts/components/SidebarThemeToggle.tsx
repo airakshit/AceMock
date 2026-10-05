@@ -45,7 +45,7 @@ export function SidebarThemeToggle() {
           size="icon-sm"
           onClick={() => setTheme(nextTheme[theme])}
           title={`Current theme: ${theme}. Click to switch.`}
-          className="size-10 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors flex items-center justify-center shrink-0"
+          className="size-10 rounded-lg text-white/75 hover:bg-white/10 hover:text-white transition-colors flex items-center justify-center shrink-0"
         >
           {currentIcon()}
         </Button>
@@ -56,17 +56,17 @@ export function SidebarThemeToggle() {
   return (
     <div className="space-y-1.5 px-1 py-1 transition-opacity duration-150">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
           Theme
         </span>
         {mounted && (
-          <span className="text-[10px] font-medium capitalize text-muted-foreground">
+          <span className="text-[10px] font-medium capitalize text-white/70">
             {theme}
           </span>
         )}
       </div>
       <div
-        className="flex items-center gap-0.5 rounded-lg border border-sidebar-border bg-sidebar-accent/30 p-0.5"
+        className="flex items-center gap-0.5 rounded-lg border border-white/20 bg-white/10 p-0.5"
         role="group"
         aria-label="Theme preference"
       >
@@ -83,10 +83,10 @@ export function SidebarThemeToggle() {
               aria-label={`${label} theme`}
               aria-pressed={isSelected}
               className={cn(
-                "h-6.5 flex-1 gap-1.5 rounded-md text-[11px] font-medium text-muted-foreground transition-all duration-150",
+                "h-6.5 flex-1 gap-1.5 rounded-md text-[11px] font-medium transition-all duration-150",
                 isSelected
-                  ? "bg-card text-foreground font-semibold shadow-2xs border border-border/50"
-                  : "hover:bg-sidebar-accent/60 hover:text-foreground",
+                  ? "bg-sidebar-foreground font-semibold text-sidebar"
+                  : "text-white/70 hover:bg-white/10 hover:text-white",
               )}
             >
               <Icon className="size-3" />

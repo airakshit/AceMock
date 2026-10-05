@@ -1,4 +1,4 @@
-import { AppHeader } from "@/components/layouts/components/AppHeader";
+import { PageHeader } from "@/components/patterns/page-header";
 import { MockTestsAdminView } from "@/features/mocks/admin";
 
 export const metadata = {
@@ -8,14 +8,12 @@ export const metadata = {
 
 export default function AdminMockTestsPage() {
   return (
-    <>
-      <AppHeader
+    <div className="flex-1 space-y-5 p-4 md:p-6">
+      <PageHeader
         title="Mock Tests Management"
-        description="Assemble, schedule, and configure mock tests from document question banks."
+        description="Assemble and configure mock tests from document question banks."
       />
-      <div className="flex-1 p-4 md:p-6">
-        <MockTestsAdminView />
-      </div>
-    </>
+      <MockTestsAdminView />
+    </div>
   );
 }

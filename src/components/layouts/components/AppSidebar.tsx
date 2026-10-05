@@ -39,16 +39,16 @@ export function AppSidebar() {
       collapsible="icon"
       className="overflow-hidden border-r border-sidebar-border/70 bg-sidebar"
     >
-      {/* Brand Header — h-14 matches AppHeader height */}
+      {/* Brand Header */}
       <SidebarHeader className="h-14 shrink-0 overflow-hidden border-b border-sidebar-border/60 p-0">
         <Link
           href="/dashboard"
           onClick={handleNavClick}
-          className="group/brand flex h-full w-full items-center px-2 transition-colors hover:bg-sidebar-accent/40"
+          className="group/brand flex h-full w-full items-center px-2 transition-colors hover:bg-sidebar-accent"
         >
           {/* Logo container: exactly size-10 (40px) centered in 56px rail */}
           <div className="flex size-10 shrink-0 items-center justify-center">
-            <div className="flex size-8 items-center justify-center rounded-[10px] bg-brand-gradient text-white shadow-sm ring-1 ring-inset ring-white/20 transition-transform duration-200 group-hover/brand:scale-105">
+            <div className="flex size-8 items-center justify-center rounded-[10px] bg-white/15 text-white shadow-sm ring-1 ring-inset ring-white/25 transition-transform duration-200 group-hover/brand:scale-105">
               <Layers className="size-4" />
             </div>
           </div>
@@ -62,10 +62,10 @@ export function AppSidebar() {
                 : "pointer-events-none max-w-0 opacity-0",
             )}
           >
-            <span className="truncate font-heading text-sm font-bold tracking-tight text-foreground">
+            <span className="truncate font-heading text-sm font-bold tracking-tight text-sidebar-foreground">
               {APP_NAME}
             </span>
-            <span className="truncate text-[10px] font-medium tracking-wide text-muted-foreground">
+            <span className="truncate text-[10px] font-medium tracking-wide text-sidebar-foreground/75">
               Test &amp; Analytics
             </span>
           </div>
@@ -86,13 +86,13 @@ export function AppSidebar() {
               className={cn(
                 "group relative flex h-10 w-full items-center rounded-lg text-sm font-medium transition-colors duration-150",
                 isActive
-                  ? "bg-brand-muted font-semibold text-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
+                  ? "bg-white/20 font-semibold text-white"
+                  : "text-white/75 hover:bg-white/10 hover:text-white",
               )}
             >
               {/* Active accent bar */}
               {isActive ? (
-                <span className="absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-brand" />
+                <span className="absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-white/75" />
               ) : null}
 
               {/* Centralized Icon Wrapper: exactly size-10 (40px) */}
@@ -101,8 +101,8 @@ export function AppSidebar() {
                   className={cn(
                     "size-4 shrink-0 transition-colors",
                     isActive
-                      ? "text-brand"
-                      : "text-muted-foreground group-hover:text-foreground",
+                      ? "text-white"
+                      : "text-white/70 group-hover:text-white",
                   )}
                 />
               </div>

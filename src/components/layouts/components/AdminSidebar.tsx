@@ -44,11 +44,11 @@ export function AdminSidebar() {
         <Link
           href="/admin"
           onClick={handleNavClick}
-          className="group/brand flex h-full w-full items-center px-2 text-sidebar-foreground transition-colors hover:bg-sidebar-accent/40"
+          className="group/brand flex h-full w-full items-center px-2 text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
         >
           {/* Logo container: exactly size-10 (40px) centered in 56px rail */}
           <div className="flex size-10 shrink-0 items-center justify-center">
-            <div className="flex size-8 items-center justify-center rounded-[10px] bg-brand-gradient text-white shadow-sm ring-1 ring-inset ring-white/20 transition-transform duration-200 group-hover/brand:scale-105">
+            <div className="flex size-8 items-center justify-center rounded-[10px] bg-white/15 text-white shadow-sm ring-1 ring-inset ring-white/25 transition-transform duration-200 group-hover/brand:scale-105">
               <ShieldCheck className="size-4" />
             </div>
           </div>
@@ -62,13 +62,13 @@ export function AdminSidebar() {
                 : "pointer-events-none max-w-0 opacity-0",
             )}
           >
-            <span className="flex items-center gap-1.5 truncate font-heading text-sm font-bold tracking-tight text-foreground">
+            <span className="flex items-center gap-1.5 truncate font-heading text-sm font-bold tracking-tight text-sidebar-foreground">
               Admin
-              <span className="rounded-full bg-brand-muted px-1.5 py-px font-mono text-[9px] font-semibold tracking-wide text-brand">
+              <span className="rounded-full bg-white/15 px-1.5 py-px font-mono text-[9px] font-semibold tracking-wide text-white">
                 {APP_NAME}
               </span>
             </span>
-            <span className="truncate text-[10px] font-medium tracking-wide text-muted-foreground">
+            <span className="truncate text-[10px] font-medium tracking-wide text-sidebar-foreground/75">
               Control Console
             </span>
           </div>
@@ -91,12 +91,12 @@ export function AdminSidebar() {
               className={cn(
                 "group relative flex h-10 w-full items-center rounded-lg text-sm font-medium transition-colors duration-150",
                 isActive
-                  ? "bg-brand-muted font-semibold text-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
+                  ? "bg-white/20 font-semibold text-white"
+                  : "text-white/75 hover:bg-white/10 hover:text-white",
               )}
             >
               {isActive ? (
-                <span className="absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-brand" />
+                <span className="absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-white/75" />
               ) : null}
 
               {/* Centralized Icon Wrapper */}
@@ -105,8 +105,8 @@ export function AdminSidebar() {
                   className={cn(
                     "size-4 shrink-0 transition-colors",
                     isActive
-                      ? "text-brand"
-                      : "text-muted-foreground group-hover:text-foreground",
+                      ? "text-white"
+                      : "text-white/70 group-hover:text-white",
                   )}
                 />
               </div>
@@ -146,10 +146,10 @@ export function AdminSidebar() {
               <Link
                 href="/dashboard"
                 onClick={handleNavClick}
-                className="group flex h-9 w-full items-center rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground transition-colors duration-150"
+                className="group flex h-9 w-full items-center rounded-lg text-xs font-medium text-white/75 hover:bg-white/10 hover:text-white transition-colors duration-150"
               >
                 <div className="flex size-10 shrink-0 items-center justify-center">
-                  <ArrowLeft className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <ArrowLeft className="size-3.5 shrink-0 text-white/70 group-hover:text-white transition-colors" />
                 </div>
                 <div
                   className={cn(

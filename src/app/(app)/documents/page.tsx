@@ -1,16 +1,14 @@
+import { PageHeader } from "@/components/patterns/page-header";
 import { DocumentView } from "@/features/documents/components/DocumentView";
-import { AppHeader } from "@/components/layouts/components/AppHeader";
 
 export default function DocumentPage() {
   return (
-    <>
-      <AppHeader
+    <div className="flex-1 space-y-5 p-4 md:p-6">
+      <PageHeader
         title="Documents"
-        description="Build tests tailored to your study plan."
+        description="Upload PDFs or images — questions are extracted automatically."
       />
-      <div className="flex-1 p-4 md:p-6">
-        <DocumentView />
-      </div>
-    </>
+      <DocumentView />
+    </div>
   );
 }
