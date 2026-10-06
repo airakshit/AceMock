@@ -9,14 +9,13 @@ export const metadata = {
   description: "Build a mock test from your own uploaded documents.",
 };
 
-export default async function MocksCustomPage() {
-  // The action pins `userId` to the session, so this page can only ever
-  // render tests the visitor authored — never another user's, and never the
-  // application's published tests. `initial` is only a hydration seed; the
-  // client search takes over from the first filter change.
-  const result = await searchMyCustomTestsAction();
-  const initial = result.success ? result.data : null;
-
+export default function MocksCustomPage() {
+  // No server wait here on purpose: the shell (header, labels, form,
+  // skeleton) renders instantly on navigation and the visitor's tests load
+  // in the background. The action pins `userId` to the session, so the list
+  // can only ever show tests the visitor authored — and for the same reason
+  // it must never be awaited here: touching the session during prerender
+  // opts this route out of static rendering.
   return (
     <div className="flex-1 space-y-5 p-4 md:p-6">
       <PageHeader
@@ -32,7 +31,6 @@ export default async function MocksCustomPage() {
         </h2>
         <MockTestsSearchList
           search={searchMyCustomTestsAction}
-          initial={initial}
           emptyTitle="No custom tests yet"
           emptyDescription="Build your first custom test above from the documents you have uploaded."
         />
