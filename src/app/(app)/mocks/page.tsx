@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Mock Tests | AceMock",
+  title: "Mock Tests | ePeX",
   description: "Full-length and practice examinations.",
 };
 

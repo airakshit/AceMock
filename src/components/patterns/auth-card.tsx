@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "@/components/icons/brand-logo";
 import { layout, typography } from "@/lib/design-system";
 
 interface AuthCardProps {
@@ -13,7 +13,7 @@ export function AuthCard({ children, className }: AuthCardProps) {
     <div
       className={cn(
         layout.stack,
-        "rounded-2xl border border-border/80 bg-card p-6 shadow-card sm:p-8",
+        "rounded-2xl border border-border/80 bg-card p-5 shadow-card sm:p-6",
         className,
       )}
     >
@@ -38,8 +38,13 @@ export function AuthHeader({
   return (
     <header className={cn("space-y-1.5 text-center", className)}>
       {showLogo && (
-        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-sm ring-1 ring-inset ring-white/20 lg:hidden">
-          <Layers className="size-5" />
+        <div className="mb-4 flex justify-center lg:hidden">
+          <BrandLogo
+            variant="full"
+            size="md"
+            tone="onLight"
+            href="/dashboard"
+          />
         </div>
       )}
       <h1

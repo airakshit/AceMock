@@ -4,7 +4,7 @@ import { mockTestsService } from "@/features/mocks/service";
 import { MockAttemptReviewClient } from "@/features/mocks/components/attempt/MockAttemptReviewClient";
 
 export const metadata: Metadata = {
-  title: "Review Attempt | AceMock",
+  title: "Review Attempt | ePeX",
   description: "Review your mock test attempt with detailed answer breakdown.",
 };
 

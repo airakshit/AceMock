@@ -5,7 +5,7 @@ import { MockAttemptClient } from "@/features/mocks/components/attempt/MockAttem
 import { MockTestAttemptMeta } from "@/features/mocks/components/attempt/types";
 
 export const metadata: Metadata = {
-  title: "Take Mock Test | AceMock",
+  title: "Take Mock Test | ePeX",
   description: "Attempt your mock test.",
 };
 

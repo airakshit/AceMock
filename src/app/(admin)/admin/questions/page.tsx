@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-  title: "Admin Questions | AceMock",
+  title: "Admin Questions | ePeX",
   description: "Create and manage question bank with administrative controls.",
 };
 

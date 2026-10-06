@@ -1,5 +1,5 @@
 /**
- * Layout Design Tokens — Ace Mock
+ * Layout Design Tokens — ePeX
  * 
  * Standard page shells, containers, responsive grids, and spacing primitives.
  */

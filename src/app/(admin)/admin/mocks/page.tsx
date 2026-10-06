@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/patterns/page-header";
 import { MockTestsAdminView } from "@/features/mocks/admin";
 
 export const metadata = {
-  title: "Admin Mock Tests | AceMock",
+  title: "Admin Mock Tests | ePeX",
   description: "Assemble and configure mock tests with administrative controls.",
 };
 

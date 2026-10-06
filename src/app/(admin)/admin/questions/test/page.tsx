@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-  title: "Admin Questions Inspector | AceMock",
+  title: "Admin Questions Inspector | ePeX",
   description:
     "Administrative inspection page to query and test questions directly from the database.",
 };

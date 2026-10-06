@@ -3,7 +3,7 @@ import { MocksNav } from "@/features/mocks/components/MocksNav";
 import { AttemptHistoryView } from "@/features/mocks/components/attempt-history/AttemptHistoryView";
 
 export const metadata = {
-  title: "My History | AceMock",
+  title: "My History | ePeX",
   description: "Review your past mock test attempts and score breakdowns.",
 };
 

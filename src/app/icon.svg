@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background emerald gradient calibrated to sidebar token oklch(0.47 0.13 163) -->
+    <linearGradient id="epex-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064E3B"/>
+      <stop offset="42%" stop-color="#047857"/>
+      <stop offset="85%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+
+    <!-- Inner specular bevel border -->
+    <linearGradient id="epex-border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.45"/>
+      <stop offset="40%" stop-color="#6EE7B7" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#047857" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <!-- Ambient radial highlight -->
+    <radialGradient id="epex-highlight" cx="30%" cy="20%" r="65%">
+      <stop offset="0%" stop-color="#A7F3D0" stop-opacity="0.4"/>
+      <stop offset="50%" stop-color="#10B981" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#064E3B" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Exponential curve gradient -->
+    <linearGradient id="epex-curve" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669" stop-opacity="0.2"/>
+      <stop offset="45%" stop-color="#34D399" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#A7F3D0" stop-opacity="1"/>
+    </linearGradient>
+
+    <!-- Exponent x luminous gradient -->
+    <linearGradient id="epex-x-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="70%" stop-color="#A7F3D0"/>
+      <stop offset="100%" stop-color="#6EE7B7"/>
+    </linearGradient>
+
+    <!-- Subtle drop shadows for depth -->
+    <filter id="epex-shadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#022C22" flood-opacity="0.45"/>
+    </filter>
+    <filter id="epex-text-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#022C22" flood-opacity="0.5"/>
+    </filter>
+    <filter id="epex-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Base Squircle Container -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#epex-bg)" filter="url(#epex-shadow)"/>
+  
+  <!-- Subtle Glass Surface Highlight -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#epex-highlight)"/>
+
+  <!-- Inset Bevel Stroke -->
+  <rect x="27" y="27" width="458" height="458" rx="105" fill="none" stroke="url(#epex-border)" stroke-width="6"/>
+
+  <!-- Mathematical Coordinate System & Exponential Trajectory -->
+  <g opacity="0.32">
+    <!-- Horizontal Baseline -->
+    <line x1="80" y1="388" x2="432" y2="388" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-dasharray="3 7"/>
+    <!-- Vertical Axis -->
+    <line x1="120" y1="416" x2="120" y2="112" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-dasharray="3 7"/>
+    <!-- Coordinate Tick Marks -->
+    <line x1="200" y1="384" x2="200" y2="392" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="280" y1="384" x2="280" y2="392" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="360" y1="384" x2="360" y2="392" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Exponential Curve y = e^x -->
+  <!-- Ambient halo behind curve -->
+  <path d="M 88 388 C 176 386 264 374 316 304 C 352 254 382 194 408 132" fill="none" stroke="#34D399" stroke-width="14" stroke-linecap="round" opacity="0.3" filter="url(#epex-glow)"/>
+  <!-- Crisp core curve -->
+  <path d="M 88 388 C 176 386 264 374 316 304 C 352 254 382 194 408 132" fill="none" stroke="url(#epex-curve)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Peak Vertex Node at (408, 132) -->
+  <circle cx="408" cy="132" r="9" fill="#A7F3D0" opacity="0.4" filter="url(#epex-glow)"/>
+  <circle cx="408" cy="132" r="5.5" fill="#6EE7B7"/>
+  <circle cx="408" cy="132" r="2.5" fill="#FFFFFF"/>
+
+  <!-- Exponential Function Typography: e^x -->
+  <!-- Euler's e (Italic mathematical serif) -->
+  <text x="188" y="348" font-family="Georgia, 'Times New Roman', serif" font-size="240" font-style="italic" font-weight="700" fill="#FFFFFF" text-anchor="middle" filter="url(#epex-text-shadow)">e</text>
+
+  <!-- Superscript Exponent x (Luminous mint/emerald highlight) -->
+  <text x="326" y="214" font-family="Georgia, 'Times New Roman', serif" font-size="155" font-style="italic" font-weight="700" fill="url(#epex-x-grad)" filter="url(#epex-text-shadow)">x</text>
+</svg>

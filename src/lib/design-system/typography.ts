@@ -1,5 +1,5 @@
 /**
- * Typography Design System — Ace Mock
+ * Typography Design System — ePeX
  * 
  * Standardized typography classes calibrated for visual hierarchy,
  * optical kerning, and legibility across light and dark modes.

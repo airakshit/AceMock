@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/patterns/page-header";
 import { BookmarksView } from "@/features/questions/components/bookmarks";
 
 export const metadata = {
-  title: "Bookmarks | AceMock",
+  title: "Bookmarks | ePeX",
   description: "Questions you've saved for later review.",
 };
 

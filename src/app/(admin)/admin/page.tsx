@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 
 export const metadata = {
-  title: "Admin Console | AceMock",
+  title: "Admin Console | ePeX",
   description: "Administrative console and management portal.",
 };
 

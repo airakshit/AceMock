@@ -1,5 +1,5 @@
 /**
- * Colors & Semantic Tokens — Ace Mock
+ * Colors & Semantic Tokens — ePeX
  *
  * The app's color scheme in one place. Every role maps to a semantic token
  * (defined in styles/design-tokens.css, exposed as Tailwind colors), so a

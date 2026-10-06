@@ -1,6 +1,6 @@
-# Ace Mock — Design System Guide
+# ePeX — Design System Guide
 
-Welcome to the **Ace Mock Design System**. This guide provides a straightforward reference for building clean, consistent, and accessible interfaces across the platform.
+Welcome to the **ePeX Design System**. This guide provides a straightforward reference for building clean, consistent, and accessible interfaces across the platform.
 
 ---
 
@@ -73,7 +73,7 @@ import { cn } from "@/lib/utils";
 
 Colors are calibrated in **OKLCH** color space for perceptual uniformity between Light and Dark modes.
 
-### The Ace Mock color scheme
+### The ePeX color scheme
 
 Every color in the app rolls up to one of these roles. Prefer the semantic
 token over a raw palette class — it is already tuned for both modes, so no

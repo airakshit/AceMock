@@ -5,7 +5,7 @@ import { MockTestsSearchList } from "@/features/mocks/components/MockTestsSearch
 import { searchMyCustomTestsAction } from "@/features/mocks/actions/search-my-custom-tests";
 
 export const metadata = {
-  title: "Custom Tests | AceMock",
+  title: "Custom Tests | ePeX",
   description: "Build a mock test from your own uploaded documents.",
 };
 

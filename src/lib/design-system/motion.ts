@@ -1,5 +1,5 @@
 /**
- * Motion & Interaction Design Tokens — Ace Mock
+ * Motion & Interaction Design Tokens — ePeX
  * 
  * Standard micro-interaction and transition utility classes.
  * Polished, sharp, and non-intrusive.

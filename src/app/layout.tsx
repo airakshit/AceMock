@@ -26,9 +26,6 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable} ${displayFont.variable}`}
       suppressHydrationWarning
     >
-      <head>
-        <link rel="icon" href="/favicon/favicon.ico" sizes="any" />
-      </head>
       <body className="font-sans antialiased">
         <Toaster position="top-right" richColors closeButton />
         <TooltipProvider>{children}</TooltipProvider>

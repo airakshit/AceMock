@@ -49,5 +49,5 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export const APP_NAME = "Ace Mock";
+export const APP_NAME = "ePeX";
 

@@ -5,7 +5,7 @@ import { searchApplicationTestsAction } from "@/features/mocks/actions/search-ap
 import { mockTestsService } from "@/features/mocks/service";
 
 export const metadata = {
-  title: "Mock Tests | AceMock",
+  title: "Mock Tests | ePeX",
   description: "Full-length and practice examinations.",
 };
 

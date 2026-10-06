@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Layers } from "lucide-react";
 
 import {
   Sidebar,
@@ -12,7 +11,9 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { APP_NAME, APP_NAV_ITEMS } from "@/components/layouts/constants";
+import { APP_NAV_ITEMS } from "@/components/layouts/constants";
+import { BrandIcon } from "@/components/icons/brand-logo";
+import { BrandWordmark } from "@/components/icons/brand-wordmark";
 import { SidebarThemeToggle } from "@/components/layouts/components/SidebarThemeToggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -48,8 +49,8 @@ export function AppSidebar() {
         >
           {/* Logo container: exactly size-10 (40px) centered in 56px rail */}
           <div className="flex size-10 shrink-0 items-center justify-center">
-            <div className="flex size-8 items-center justify-center rounded-[10px] bg-white/15 text-white shadow-sm ring-1 ring-inset ring-white/25 transition-transform duration-200 group-hover/brand:scale-105">
-              <Layers className="size-4" />
+            <div className="flex size-8 shrink-0 items-center justify-center transition-transform duration-200 group-hover/brand:scale-105">
+              <BrandIcon size={32} />
             </div>
           </div>
 
@@ -62,8 +63,8 @@ export function AppSidebar() {
                 : "pointer-events-none max-w-0 opacity-0",
             )}
           >
-            <span className="truncate font-heading text-sm font-bold tracking-tight text-sidebar-foreground">
-              {APP_NAME}
+            <span className="truncate">
+              <BrandWordmark tone="onBrand" className="text-sm" />
             </span>
             <span className="truncate text-[10px] font-medium tracking-wide text-sidebar-foreground/85">
               Test &amp; Analytics
