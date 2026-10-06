@@ -43,6 +43,12 @@ export interface SearchMockTestsQuery {
   sectionId?: string;
   chapterId?: string;
   byAdmin?: boolean;
+  /**
+   * Restrict the result to tests created by this user. Combined with
+   * `byAdmin` it scopes the two student views: application tests
+   * (`byAdmin: true`) vs. the caller's own tests (`userId` + `byAdmin: false`).
+   */
+  userId?: string;
   search?: string;
   cursor?: MockTestCursor | null;
   /** Rows to fetch — the service requests `pageSize + 1` to detect the end. */

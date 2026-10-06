@@ -46,21 +46,36 @@ export interface CreateMockTestFromDocumentsPayload
 export type CreateCustomMockTestPayload = CreateMockTestBasePayload;
 
 /**
- * Server-side search over mock tests. Every filter is optional and combined
- * with AND; `cursor` continues a previous result (keyset pagination).
+ * Filters any caller may send when listing mock tests.
+ *
+ * The creator flags are deliberately absent: a client can only filter by
+ * content/hierarchy, never decide *whose* tests it gets to see. Each view's
+ * action pins those server-side, so the result set cannot be widened by
+ * forging the payload.
  */
-export interface SearchMockTestsPayload {
+export interface SearchMockTestsFiltersPayload {
   scope?: MockTestScope;
   subjectId?: string;
   sectionId?: string;
   chapterId?: string;
-  /** Filter by creator type: admin-created vs. user-created tests. */
-  byAdmin?: boolean;
   /** Case-insensitive substring match on the test name. */
   search?: string;
   /** Opaque keyset cursor returned as `nextCursor` by a previous call. */
   cursor?: string;
   pageSize?: number;
+}
+
+/**
+ * Server-side search over mock tests. Every filter is optional and combined
+ * with AND; `cursor` continues a previous result (keyset pagination).
+ *
+ * Admin panel only — it is the single payload that lets the caller choose the
+ * creator flag.
+ */
+export interface SearchMockTestsPayload
+  extends SearchMockTestsFiltersPayload {
+  /** Filter by creator type: admin-created vs. user-created tests. */
+  byAdmin?: boolean;
 }
 
 export interface StartMockAttemptPayload {

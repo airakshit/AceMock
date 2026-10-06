@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/patterns/page-header";
 import { MocksNav } from "@/features/mocks/components/MocksNav";
-import { MocksView } from "@/features/mocks/components/MocksView";
+import { MockTestsSearchList } from "@/features/mocks/components/MockTestsSearchList";
+import { searchApplicationTestsAction } from "@/features/mocks/actions/search-application-tests";
 import { mockTestsService } from "@/features/mocks/service";
 
 export const metadata = {
@@ -9,20 +10,25 @@ export const metadata = {
 };
 
 export default async function MocksTestsPage() {
-  const initialTests = await mockTestsService.getAllMockTests();
+  // Only the tests published by the application (`byAdmin = true`) — the
+  // flag lives in the service, so no caller of this page can widen it. The
+  // first page is rendered here purely so the list hydrates without a flash;
+  // every later page comes from the client-side keyset search.
+  const initial = await mockTestsService.searchApplicationTests();
 
   return (
     <div className="flex-1 space-y-5 p-4 md:p-6">
       <PageHeader
         title="Mock Tests"
-        description={
-          initialTests.length > 0
-            ? `${initialTests.length} tests · full-length and chapter practice`
-            : "Full-length and chapter practice tests"
-        }
+        description="Full-length and chapter practice tests."
       />
       <MocksNav active="tests" />
-      <MocksView initialTests={initialTests} />
+      <MockTestsSearchList
+        search={searchApplicationTestsAction}
+        initial={initial}
+        emptyTitle="No mock tests available yet"
+        emptyDescription="Mock examinations will appear here once published."
+      />
     </div>
   );
 }

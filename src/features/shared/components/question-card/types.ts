@@ -67,6 +67,8 @@ export type QuestionCardProps = {
   /** Optimistic selection (exam mode) — shown immediately before server confirmation */
   pendingAnswer?: OptionKey | null;
   onAnswerChange: (key: OptionKey) => void;
+  /** Extra classes merged onto the card root (e.g. shadow overrides). */
+  className?: string;
   /**
    * Whether the question is already bookmarked. Controls the bookmark
    * button's initial visual state (amber, filled icon) and acts as a

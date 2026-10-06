@@ -318,6 +318,10 @@ export function CustomMockTestForm() {
       );
       handleReset();
       router.refresh();
+      // The "Your tests" list below re-runs its search in place — a plain
+      // router.refresh() would only change its hydration seed, which the
+      // mounted list deliberately ignores.
+      window.dispatchEvent(new Event("mocks:refresh"));
     } catch {
       toast.error("Unexpected error creating the custom test.");
     } finally {

@@ -1,7 +1,7 @@
 "use server";
 
 import { handleActionError } from "@/features/shared/actions/error";
-import { requireSession } from "@/features/shared/actions/require-session";
+import { requireAdmin } from "@/features/shared/actions/require-admin";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { SearchMockTestsPayload } from "../dto/payloads";
 import { MockTestSearchResult } from "../dto/results";
@@ -11,14 +11,16 @@ import { mockTestsService } from "../service";
  * Searches mock tests with optional scope / subject / section / chapter /
  * creator / name filters and keyset (cursor) pagination.
  *
- * Read-only and available to any signed-in user — it exposes exactly the
- * same tests as the regular mock test list, just filtered and paginated.
+ * Admin only: this is the single search whose payload decides *whose* tests
+ * are returned (`byAdmin`), so it must not be reachable from the student
+ * views — those use `searchApplicationTestsAction` /
+ * `searchMyCustomTestsAction`, which pin the flags server-side.
  */
 export async function searchMockTestsAction(
   payload: SearchMockTestsPayload = {},
 ): Promise<ServerActionResult<MockTestSearchResult>> {
   try {
-    await requireSession();
+    await requireAdmin();
 
     const data = await mockTestsService.searchMockTests(payload);
 

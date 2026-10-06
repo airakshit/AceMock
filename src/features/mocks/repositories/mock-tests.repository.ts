@@ -201,6 +201,7 @@ export class MockTestsRepository {
       conditions.push(eq(mockTests.chapterId, query.chapterId));
     if (query.byAdmin !== undefined)
       conditions.push(eq(mockTests.byAdmin, query.byAdmin));
+    if (query.userId) conditions.push(eq(mockTests.userId, query.userId));
     if (query.search?.trim())
       conditions.push(ilike(mockTests.name, `%${query.search.trim()}%`));
 

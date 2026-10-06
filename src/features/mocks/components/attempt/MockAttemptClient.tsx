@@ -41,6 +41,7 @@ import type {
   PassageType,
 } from "@/features/shared/components/question-card/types";
 import { QuestionPalette } from "./QuestionPalette";
+import { resetQuestionScroll } from "./question-scroll";
 import type { AttemptPhase, FinishReason, MockTestAttemptMeta } from "./types";
 import { useAttemptTimer } from "./use-attempt-timer";
 
@@ -151,13 +152,12 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
   const isCriticalTime =
     remainingSeconds !== null && remainingSeconds <= 60 && remainingSeconds > 0;
 
-  // Keep the active question visible when navigating between questions.
+  // After navigation, glide the question back to the top — the question
+  // column on desktop, the page on mobile — while the navigator stays put.
+  // A no-op while already at the top.
   useEffect(() => {
     if (!isExamLive) return;
-    questionAreaRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    resetQuestionScroll(questionAreaRef);
   }, [currentIndex, isExamLive]);
 
   // ------------------------------------------------------------------
@@ -482,9 +482,9 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
           : "Confirm & Next";
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
+    <div className="flex min-h-full flex-1 flex-col lg:h-svh lg:min-h-0">
       {/* Top bar: identity + timer + submit */}
-      <header className="sticky top-0 z-20 border-b border-border/80 bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/80">
+      <header className="sticky top-0 z-20 shrink-0 border-b border-border/80 bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/80">
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-2 px-3 sm:px-4">
           <Button
             type="button"
@@ -576,11 +576,11 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
         </div>
       </header>
 
-      {/* Body: question area + desktop navigator */}
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 p-3 sm:p-4 lg:flex-row lg:gap-6 lg:p-6">
+      {/* Body: question column + navigator column, same top edge */}
+      <div className="mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4 p-3 sm:p-4 lg:flex-row lg:gap-6 lg:p-6">
         <main
           ref={questionAreaRef}
-          className="min-w-0 flex-1 scroll-mt-16 space-y-4"
+          className="min-w-0 flex-1 space-y-4 scrollbar-subtle lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain"
         >
           {currentQuestion && (
             <QuestionsQuestionCard
@@ -614,12 +614,13 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
                 if (phase === "exam") setPendingOption(key);
               }}
               isBookmarked={false}
+              className="shadow-none hover:shadow-none"
             />
           )}
         </main>
 
-        <aside className="hidden w-72 shrink-0 lg:block z-10">
-          <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto">
+        <aside className="hidden min-h-0 w-72 shrink-0 lg:block">
+          <div className="h-full overflow-y-auto overscroll-contain">
             <QuestionPalette
               questions={questions}
               selections={selections}
@@ -631,7 +632,7 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
       </div>
 
       {/* Bottom action bar */}
-      <div className="sticky bottom-0 z-30 border-t border-border/80 bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/80">
+      <div className="sticky bottom-0 z-10 shrink-0 border-t border-border/80 bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/80">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-3 sm:px-4">
           <Button
             type="button"

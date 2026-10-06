@@ -86,6 +86,7 @@ export function QuestionCard({
   onAnswerChange,
   isBookmarked = false,
   solutionControls,
+  className,
 }: QuestionCardProps) {
   const {
     id,
@@ -105,7 +106,7 @@ export function QuestionCard({
   const hasMarks = (marks != null && marks > 0) || (negativeMarks != null && negativeMarks > 0);
 
   return (
-    <article className="overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md">
+    <article className={cn("overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md", className)}>
       {/* ─── Header ─── */}
       <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b bg-muted/30 px-4 py-3 sm:px-5">
         {/* Left: identity */}

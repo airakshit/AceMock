@@ -10,7 +10,7 @@ export const SCOPE_OPTIONS: Array<{
 }> = [
   {
     value: "ioe_model",
-    label: "IOE Model Format",
+    label: "IOE Model",
     hint: "Full IOE entrance model test",
   },
   { value: "subject", label: "SubjectWise", hint: "Everything in one subject" },

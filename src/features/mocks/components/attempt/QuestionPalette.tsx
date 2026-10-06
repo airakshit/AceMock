@@ -61,7 +61,7 @@ export function QuestionPalette({
   return (
     <section
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-card",
+        "flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4",
         className,
       )}
       aria-label="Question navigator"

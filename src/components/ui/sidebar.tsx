@@ -17,13 +17,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { PanelLeftIcon } from "lucide-react"
+import { Check, PanelLeftIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -31,6 +37,24 @@ const SIDEBAR_WIDTH = "15rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_LOCK_KEY = "ace-mock:sidebar-locked"
+
+function subscribeSidebarLock(callback: () => void) {
+  window.addEventListener("storage", callback)
+  return () => window.removeEventListener("storage", callback)
+}
+
+function getSidebarLockSnapshot(): boolean {
+  try {
+    return window.localStorage.getItem(SIDEBAR_LOCK_KEY) === "1"
+  } catch {
+    return false
+  }
+}
+
+function getSidebarLockServerSnapshot(): boolean {
+  return false
+}
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -42,6 +66,9 @@ type SidebarContextProps = {
   toggleSidebar: () => void
   isHovered: boolean
   setIsHovered: (hovered: boolean) => void
+  /** Pinned by the user via the sidebar context menu — hover no longer expands. */
+  locked: boolean
+  toggleLocked: () => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -87,6 +114,30 @@ function SidebarProvider({
     }
   }, [])
 
+  // Pinned lock, persisted across reloads. useSyncExternalStore (instead of
+  // state + effect) keeps server prerender (unlocked) and client hydration
+  // consistent with no extra render pass.
+  const [, bumpLockVersion] = React.useReducer(
+    (version: number) => version + 1,
+    0
+  )
+  const locked = React.useSyncExternalStore(
+    subscribeSidebarLock,
+    getSidebarLockSnapshot,
+    getSidebarLockServerSnapshot
+  )
+  const toggleLocked = React.useCallback(() => {
+    try {
+      window.localStorage.setItem(
+        SIDEBAR_LOCK_KEY,
+        getSidebarLockSnapshot() ? "0" : "1"
+      )
+    } catch {
+      // Storage unavailable — the lock simply won't persist.
+    }
+    bumpLockVersion()
+  }, [])
+
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen)
@@ -127,8 +178,8 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
 
-  // Expanded if either open or hovered on desktop
-  const state = open || isHovered ? "expanded" : "collapsed"
+  // Expanded if permanently open, or hovered on desktop while unlocked
+  const state = open || (isHovered && !locked) ? "expanded" : "collapsed"
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
@@ -141,8 +192,10 @@ function SidebarProvider({
       toggleSidebar,
       isHovered,
       setIsHovered: handleSetHovered,
+      locked,
+      toggleLocked,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, isHovered, handleSetHovered]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, isHovered, handleSetHovered, locked, toggleLocked]
   )
 
   return (
@@ -168,6 +221,35 @@ function SidebarProvider({
   )
 }
 
+/**
+ * Right-click menu item for the desktop sidebar.
+ * Shows a green tick while the sidebar is pinned (locked) and toggles the
+ * hover-to-expand behavior without affecting navigation.
+ */
+function SidebarLockMenu({
+  onHoverChange,
+}: {
+  onHoverChange: (hovering: boolean) => void
+}) {
+  const { locked, toggleLocked } = useSidebar()
+
+  return (
+    <ContextMenuContent
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
+    >
+      <ContextMenuItem onClick={toggleLocked}>
+        {locked ? (
+          <Check aria-hidden="true" className="size-3.5 text-success" />
+        ) : (
+          <span aria-hidden="true" className="size-3.5" />
+        )}
+        Lock Sidebar
+      </ContextMenuItem>
+    </ContextMenuContent>
+  )
+}
+
 function Sidebar({
   side = "left",
   variant = "sidebar",
@@ -181,7 +263,30 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, open, openMobile, setOpenMobile, setIsHovered } = useSidebar()
+  const { isMobile, state, open, openMobile, setOpenMobile, setIsHovered, locked } = useSidebar()
+  const [lockMenuOpen, setLockMenuOpen] = React.useState(false)
+  // Grace-period auto-dismiss for the lock menu: leaving the sidebar starts
+  // a short timer, entering the menu itself cancels it — so the menu
+  // vanishes when the user walks away, but stays clickable on the way in.
+  const menuCloseTimer = React.useRef<number | null>(null)
+  const cancelMenuClose = () => {
+    if (menuCloseTimer.current !== null) {
+      window.clearTimeout(menuCloseTimer.current)
+      menuCloseTimer.current = null
+    }
+  }
+  const scheduleMenuClose = () => {
+    cancelMenuClose()
+    menuCloseTimer.current = window.setTimeout(() => setLockMenuOpen(false), 350)
+  }
+  React.useEffect(
+    () => () => {
+      if (menuCloseTimer.current !== null) {
+        window.clearTimeout(menuCloseTimer.current)
+      }
+    },
+    []
+  )
 
   if (collapsible === "none") {
     return (
@@ -245,30 +350,51 @@ function Sidebar({
             : "w-(--sidebar-width-icon)"
         )}
       />
-      <div
-        data-slot="sidebar-container"
-        data-side={side}
-        onMouseEnter={() => !isMobile && setIsHovered(true)}
-        onMouseLeave={() => !isMobile && setIsHovered(false)}
-        className={cn(
-          "fixed inset-y-0 z-30 hidden h-svh transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] data-[side=left]:left-0 data-[side=right]:right-0 md:flex overflow-hidden",
-          variant === "floating" || variant === "inset"
-            ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-            : state === "collapsed"
-              ? "w-(--sidebar-width-icon) border-r border-sidebar-border"
-              : "w-(--sidebar-width) border-r border-sidebar-border shadow-2xl shadow-black/15 dark:shadow-black/50",
-          className
-        )}
-        {...props}
-      >
-        <div
-          data-sidebar="sidebar"
-          data-slot="sidebar-inner"
-          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
+      <ContextMenu open={lockMenuOpen} onOpenChange={setLockMenuOpen}>
+        <ContextMenuTrigger
+          render={
+            <div
+              data-slot="sidebar-container"
+              data-side={side}
+              onMouseEnter={() => {
+                cancelMenuClose()
+                if (!isMobile && !locked) setIsHovered(true)
+              }}
+              onMouseLeave={() => {
+                if (!isMobile) setIsHovered(false)
+                scheduleMenuClose()
+              }}
+              className={cn(
+                "fixed inset-y-0 z-30 hidden h-svh transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] data-[side=left]:left-0 data-[side=right]:right-0 md:flex overflow-hidden",
+                variant === "floating" || variant === "inset"
+                  ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
+                  : state === "collapsed"
+                    ? "w-(--sidebar-width-icon) border-r border-sidebar-border"
+                    : "w-(--sidebar-width) border-r border-sidebar-border shadow-2xl shadow-black/15 dark:shadow-black/50",
+                className
+              )}
+              {...props}
+            />
+          }
         >
-          {children}
-        </div>
-      </div>
+          <div
+            data-sidebar="sidebar"
+            data-slot="sidebar-inner"
+            className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
+          >
+            {children}
+          </div>
+        </ContextMenuTrigger>
+        <SidebarLockMenu
+          onHoverChange={(hovering) => {
+            if (hovering) {
+              cancelMenuClose()
+            } else {
+              scheduleMenuClose()
+            }
+          }}
+        />
+      </ContextMenu>
     </div>
   )
 }

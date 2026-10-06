@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { ServerActionError } from "@/features/shared/actions/error";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { generateUUIDv7, isValidUUID } from "@/features/shared/utils";
@@ -15,6 +15,7 @@ import {
   CreateCustomMockTestPayload,
   CreateMockTestBasePayload,
   CreateMockTestFromDocumentsPayload,
+  SearchMockTestsFiltersPayload,
   SearchMockTestsPayload,
 } from "./dto/payloads";
 import {
@@ -406,15 +407,56 @@ export class MockTestsService {
   }
 
   /**
-   * Cursor-paginated search over mock tests (scope / hierarchy / creator /
-   * name filters).
+   * Cursor-paginated search over mock tests (scope / hierarchy / name
+   * filters), restricted to the tests published by the application.
+   *
+   * This backs `/mocks/tests`: students must never see tests authored by
+   * another user, so the creator flags are pinned here rather than accepted
+   * from the payload.
+   */
+  async searchApplicationTests(
+    payload: SearchMockTestsFiltersPayload = {},
+  ): Promise<MockTestSearchResult> {
+    return this.runSearch(payload, { byAdmin: true });
+  }
+
+  /**
+   * Cursor-paginated search restricted to the tests the given user authored
+   * themselves (admin-panel creations are excluded).
+   *
+   * This backs `/mocks/custom`: the `userId` always comes from the session,
+   * never from the client, so a caller cannot read someone else's tests.
+   */
+  async searchMyCustomTests(
+    userId: string,
+    payload: SearchMockTestsFiltersPayload = {},
+  ): Promise<MockTestSearchResult> {
+    return this.runSearch(payload, { userId, byAdmin: false });
+  }
+
+  /**
+   * Admin panel search — the only entry point where the caller chooses the
+   * creator flag (`byAdmin` / unrestricted).
+   */
+  async searchMockTests(
+    payload: SearchMockTestsPayload = {},
+  ): Promise<MockTestSearchResult> {
+    return this.runSearch(payload, { byAdmin: payload.byAdmin });
+  }
+
+  /**
+   * Single keyset-paginated search shared by every caller above.
    *
    * Fetches `pageSize + 1` rows to decide `hasNextPage`, so pages never skip
    * or duplicate a record: `nextCursor` holds the exact ORDER BY key of the
    * last returned row and must be replayed with the same filters.
+   *
+   * `creator` is applied verbatim and cannot be overridden by the payload —
+   * it is the one thing the client has no say in.
    */
-  async searchMockTests(
-    payload: SearchMockTestsPayload = {},
+  private async runSearch(
+    payload: SearchMockTestsFiltersPayload,
+    creator: { byAdmin?: boolean; userId?: string },
   ): Promise<MockTestSearchResult> {
     if (payload.scope !== undefined && !isMockTestScope(payload.scope)) {
       throw new ServerActionError(
@@ -451,7 +493,8 @@ export class MockTestsService {
       subjectId: hierarchyFilters.subjectId?.trim() || undefined,
       sectionId: hierarchyFilters.sectionId?.trim() || undefined,
       chapterId: hierarchyFilters.chapterId?.trim() || undefined,
-      byAdmin: payload.byAdmin,
+      byAdmin: creator.byAdmin,
+      userId: creator.userId,
       search: payload.search?.trim() || undefined,
       cursor,
       limit: pageSize + 1,
