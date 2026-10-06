@@ -38,9 +38,10 @@ export function AuthHeader({
   return (
     <header className={cn("space-y-1.5 text-center", className)}>
       {showLogo && (
-        <div className="mb-4 flex justify-center lg:hidden">
+        <div className="mb-3 flex w-full justify-center lg:hidden">
           <BrandLogo
             variant="full"
+            layout="vertical"
             size="md"
             tone="onLight"
             href="/dashboard"

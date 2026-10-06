@@ -274,6 +274,7 @@ export function BrandIcon({
 
 export interface BrandLogoProps {
   variant?: "full" | "icon" | "wordmark";
+  layout?: "horizontal" | "vertical";
   size?: "sm" | "md" | "lg" | "xl";
   tone?: BrandWordmarkTone;
   subtitle?: string | boolean;
@@ -294,6 +295,7 @@ const sizeMap = {
  */
 export function BrandLogo({
   variant = "full",
+  layout = "horizontal",
   size = "md",
   tone = "onLight",
   subtitle = false,
@@ -312,8 +314,16 @@ export function BrandLogo({
       ? "text-white/75"
       : "text-muted-foreground";
 
+  const isVertical = layout === "vertical";
+
   const content = (
-    <div className={cn("inline-flex items-center gap-2.5", className)}>
+    <div
+      className={cn(
+        "inline-flex items-center",
+        isVertical ? "flex-col justify-center gap-1.5 text-center" : "gap-2.5",
+        className,
+      )}
+    >
       {variant !== "wordmark" && (
         <div
           className={cn(
@@ -326,7 +336,12 @@ export function BrandLogo({
       )}
 
       {variant !== "icon" && (
-        <div className="flex flex-col overflow-hidden leading-tight">
+        <div
+          className={cn(
+            "flex flex-col overflow-hidden leading-tight",
+            isVertical && "items-center text-center",
+          )}
+        >
           <BrandWordmark tone={tone} size={config.wordmark} />
           {subtitle && (
             <span
@@ -348,7 +363,10 @@ export function BrandLogo({
     return (
       <Link
         href={href}
-        className="group/brand inline-flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded-lg"
+        className={cn(
+          "group/brand inline-flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded-lg",
+          isVertical && "flex-col justify-center text-center",
+        )}
       >
         {content}
       </Link>
