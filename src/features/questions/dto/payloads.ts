@@ -82,3 +82,24 @@ export interface GetBookmarkedQuestionsPayloadCommand {
 export interface GetQuestionSolutionPayloadCommand {
     questionId: string;
 }
+
+/**
+ * Payload for one cursor-paginated admin page of reported questions.
+ *
+ * `cursor` is the opaque token returned by the previous page — there is no
+ * limit/offset anywhere in the flow. `reportType` / `dateFrom` / `dateTo`
+ * are the filter window: omitted or empty means unfiltered.
+ *
+ * The date bounds are plain `YYYY-MM-DD` strings (the literal value of a
+ * `<input type="date">`) so no timezone guessing happens on the wire; the
+ * service turns them into UTC instants.
+ */
+export interface SearchReportedQuestionsPayloadCommand {
+    cursor?: string;
+    /** Omitted/empty = every report category. */
+    reportType?: QuestionReportType;
+    /** `YYYY-MM-DD`, inclusive start of the window. */
+    dateFrom?: string;
+    /** `YYYY-MM-DD`, inclusive end of the window. */
+    dateTo?: string;
+}

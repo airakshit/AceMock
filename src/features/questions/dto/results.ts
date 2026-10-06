@@ -5,6 +5,7 @@ import {
   BookmarkedQuestionProjection,
   CurriculumOptionsProjection,
   QuestionDetailsProjection,
+  ReportedQuestionProjection,
 } from "./projections";
 import { DocumentWithQuestionCountProjection } from "@/features/documents/dto/projections";
 import { QuestionOptionKey, QuestionReportType } from "../types";
@@ -93,4 +94,39 @@ export interface GetQuestionSolutionResult {
   solution: string | null;
   /** Signed URL for the solution diagram, when one exists. */
   solutionDiagramUrl: string | null;
+}
+
+/**
+ * One cursor-paginated admin page of reported questions, newest reported
+ * question first. `nextCursor` is null once the list is exhausted; it must
+ * be passed back verbatim to fetch the following page.
+ *
+ * Reports are already rolled up — `questions[i].reports` carries the
+ * categories, counts, and latest detail for that question within the
+ * active filter window.
+ */
+export interface SearchReportedQuestionsResult {
+  questions: ReportedQuestionProjection[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/**
+ * Rollup powering the reports page header: totals plus one entry per
+ * report category.
+ *
+ * Both maps are keyed by *every* `question_report_type_enum` value and
+ * zero-filled, so the UI can render all six categories without fallbacks
+ * and a category with no reports still shows as 0 rather than vanishing.
+ *
+ * `questionCountByType` is distinct questions (the "how many questions are
+ * affected" view the admin triages by); `reportCountByType` is raw report
+ * rows, so a question reported six times counts once against its type and
+ * six times in total.
+ */
+export interface QuestionReportsSummaryResult {
+  totalReports: number;
+  totalReportedQuestions: number;
+  questionCountByType: Record<QuestionReportType, number>;
+  reportCountByType: Record<QuestionReportType, number>;
 }

@@ -3,7 +3,7 @@
 
 // Accessed by: services and repositories
 
-import { QuestionDifficulty, QuestionOption, QuestionOptionKey } from "../types";
+import { QuestionDifficulty, QuestionOption, QuestionOptionKey, QuestionReportType } from "../types";
 
 /**
  * Base read model projection representing a row in the `questions` table.
@@ -159,6 +159,88 @@ export interface BookmarkedQuestionRow {
   solution: string | null;
   /** Raw storage path (NULL when absent / not included); signed by the service. */
   solutionDiagram: string | null;
+  chapterName: string | null;
+  sectionName: string | null;
+  subjectName: string | null;
+  subjectSlug: string | null;
+}
+
+/**
+ * One report category rolled up onto a reported question.
+ *
+ * `count` / `lastReportedAt` / `latestDescription` only ever cover the
+ * reports inside the active filter window, so what the admin reads on the
+ * card always belongs to the rows they filtered for.
+ */
+export interface ReportedQuestionTypeProjection {
+  reportType: QuestionReportType;
+  /** Matching reports of this type on the question. */
+  count: number;
+  /** Newest matching report of this type — the sort key for the badges. */
+  lastReportedAt: Date;
+  /**
+   * Most recent free-text detail left for this type, if any. Bounded to
+   * one string per type so a popular question can never grow the payload
+   * without limit.
+   */
+  latestDescription: string | null;
+}
+
+/**
+ * Raw row returned by the reported-question page query: one *question*
+ * per row with its matching reports rolled up.
+ *
+ * Answer data (`correctOption`, `solution`) is always selected — the page
+ * is admin-only and the whole point is inspecting the reported answer.
+ */
+export interface ReportedQuestionRow {
+  questionId: string;
+  /** Newest matching report — also the keyset sort key. */
+  latestReportAt: Date;
+  /** Matching reports grouped by type, newest type first. */
+  reports: ReportedQuestionTypeProjection[];
+  /** Matching report rows across every type. */
+  reportCount: number;
+  /** Distinct reporters across the matching reports. */
+  reporterCount: number;
+  question: string;
+  options: QuestionOption[] | unknown;
+  correctOption: string;
+  marks: number;
+  difficulty: QuestionDifficulty;
+  questionDiagram: string | null;
+  /** Whether a written solution exists (drives the solution badge). */
+  hasSolution: boolean;
+  solution: string | null;
+  /** Raw storage path — signed by the service before it leaves the server. */
+  solutionDiagram: string | null;
+  chapterName: string | null;
+  sectionName: string | null;
+  subjectName: string | null;
+  subjectSlug: string | null;
+}
+
+/**
+ * Read model for one reported question on the admin reports page —
+ * {@link ReportedQuestionRow} with storage paths swapped for signed URLs.
+ */
+export interface ReportedQuestionProjection {
+  questionId: string;
+  latestReportAt: Date;
+  reports: ReportedQuestionTypeProjection[];
+  reportCount: number;
+  reporterCount: number;
+  question: string;
+  options: QuestionOption[] | unknown;
+  correctOption: QuestionOptionKey;
+  marks: number;
+  difficulty: QuestionDifficulty;
+  /** Signed URL after the service signs storage paths. */
+  questionDiagramUrl: string | null;
+  hasSolution: boolean;
+  solution: string | null;
+  /** Signed URL; null when the question has no solution diagram. */
+  solutionDiagramUrl: string | null;
   chapterName: string | null;
   sectionName: string | null;
   subjectName: string | null;

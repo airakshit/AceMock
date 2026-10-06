@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Database } from "lucide-react";
+import { Database, Flag } from "lucide-react";
 import { QuestionsAdminView } from "@/features/questions/admin";
 import { PageHeader } from "@/components/patterns/page-header";
 import { buttonVariants } from "@/components/ui/button";
@@ -18,17 +18,30 @@ export default function AdminQuestionsPage() {
         description="Author questions with LaTeX, options, hints, and explanations."
         className="mx-auto w-full max-w-7xl"
         action={
-          <Link
-            href="/admin/questions/test"
-            className={cn(
-              buttonVariants({ variant: "outline" }),
-              "gap-1.5 text-xs",
-            )}
-          >
-            <Database className="size-3.5 text-muted-foreground" />
-            <span className="hidden sm:inline">Inspect Database</span>
-            <span className="sm:hidden">Inspect</span>
-          </Link>
+          <>
+            <Link
+              href="/admin/questions/reports"
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "gap-1.5 text-xs",
+              )}
+            >
+              <Flag className="size-3.5 text-danger" />
+              <span className="hidden sm:inline">Student Reports</span>
+              <span className="sm:hidden">Reports</span>
+            </Link>
+            <Link
+              href="/admin/questions/test"
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "gap-1.5 text-xs",
+              )}
+            >
+              <Database className="size-3.5 text-muted-foreground" />
+              <span className="hidden sm:inline">Inspect Database</span>
+              <span className="sm:hidden">Inspect</span>
+            </Link>
+          </>
         }
       />
       <QuestionsAdminView />

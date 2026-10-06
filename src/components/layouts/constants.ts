@@ -1,6 +1,7 @@
 import {
   Bookmark,
   ClipboardList,
+  Flag,
   HelpCircle,
   LayoutDashboard,
   SlidersHorizontal,
@@ -41,6 +42,11 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
     title: "Questions",
     href: "/admin/questions",
     icon: HelpCircle,
+  },
+  {
+    title: "Reports",
+    href: "/admin/questions/reports",
+    icon: Flag,
   },
   {
     title: "Mock Tests",

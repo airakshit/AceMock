@@ -7,3 +7,5 @@ export * from "./actions/remove-question-bookmark";
 export * from "./actions/report-question";
 export * from "./actions/get-bookmarked-questions";
 export * from "./actions/get-question-solution";
+export * from "./actions/search-reported-questions";
+export * from "./actions/get-question-reports-summary";

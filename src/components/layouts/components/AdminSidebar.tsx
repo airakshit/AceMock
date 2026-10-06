@@ -24,6 +24,15 @@ export function AdminSidebar() {
   const { isMobile, setOpenMobile, setIsHovered, state } = useSidebar();
   const isExpanded = state === "expanded" || isMobile;
 
+  // Longest matching href wins, so a nested route
+  // (/admin/questions/reports) lights up its own entry instead of also
+  // lighting up its parent.
+  const activeHref = ADMIN_NAV_ITEMS.filter(
+    (item) =>
+      pathname === item.href ||
+      (item.href !== "/admin" && pathname.startsWith(`${item.href}/`)),
+  ).sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
   // Collapse sidebar whenever the route changes
   useEffect(() => {
     setIsHovered(false);
@@ -80,10 +89,7 @@ export function AdminSidebar() {
       {/* Navigation Items */}
       <SidebarContent className="p-2 space-y-1 overflow-x-hidden overflow-y-auto no-scrollbar">
         {ADMIN_NAV_ITEMS.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/admin" && pathname.startsWith(`${item.href}/`)) ||
-            (item.href === "/admin" && pathname === "/admin");
+          const isActive = activeHref === item.href;
 
           const buttonContent = (
             <Link
