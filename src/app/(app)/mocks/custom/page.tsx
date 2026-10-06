@@ -1,6 +1,5 @@
 import { PageHeader } from "@/components/patterns/page-header";
-// BISECT-2: form import removed to test graph involvement
-// import { CustomMockTestForm } from "@/features/mocks/components/CustomMockTestForm";
+import { CustomMockTestForm } from "@/features/mocks/components/CustomMockTestForm";
 import { MocksNav } from "@/features/mocks/components/MocksNav";
 import { MockTestsSearchList } from "@/features/mocks/components/MockTestsSearchList";
 import { searchMyCustomTestsAction } from "@/features/mocks/actions/search-my-custom-tests";
@@ -25,8 +24,7 @@ export default async function MocksCustomPage() {
         description="Assemble a practice test from documents you have uploaded."
       />
       <MocksNav active="custom" />
-      {/* BISECT-1: form usage stubbed (import kept) to isolate render vs graph */}
-      {/* <CustomMockTestForm /> */}
+      <CustomMockTestForm />
 
       <section className="space-y-4 pt-1">
         <h2 className="font-heading text-lg font-bold tracking-tight sm:text-xl">
