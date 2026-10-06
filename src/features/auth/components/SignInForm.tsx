@@ -107,7 +107,12 @@ export function SignInForm({
         />
       </FieldGroup>
 
-      <Button type="submit" className="relative h-10 w-full" disabled={loading}>
+      <Button
+        type="submit"
+        variant="success"
+        className="relative h-10 w-full"
+        disabled={loading}
+      >
         {loading ? <Loader2 size={16} className="animate-spin" /> : "Log in"}
         {isMounted && authClient.isLastUsedLoginMethod("email") && (
           <LastUsedIndicator />

@@ -102,7 +102,12 @@ export function SignUpForm({
         />
       </FieldGroup>
 
-      <Button type="submit" className="h-10 w-full" disabled={loading}>
+      <Button
+        type="submit"
+        variant="success"
+        className="h-10 w-full"
+        disabled={loading}
+      >
         {loading ? <Loader2 size={16} className="animate-spin" /> : "Sign up"}
       </Button>
     </form>

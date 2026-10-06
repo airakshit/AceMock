@@ -3,11 +3,11 @@ export const LastUsedIndicator = () => (
     className="
       absolute -right-2 -top-2
       rounded-full
-      border border-brand/40
-      bg-brand/10
+      border border-transparent
+      bg-brand
       px-2 py-0.5
       text-[10px] font-semibold leading-none
-      text-brand
+      text-white
       shadow-xs
       backdrop-blur-xs
       pointer-events-none
