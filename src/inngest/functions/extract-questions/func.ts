@@ -15,6 +15,7 @@ import { mergeOcrResults } from "./merge-ocr-results";
 import type { ResolvedQuestion } from "./types";
 import { QuestionPersistError } from "./errors";
 import { ocrPage, OcrPageResult, OcrPageFailedError } from "../ocr-page";
+import { CLASSIFY_QUESTIONS_EVENT } from "../classify-questions/func";
 import { FileProcessingStatus } from "@/features/documents/types";
 
 export interface ExtractDocumentQuestionEventData {
@@ -120,9 +121,10 @@ export const extractQuestions = inngest.createFunction(
 
     if (allDocPages.length === 0) {
       await step.run("mark-document-failed-no-pages", async () => {
-        await documentsRepository.updateFileProcessingStatus(db, {
+        await documentsRepository.update(db, {
           documentId,
-          status: "failed" as FileProcessingStatus,
+          userId,
+          status: "failed",
         });
       });
 
@@ -167,9 +169,10 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-documents-as-extracting-questions", async () => {
-        await documentsRepository.updateFileProcessingStatus(db, {
+        await documentsRepository.update(db, {
           documentId,
-          status: "extracting_questions" as FileProcessingStatus,
+          userId,
+          status: "extracting_questions",
         });
       });
 
@@ -242,9 +245,10 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-document-failed-incomplete-pages", async () => {
-        await documentsRepository.updateFileProcessingStatus(db, {
+        await documentsRepository.update(db, {
           documentId,
-          status: "failed" as FileProcessingStatus,
+          userId,
+          status: "failed",
         });
       });
 
@@ -257,9 +261,10 @@ export const extractQuestions = inngest.createFunction(
 
     // 5. All pages are successful! Ensure status is merging_questions and perform merging
     await step.run("mark-document-merging-questions", async () => {
-      await documentsRepository.updateFileProcessingStatus(db, {
+      await documentsRepository.update(db, {
         documentId,
-        status: "merging_questions" as FileProcessingStatus,
+        userId,
+        status: "merging_questions",
       });
     });
 
@@ -286,9 +291,10 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-document-completed-zero-questions", async () => {
-        await documentsRepository.updateFileProcessingStatus(db, {
+        await documentsRepository.update(db, {
           documentId,
-          status: "completed" as FileProcessingStatus,
+          userId,
+          status: "completed",
         });
       });
 
@@ -392,6 +398,13 @@ export const extractQuestions = inngest.createFunction(
         documentId,
         status: "completed" as FileProcessingStatus,
       });
+    });
+
+    // Classification only reads rows whose `chapter_id` is still null, so this
+    // is safe to re-send on a resumed run — it picks up whatever was skipped.
+    await step.sendEvent("trigger-classify-questions", {
+      name: CLASSIFY_QUESTIONS_EVENT,
+      data: { documentId },
     });
   },
 );

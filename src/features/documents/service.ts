@@ -12,7 +12,11 @@ import { supabaseStorageClient } from "../shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
 import { inngest } from "@/inngest/client";
 import { EXTRACT_QUESTIONS_EVENT } from "@/inngest/functions/extract-questions/func";
-import { DocumentProcessingStatus, FileUploadStatus, FileProcessingStatus } from "./types";
+import {
+  DocumentProcessingStatus,
+  FileUploadStatus,
+  FileProcessingStatus,
+} from "./types";
 import { documentFiles } from "@/db/schemas";
 import { and, eq } from "drizzle-orm";
 
@@ -196,7 +200,10 @@ class DocumentsService {
     });
 
     if (!deletedDocument) {
-      throw new ServerActionError("INTERNAL_ERROR", "Failed to delete document.");
+      throw new ServerActionError(
+        "INTERNAL_ERROR",
+        "Failed to delete document.",
+      );
     }
 
     return {
@@ -408,12 +415,6 @@ class DocumentsService {
     );
 
     if (totalPages === 0) {
-      // Preprocessing needed: convert files into page images, then extract questions
-      await documentsRepository.updateFileProcessingStatus(db, {
-        documentId,
-        status: "processing_files" as FileProcessingStatus,
-      });
-
       await inngest.send({
         name: "document/process",
         data: {
@@ -422,12 +423,6 @@ class DocumentsService {
         },
       });
     } else {
-      // Pages already exist; trigger question extraction (which will process only pending/failed pages)
-      await documentsRepository.updateFileProcessingStatus(db, {
-        documentId,
-        status: "extracting_questions" as FileProcessingStatus,
-      });
-
       await inngest.send({
         name: EXTRACT_QUESTIONS_EVENT,
         data: {

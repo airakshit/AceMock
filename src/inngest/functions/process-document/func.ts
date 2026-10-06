@@ -5,7 +5,10 @@ import { storagePaths } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { performance } from "node:perf_hooks";
-import { FileProcessingStatus } from "@/features/documents/types";
+import {
+  DocumentProcessingStatus,
+  FileProcessingStatus,
+} from "@/features/documents/types";
 import { eq } from "drizzle-orm";
 import { documentFiles } from "@/db/schemas";
 import { generateUUIDv7 } from "@/features/shared/utils";
@@ -29,32 +32,28 @@ export const processDocument = inngest.createFunction(
     let start = performance.now();
 
     await step.run(`mark-document-as-processing-files`, async () => {
-      await documentsRepository.updateFileProcessingStatus(db, {
-        documentId,
-        status: "processing_files" as FileProcessingStatus,
+      await documentsRepository.update(db, {
+        documentId: documentId,
+        userId: userId,
+        status: "processing_files",
       });
     });
 
     const docFiles = await step.run(`mark-files-as-running`, async () => {
-      // Update file processing status to running
-      const files = await db
-        .select()
-        .from((await import("@/db/schemas")).documentFiles)
-        .where(eq((await import("@/db/schemas")).documentFiles.documentId, documentId));
-      for (const file of files) {
-        await documentsRepository.updateFileProcessingStatus(db, {
-          documentId,
-          status: "running" as FileProcessingStatus,
-        });
-      }
+      const files = await documentsRepository.updateFileProcessingStatus(db, {
+        documentId,
+        status: "running" as FileProcessingStatus,
+      });
+
       return files;
     });
 
     if (!docFiles || docFiles.length === 0) {
       await step.run(`mark-document-as-failed-no-files`, async () => {
-        await documentsRepository.updateFileProcessingStatus(db, {
-          documentId,
-          status: "failed" as FileProcessingStatus,
+        await documentsRepository.update(db, {
+          documentId: documentId,
+          userId: userId,
+          status: "failed",
         });
       });
 
@@ -161,17 +160,11 @@ export const processDocument = inngest.createFunction(
     );
 
     await step.run(`mark-files-as-completed`, async () => {
-      // Update file processing status to completed
-      const files = await db
-        .select()
-        .from((await import("@/db/schemas")).documentFiles)
-        .where(eq((await import("@/db/schemas")).documentFiles.documentId, documentId));
-      for (const file of files) {
-        await documentsRepository.updateFileProcessingStatus(db, {
-          documentId,
-          status: "completed" as FileProcessingStatus,
-        });
-      }
+      const files = await documentsRepository.updateFileProcessingStatus(db, {
+        documentId,
+        status: "completed" as FileProcessingStatus,
+      });
+
       return files;
     });
 
@@ -188,13 +181,13 @@ export const processDocument = inngest.createFunction(
           });
         });
       });
-      const createdPages = await documentsRepository.createManyFilePages(db, data);
-      await documentsRepository.updateFileProcessingStatus(db, {
-        documentId,
-        status: "extracting_questions" as FileProcessingStatus,
-      });
+      const createdPages = await documentsRepository.createManyFilePages(
+        db,
+        data,
+      );
       return createdPages;
     });
+
     logger.info(
       {
         step: "create-ready-pages",
@@ -206,9 +199,10 @@ export const processDocument = inngest.createFunction(
 
     if (pages.length === 0) {
       await step.run("mark-document-as-failed-no-pages", async () => {
-        await documentsRepository.updateFileProcessingStatus(db, {
+        await documentsRepository.update(db, {
           documentId,
-          status: "failed" as FileProcessingStatus,
+          userId,
+          status: "failed",
         });
       });
 
