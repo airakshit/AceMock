@@ -27,7 +27,13 @@ interface QuestionPaletteProps {
 
 /**
  * Grid navigator that lets examinees jump to any question and see at a
- * glance which questions are answered / correct / incorrect.
+ * glance which one is current, which are attempted, and which are still
+ * unattempted — or correct / incorrect / unattempted in review mode.
+ *
+ * Green and red belong to review only (correct / incorrect). Exam mode
+ * uses blue for the current question, a filled neutral for attempted
+ * ones, and amber for unattempted ones; review reuses the same amber
+ * for unattempted so the meaning never changes between modes.
  */
 export function QuestionPalette({
   questions,
@@ -110,13 +116,22 @@ export function QuestionPalette({
           const reviewResult = results?.[question.questionId];
           const isCorrect = reviewResult === "correct";
           const isIncorrect = reviewResult === "incorrect";
+          const statusLabel = isCorrect
+            ? ", correct"
+            : isIncorrect
+              ? ", incorrect"
+              : isReview
+                ? ", unattempted"
+                : isAnswered
+                  ? ", answered"
+                  : ", unattempted";
 
           return (
             <button
               key={question.id}
               type="button"
               onClick={() => onSelect(index)}
-              aria-label={`Go to question ${index + 1}${isCorrect ? ", correct" : isIncorrect ? ", incorrect" : ", not attempted"}`}
+              aria-label={`Go to question ${index + 1}${statusLabel}`}
               aria-current={isCurrent ? "true" : undefined}
               className={cn(
                 "flex h-9 items-center justify-center rounded-md border text-xs font-semibold tabular-nums transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
@@ -125,16 +140,18 @@ export function QuestionPalette({
                   : isCurrent && isReview && isIncorrect
                     ? "ring-2 ring-primary ring-offset-1 ring-offset-card border-danger/60 bg-danger/10 text-danger"
                     : isCurrent && isReview
-                      ? "ring-2 ring-primary ring-offset-1 ring-offset-card border-muted/70 bg-muted/40 text-muted-foreground"
+                      ? "ring-2 ring-primary ring-offset-1 ring-offset-card border-warning/60 bg-warning/10 text-warning"
                       : isCurrent
                         ? "border-primary bg-primary text-primary-foreground shadow-sm"
                         : isCorrect
                           ? "border-success/40 bg-success/10 text-success hover:border-success/60"
                           : isIncorrect
                             ? "border-danger/40 bg-danger/10 text-danger hover:border-danger/60"
-                            : isAnswered || isReview
-                              ? "border-border/70 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                              : "border-border/70 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                            : isReview
+                              ? "border-warning/50 bg-warning/10 text-warning hover:border-warning"
+                              : isAnswered
+                                ? "border-border bg-muted text-foreground hover:border-primary/50"
+                                : "border-warning/50 bg-warning/10 text-warning hover:border-warning",
               )}
             >
               {index + 1}
@@ -150,11 +167,11 @@ export function QuestionPalette({
             className={cn(
               "size-2.5 rounded-sm",
               isReview
-                ? "border-primary bg-card"
+                ? "border border-primary bg-card"
                 : "bg-primary",
             )}
           />
-          Current
+          {isReview ? "Current" : "Current Question"}
         </li>
         {isReview ? (
           <>
@@ -167,19 +184,19 @@ export function QuestionPalette({
               Incorrect
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm border border-border/70 bg-muted" />
-              Not attempted
+              <span className="size-2.5 rounded-sm bg-warning/70" />
+              Unattempted
             </li>
           </>
         ) : (
           <>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-success/70" />
-              Answered
+              <span className="size-2.5 rounded-sm border border-border bg-muted" />
+              Attempted
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm border border-border/70 bg-muted" />
-              Not answered
+              <span className="size-2.5 rounded-sm bg-warning/70" />
+              Unattempted
             </li>
           </>
         )}

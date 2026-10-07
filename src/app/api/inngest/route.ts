@@ -3,8 +3,9 @@ import { inngest } from "@/inngest/client";
 import { processDocument } from "@/inngest/functions/process-document";
 import { extractQuestions } from "@/inngest/functions/extract-questions";
 import { ocrPage } from "@/inngest/functions/ocr-page";
+import { classifyQuestions } from "@/inngest/functions/classify-questions";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [processDocument, extractQuestions, ocrPage],
+  functions: [processDocument, extractQuestions, ocrPage, classifyQuestions],
 });

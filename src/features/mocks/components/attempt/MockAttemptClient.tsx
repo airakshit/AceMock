@@ -6,15 +6,12 @@ import { toast } from "sonner";
 import {
   AlarmClock,
   ArrowLeft,
-  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   LayoutGrid,
-  Loader2,
   Send,
-  SkipForward,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -335,6 +332,22 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
     );
   };
 
+  /**
+   * Advances to the next question. When an answer is selected it is
+   * committed first (optimistic local commit + background server write);
+   * with nothing selected the question is simply skipped — the server is
+   * only ever hit for a real selection.
+   */
+  const handleNext = () => {
+    if (canConfirm) {
+      handleConfirmAnswer();
+      return;
+    }
+    if (!isLastQuestion) {
+      goToQuestion(currentIndex + 1);
+    }
+  };
+
   const goToQuestion = (index: number) => {
     if (index < 0 || index >= questions.length) return;
     setCurrentIndex(index);
@@ -468,18 +481,6 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
   // ------------------------------------------------------------------
   const progressPercent =
     questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
-
-  const confirmLabel = isFinishing
-    ? "Submitting..."
-    : isAlreadySaved
-      ? "Saved"
-      : pendingOption === null
-        ? savedOption
-          ? "Answered"
-          : "Select option"
-        : isLastQuestion
-          ? "Confirm"
-          : "Confirm & Next";
 
   return (
     <div className="flex min-h-full flex-1 flex-col lg:h-svh lg:min-h-0">
@@ -651,41 +652,16 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
             variant="outline"
             size="sm"
             className="h-9 gap-1.5 sm:h-8"
-            disabled={isLastQuestion || isFinishing}
-            onClick={() => goToQuestion(currentIndex + 1)}
-            title="Skip this question without saving"
+            disabled={isFinishing || (isLastQuestion && !canConfirm)}
+            onClick={handleNext}
+            title={
+              canConfirm
+                ? "Save the selected answer and go to the next question"
+                : "Go to the next question without saving"
+            }
           >
-            <SkipForward />
-            Skip
-          </Button>
-
-          <div className="flex-1" />
-
-          <Button
-            type="button"
-            size="sm"
-            className={cn(
-              "h-9 min-w-32 gap-1.5 px-4 sm:h-8 sm:min-w-40",
-              isAlreadySaved || (!pendingOption && savedOption)
-                ? "pointer-events-none border border-success/40 bg-success/10 text-success"
-                : "",
-            )}
-            disabled={!canConfirm || isFinishing}
-            onClick={handleConfirmAnswer}
-          >
-            {isFinishing ? (
-              <>
-                <Loader2 className="animate-spin" />
-                {confirmLabel}
-              </>
-            ) : isAlreadySaved || (!pendingOption && savedOption) ? (
-              <>
-                <Check />
-                {confirmLabel}
-              </>
-            ) : (
-              confirmLabel
-            )}
+            Next
+            <ChevronRight />
           </Button>
         </div>
       </div>
