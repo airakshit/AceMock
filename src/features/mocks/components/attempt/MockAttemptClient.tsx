@@ -612,7 +612,11 @@ export function MockAttemptClient({ mockTest }: MockAttemptClientProps) {
               selectedAnswer={savedOption as OptionKey | null}
               pendingAnswer={pendingOption as OptionKey | null}
               onAnswerChange={(key) => {
-                if (phase === "exam") setPendingOption(key);
+                // Tapping the pending option again unselects it — Next then
+                // skips without touching the server.
+                if (phase === "exam") {
+                  setPendingOption((prev) => (prev === key ? null : key));
+                }
               }}
               isBookmarked={false}
               className="shadow-none hover:shadow-none"
