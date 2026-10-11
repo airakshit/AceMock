@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { LastUsedIndicator } from "@/components/shared/LastUsedIndicator";
 import { authClient } from "@/lib/auth/auth-client";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface ContinueWithGoogleProps {
   callbackURL?: string;
@@ -19,13 +18,17 @@ export function ContinueWithGoogle({
   className,
   label = "Continue with Google",
 }: ContinueWithGoogleProps) {
-  const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastUsed, setLastUsed] = useState(false);
 
   const params = useSearchParams();
 
   useEffect(() => {
-    setIsMounted(true);
+    const checkLastUsed = async () => {
+      const result = await authClient.isLastUsedLoginMethod("google");
+      setLastUsed(result);
+    };
+    checkLastUsed();
   }, []);
 
   const handleClick = async () => {
@@ -48,50 +51,69 @@ export function ContinueWithGoogle({
   };
 
   return (
-    <Button
-      variant="outline"
-      className={cn(
-        "relative h-10 w-full justify-center gap-2.5 text-sm font-medium",
-        className,
-      )}
-      onClick={handleClick}
-      disabled={isLoading}
-      aria-label={label}
-    >
-      {isLoading ? (
-        <Loader2 className="h-5 w-5 animate-spin" />
-      ) : (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="1.2em"
-          height="1.2em"
-          viewBox="0 0 256 262"
-          className="h-5 w-5"
+    <div className="relative w-full">
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        onClick={handleClick}
+        disabled={isLoading}
+        aria-label={label}
+        className={cn(
+          "relative flex h-11 w-full items-center justify-center gap-2.5 rounded-xl",
+          "bg-secondary border border-border text-foreground",
+          "text-sm font-medium transition-all duration-200",
+          "hover:bg-accent hover:border-border/80 hover:text-foreground",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          "disabled:opacity-60 disabled:cursor-not-allowed",
+          className,
+        )}
+      >
+        {isLoading ? (
+          <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 256 262"
+            className="h-5 w-5 flex-shrink-0"
+            aria-hidden="true"
+          >
+            <path
+              fill="#4285F4"
+              d="M255.878 133.451c0-10.734-.871-18.567-2.756-26.69H130.55v48.448h71.947c-1.45 12.04-9.283 30.172-26.69 42.356l-.244 1.622l38.755 30.023l2.685.268c24.659-22.774 38.875-56.282 38.875-96.027"
+            />
+            <path
+              fill="#34A853"
+              d="M130.55 261.1c35.248 0 64.839-11.605 86.453-31.622l-41.196-31.913c-11.024 7.688-25.82 13.055-45.257 13.055c-34.523 0-63.824-22.773-74.269-54.25l-1.531.13l-40.298 31.187l-.527 1.465C35.393 231.798 79.49 261.1 130.55 261.1"
+            />
+            <path
+              fill="#FBBC05"
+              d="M56.281 156.37c-2.756-8.123-4.351-16.827-4.351-25.82c0-8.994 1.595-17.697 4.206-25.82l-.073-1.73L15.26 71.312l-1.335.635C5.077 89.644 0 109.517 0 130.55s5.077 40.905 13.925 58.602z"
+            />
+            <path
+              fill="#EB4335"
+              d="M130.55 50.479c24.514 0 41.05 10.589 50.479 19.438l36.844-35.974C195.245 12.91 165.798 0 130.55 0C79.49 0 35.393 29.301 13.925 71.947l42.211 32.783c10.59-31.477 39.891-54.251 74.414-54.251"
+            />
+          </svg>
+        )}
+
+        <span className="truncate">{label}</span>
+      </motion.button>
+
+      {lastUsed && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, y: 4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="pointer-events-none absolute right-3 -top-2.5 z-10"
+          style={{ transformOrigin: "center" }}
         >
-          <path
-            fill="#4285F4"
-            d="M255.878 133.451c0-10.734-.871-18.567-2.756-26.69H130.55v48.448h71.947c-1.45 12.04-9.283 30.172-26.69 42.356l-.244 1.622l38.755 30.023l2.685.268c24.659-22.774 38.875-56.282 38.875-96.027"
-          />{" "}
-          <path
-            fill="#34A853"
-            d="M130.55 261.1c35.248 0 64.839-11.605 86.453-31.622l-41.196-31.913c-11.024 7.688-25.82 13.055-45.257 13.055c-34.523 0-63.824-22.773-74.269-54.25l-1.531.13l-40.298 31.187l-.527 1.465C35.393 231.798 79.49 261.1 130.55 261.1"
-          />{" "}
-          <path
-            fill="#FBBC05"
-            d="M56.281 156.37c-2.756-8.123-4.351-16.827-4.351-25.82c0-8.994 1.595-17.697 4.206-25.82l-.073-1.73L15.26 71.312l-1.335.635C5.077 89.644 0 109.517 0 130.55s5.077 40.905 13.925 58.602z"
-          />{" "}
-          <path
-            fill="#EB4335"
-            d="M130.55 50.479c24.514 0 41.05 10.589 50.479 19.438l36.844-35.974C195.245 12.91 165.798 0 130.55 0C79.49 0 35.393 29.301 13.925 71.947l42.211 32.783c10.59-31.477 39.891-54.251 74.414-54.251"
-          />
-        </svg>
+          <span className="flex h-5 items-center gap-1 rounded-full border border-success/30 bg-success/20 px-2 text-[10px] font-semibold text-success whitespace-nowrap shadow-md backdrop-blur-sm">
+            <span className="relative flex h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+            Last used
+          </span>
+        </motion.div>
       )}
-
-      {label}
-
-      {!isLoading &&
-        isMounted &&
-        authClient.isLastUsedLoginMethod("google") && <LastUsedIndicator />}
-    </Button>
+    </div>
   );
 }

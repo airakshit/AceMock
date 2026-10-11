@@ -48,10 +48,8 @@ export function AppSidebar() {
           className="group/brand flex h-full w-full items-center px-2 transition-colors hover:bg-sidebar-accent"
         >
           {/* Logo container: exactly size-10 (40px) centered in 56px rail */}
-          <div className="flex size-10 shrink-0 items-center justify-center">
-            <div className="flex size-8 shrink-0 items-center justify-center transition-transform duration-200 group-hover/brand:scale-105">
-              <BrandIcon size={32} />
-            </div>
+          <div className="flex size-10 shrink-0 items-center justify-center transition-transform duration-200 group-hover/brand:scale-105">
+            <BrandIcon size={32} />
           </div>
 
           {/* Brand Title: smooth width/opacity reveal */}
