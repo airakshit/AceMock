@@ -19,9 +19,9 @@ export function AuthPanelBackdrop({ idPrefix = "auth" }: AuthPanelBackdropProps)
       <div className="pointer-events-none absolute inset-0 bg-grid-fade opacity-30" />
 
       {/* Ambient glowing orbs */}
-      <div className="pointer-events-none absolute -top-28 -left-28 size-[420px] rounded-full bg-emerald-400/20 blur-[100px]" />
-      <div className="pointer-events-none absolute top-1/2 -right-24 size-[380px] -translate-y-1/2 rounded-full bg-emerald-300/15 blur-[90px]" />
-      <div className="pointer-events-none absolute -bottom-32 left-1/4 size-[400px] rounded-full bg-emerald-950/40 blur-[80px]" />
+      <div className="pointer-events-none absolute -top-28 -left-28 size-105 rounded-full bg-emerald-400/20 blur-[100px]" />
+      <div className="pointer-events-none absolute top-1/2 -right-24 size-95 -translate-y-1/2 rounded-full bg-emerald-300/15 blur-[90px]" />
+      <div className="pointer-events-none absolute -bottom-32 left-1/4 size-100 rounded-full bg-emerald-950/40 blur-[80px]" />
 
       {/* Decorative Exponential Function Curves (Watermark Art) */}
       <svg
