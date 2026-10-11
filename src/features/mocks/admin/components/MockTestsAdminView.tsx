@@ -36,6 +36,7 @@ import {
 import { MetricCard } from "@/components/patterns/metric-card";
 import { SearchInput } from "@/components/patterns/search-input";
 import { EmptyState } from "@/components/patterns/empty-state";
+import { HierarchyFilterChips } from "@/components/patterns/hierarchy-filter-chips";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
@@ -500,21 +501,19 @@ export function MockTestsAdminView() {
         </div>
       </div>
 
-      {/* Search Filters */}
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-card">
-        <span className="flex items-center gap-1.5 pb-1.5 text-xs font-medium text-muted-foreground">
-          <ListFilter className="size-3.5" aria-hidden="true" />
-          <span>Filters</span>
-        </span>
-
-        <div className="space-y-1">
-          <span className="block text-[11px] font-medium text-muted-foreground">
-            Scope
+      {/* Search Filters — subjects first; sections and chapters reveal one level at a time */}
+      <div className="rounded-xl border border-border/80 bg-card p-3 shadow-card">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <ListFilter className="size-3.5" aria-hidden="true" />
+            <span>Filters</span>
           </span>
+
           <NativeSelect
             size="sm"
             value={filters.scope}
             onChange={(e) => handleFilterChange("scope", e.target.value)}
+            aria-label="Scope"
             className="w-40"
           >
             <NativeSelectOption value="">All scopes</NativeSelectOption>
@@ -526,99 +525,67 @@ export function MockTestsAdminView() {
               Miscellaneous
             </NativeSelectOption>
           </NativeSelect>
-        </div>
 
-        <div className="space-y-1">
-          <span className="block text-[11px] font-medium text-muted-foreground">
-            Subject
-          </span>
-          <NativeSelect
-            size="sm"
-            value={filters.subjectId}
-            onChange={(e) => handleFilterChange("subjectId", e.target.value)}
-            disabled={curriculum === null}
-            className="w-44"
-          >
-            <NativeSelectOption value="">All subjects</NativeSelectOption>
-            {(curriculum?.subjects ?? []).map((subject) => (
-              <NativeSelectOption key={subject.id} value={subject.id}>
-                {subject.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="space-y-1">
-          <span className="block text-[11px] font-medium text-muted-foreground">
-            Section
-          </span>
-          <NativeSelect
-            size="sm"
-            value={filters.sectionId}
-            onChange={(e) => handleFilterChange("sectionId", e.target.value)}
-            disabled={!filters.subjectId}
-            className="w-44"
-          >
-            <NativeSelectOption value="">
-              {!filters.subjectId ? "Pick a subject first" : "All sections"}
-            </NativeSelectOption>
-            {availableSections.map((section) => (
-              <NativeSelectOption key={section.id} value={section.id}>
-                {section.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="space-y-1">
-          <span className="block text-[11px] font-medium text-muted-foreground">
-            Chapter
-          </span>
-          <NativeSelect
-            size="sm"
-            value={filters.chapterId}
-            onChange={(e) => handleFilterChange("chapterId", e.target.value)}
-            disabled={!filters.sectionId}
-            className="w-44"
-          >
-            <NativeSelectOption value="">
-              {!filters.sectionId ? "Pick a section first" : "All chapters"}
-            </NativeSelectOption>
-            {availableChapters.map((chapter) => (
-              <NativeSelectOption key={chapter.id} value={chapter.id}>
-                {chapter.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="space-y-1">
-          <span className="block text-[11px] font-medium text-muted-foreground">
-            Created by
-          </span>
           <NativeSelect
             size="sm"
             value={filters.byAdmin}
             onChange={(e) => handleFilterChange("byAdmin", e.target.value)}
+            aria-label="Created by"
             className="w-36"
           >
             <NativeSelectOption value="">Anyone</NativeSelectOption>
             <NativeSelectOption value="admin">Admin</NativeSelectOption>
             <NativeSelectOption value="user">User</NativeSelectOption>
           </NativeSelect>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="h-8 gap-1 text-xs text-muted-foreground"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+              <span>Clear filters</span>
+            </Button>
+          )}
         </div>
 
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-            className="h-8 gap-1 text-xs text-muted-foreground"
-          >
-            <X className="size-3.5" aria-hidden="true" />
-            <span>Clear filters</span>
-          </Button>
-        )}
+        <div className="mt-1 space-y-1">
+          <HierarchyFilterChips
+            label="Subject"
+            options={curriculum?.subjects ?? []}
+            value={filters.subjectId}
+            onChange={(value) => handleFilterChange("subjectId", value)}
+            allLabel="All subjects"
+            loading={curriculum === null}
+            emptyLabel={
+              curriculum === null ? "Loading subjects…" : "No subjects found"
+            }
+          />
+
+          {filters.subjectId && (
+            <HierarchyFilterChips
+              label="Section"
+              options={availableSections}
+              value={filters.sectionId}
+              onChange={(value) => handleFilterChange("sectionId", value)}
+              allLabel="All sections"
+              emptyLabel="No sections in this subject"
+            />
+          )}
+
+          {filters.sectionId && (
+            <HierarchyFilterChips
+              label="Chapter"
+              options={availableChapters}
+              value={filters.chapterId}
+              onChange={(value) => handleFilterChange("chapterId", value)}
+              allLabel="All chapters"
+              emptyLabel="No chapters in this section"
+            />
+          )}
+        </div>
       </div>
 
       {/* Tests List */}

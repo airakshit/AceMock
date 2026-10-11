@@ -10,6 +10,7 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { SearchInput } from "@/components/patterns/search-input";
+import { HierarchyFilterChips } from "@/components/patterns/hierarchy-filter-chips";
 import { getCurriculumOptionsAction } from "@/features/questions/actions";
 import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
 // Same option list (and the same wording) the custom-test form shows, so the
@@ -22,14 +23,6 @@ const EMPTY_CURRICULUM: CurriculumOptionsProjection = {
   sections: [],
   chapters: [],
 };
-
-interface FilterField {
-  key: keyof MockTestsFilterState;
-  label: string;
-  placeholder: string;
-  disabled?: boolean;
-  options: { value: string; label: string }[];
-}
 
 interface MockTestsFilterBarProps {
   filters: MockTestsFilterState;
@@ -45,12 +38,13 @@ interface MockTestsFilterBarProps {
 }
 
 /**
- * Search + test type / hierarchy filter bar shared by the student mock-test
+ * Search + incremental hierarchy filter bar shared by the student mock-test
  * lists.
  *
- * Reads as one row on desktop (search and status on top, filters in a
- * 4-up grid below) and collapses to a single full-width column on phones,
- * so every select stays a comfortable touch target.
+ * The curriculum filter reveals one level at a time — subject chips first,
+ * section chips only after a subject is picked, chapter chips only after a
+ * section — so the bar stays one compact card instead of a wall of selects.
+ * Each row scrolls horizontally on phones instead of wrapping.
  *
  * "Test Type" is not an independent choice: picking a subject / section /
  * chapter moves it automatically (see `handleFilterChange` in
@@ -58,7 +52,7 @@ interface MockTestsFilterBarProps {
  * stores are the same fact.
  *
  * The hierarchy options (subjects → sections → chapters) load here rather
- * than in each view: they are the data behind these selects and nothing else.
+ * than in each view: they are the data behind these chips and nothing else.
  */
 export function MockTestsFilterBar({
   filters,
@@ -118,46 +112,6 @@ export function MockTestsFilterBar({
     [curriculum, filters.sectionId],
   );
 
-  // The subject is always offered; section/chapter unlock one level at a
-  // time so a user never has to guess why a select is empty.
-  const fields: FilterField[] = [
-    {
-      key: "scope",
-      label: "Test Type",
-      placeholder: "All test types",
-      options: SCOPE_OPTIONS,
-    },
-    {
-      key: "subjectId",
-      label: "Subject",
-      placeholder: curriculum === null ? "Loading subjects…" : "All subjects",
-      options: (curriculum?.subjects ?? []).map((subject) => ({
-        value: subject.id,
-        label: subject.name,
-      })),
-    },
-    {
-      key: "sectionId",
-      label: "Section",
-      placeholder: filters.subjectId ? "All sections" : "Pick a subject first",
-      disabled: !filters.subjectId,
-      options: availableSections.map((section) => ({
-        value: section.id,
-        label: section.name,
-      })),
-    },
-    {
-      key: "chapterId",
-      label: "Chapter",
-      placeholder: filters.sectionId ? "All chapters" : "Pick a section first",
-      disabled: !filters.sectionId,
-      options: availableChapters.map((chapter) => ({
-        value: chapter.id,
-        label: chapter.name,
-      })),
-    },
-  ];
-
   return (
     <div className="rounded-xl border border-border/80 bg-card p-3 shadow-card sm:p-4">
       {/* Name search + live status */}
@@ -191,40 +145,64 @@ export function MockTestsFilterBar({
         </div>
       </div>
 
-      {/* Test type + hierarchy — full width on phones, one row from lg up */}
+      {/* Test type + incremental hierarchy — subjects first, deeper levels reveal one at a time */}
       <div className="mt-3 border-t border-border/60 pt-3">
-        <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <ListFilter className="size-3.5" aria-hidden="true" />
-          <span>Filters</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <ListFilter className="size-3.5" aria-hidden="true" />
+            <span>Filters</span>
+          </span>
+
+          <NativeSelect
+            size="sm"
+            value={filters.scope}
+            onChange={(e) => onFilterChange("scope", e.target.value)}
+            aria-label="Test type"
+            className="w-44"
+          >
+            <NativeSelectOption value="">All test types</NativeSelectOption>
+            {SCOPE_OPTIONS.map((option) => (
+              <NativeSelectOption key={option.value} value={option.value}>
+                {option.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
         </div>
 
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          {fields.map((field) => (
-            <div key={field.key} className="min-w-0 space-y-1">
-              <label
-                htmlFor={`mock-filter-${field.key}`}
-                className="block text-[11px] font-medium text-muted-foreground"
-              >
-                {field.label}
-              </label>
-              <NativeSelect
-                id={`mock-filter-${field.key}`}
-                value={filters[field.key]}
-                onChange={(e) => onFilterChange(field.key, e.target.value)}
-                disabled={field.disabled}
-                // Phones get a 44px tap target; from sm up the bar tightens
-                // back to the toolbar height used elsewhere.
-                className="w-full [&>select]:h-11 sm:[&>select]:h-9"
-              >
-                <NativeSelectOption value="">{field.placeholder}</NativeSelectOption>
-                {field.options.map((option) => (
-                  <NativeSelectOption key={option.value} value={option.value}>
-                    {option.label}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </div>
-          ))}
+        <div className="mt-1 space-y-1">
+          <HierarchyFilterChips
+            label="Subject"
+            options={curriculum?.subjects ?? []}
+            value={filters.subjectId}
+            onChange={(value) => onFilterChange("subjectId", value)}
+            allLabel="All subjects"
+            loading={curriculum === null}
+            emptyLabel={
+              curriculum === null ? "Loading subjects…" : "No subjects found"
+            }
+          />
+
+          {filters.subjectId && (
+            <HierarchyFilterChips
+              label="Section"
+              options={availableSections}
+              value={filters.sectionId}
+              onChange={(value) => onFilterChange("sectionId", value)}
+              allLabel="All sections"
+              emptyLabel="No sections in this subject"
+            />
+          )}
+
+          {filters.sectionId && (
+            <HierarchyFilterChips
+              label="Chapter"
+              options={availableChapters}
+              value={filters.chapterId}
+              onChange={(value) => onFilterChange("chapterId", value)}
+              allLabel="All chapters"
+              emptyLabel="No chapters in this section"
+            />
+          )}
         </div>
       </div>
     </div>

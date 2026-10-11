@@ -35,14 +35,11 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchInput } from "@/components/patterns/search-input";
+import { HierarchyFilterChips } from "@/components/patterns/hierarchy-filter-chips";
 import { getDocumentsSummaryAction } from "@/features/documents/actions/get-documents-summary";
 import type { DocumentWithQuestionCountProjection } from "@/features/documents/dto/projections";
 import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
@@ -328,8 +325,6 @@ export function CustomMockTestForm() {
       setIsSubmitting(false);
     }
   };
-
-  const curriculumSelectCount = needsChapter ? 3 : needsSection ? 2 : 1;
 
   return (
     <Collapsible
@@ -658,19 +653,14 @@ export function CustomMockTestForm() {
 
                 {needsSubject &&
                   (curriculum === null && !curriculumLoadFailed ? (
-                    <div role="status" className="space-y-3">
-                      <span className="sr-only">Loading curriculum</span>
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        {Array.from({ length: curriculumSelectCount }).map(
-                          (_, index) => (
-                            <div key={index} className="space-y-2">
-                              <Skeleton className="h-4 w-16" />
-                              <Skeleton className="h-8 w-full rounded-lg" />
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </div>
+                    <HierarchyFilterChips
+                      label="Subject"
+                      options={[]}
+                      value=""
+                      onChange={() => {}}
+                      loading
+                      required
+                    />
                   ) : curriculumLoadFailed ? (
                     <div className="flex flex-col items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -691,142 +681,80 @@ export function CustomMockTestForm() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="space-y-2">
                       <Controller
                         name="subjectId"
                         control={form.control}
                         render={({ field, fieldState }) => (
-                          <Field
-                            data-invalid={fieldState.invalid}
-                            className="min-w-0"
-                          >
-                            <FieldLabel htmlFor="custom-mock-subject">
-                              Subject{" "}
-                              <span className="text-destructive">*</span>
-                            </FieldLabel>
-                            <NativeSelect
-                              id="custom-mock-subject"
-                              size="sm"
-                              value={field.value}
-                              disabled={isSubmitting}
-                              className="w-full"
-                              onChange={(e) => {
-                                field.onChange(e.target.value);
-                                // Picking a parent always invalidates its children.
-                                form.setValue("sectionId", "");
-                                form.setValue("chapterId", "");
-                                form.clearErrors(["sectionId", "chapterId"]);
-                              }}
-                            >
-                              <NativeSelectOption value="">
-                                Select a subject
-                              </NativeSelectOption>
-                              {(curriculum?.subjects ?? []).map((subject) => (
-                                <NativeSelectOption
-                                  key={subject.id}
-                                  value={subject.id}
-                                >
-                                  {subject.name}
-                                </NativeSelectOption>
-                              ))}
-                            </NativeSelect>
-                            {fieldState.invalid && (
-                              <FieldError errors={[fieldState.error]} />
-                            )}
-                          </Field>
+                          <HierarchyFilterChips
+                            label="Subject"
+                            required
+                            options={curriculum?.subjects ?? []}
+                            value={field.value}
+                            onChange={(value) => {
+                              field.onChange(value);
+                              // Picking a parent always invalidates its children.
+                              form.setValue("sectionId", "");
+                              form.setValue("chapterId", "");
+                              form.clearErrors(["sectionId", "chapterId"]);
+                            }}
+                            disabled={isSubmitting}
+                            emptyLabel="No subjects available"
+                            error={
+                              fieldState.invalid
+                                ? fieldState.error?.message
+                                : undefined
+                            }
+                          />
                         )}
                       />
 
-                      {needsSection && (
+                      {needsSection && watchedSubjectId && (
                         <Controller
                           name="sectionId"
                           control={form.control}
                           render={({ field, fieldState }) => (
-                            <Field
-                              data-invalid={fieldState.invalid}
-                              className="min-w-0"
-                            >
-                              <FieldLabel htmlFor="custom-mock-section">
-                                Section{" "}
-                                <span className="text-destructive">*</span>
-                              </FieldLabel>
-                              <NativeSelect
-                                id="custom-mock-section"
-                                size="sm"
-                                value={field.value}
-                                disabled={!watchedSubjectId || isSubmitting}
-                                className="w-full"
-                                onChange={(e) => {
-                                  field.onChange(e.target.value);
-                                  form.setValue("chapterId", "");
-                                  form.clearErrors("chapterId");
-                                }}
-                              >
-                                <NativeSelectOption value="">
-                                  {!watchedSubjectId
-                                    ? "Pick a subject first"
-                                    : availableSections.length === 0
-                                      ? "No sections in this subject"
-                                      : "Select a section"}
-                                </NativeSelectOption>
-                                {availableSections.map((section) => (
-                                  <NativeSelectOption
-                                    key={section.id}
-                                    value={section.id}
-                                  >
-                                    {section.name}
-                                  </NativeSelectOption>
-                                ))}
-                              </NativeSelect>
-                              {fieldState.invalid && (
-                                <FieldError errors={[fieldState.error]} />
-                              )}
-                            </Field>
+                            <HierarchyFilterChips
+                              label="Section"
+                              required
+                              options={availableSections}
+                              value={field.value}
+                              onChange={(value) => {
+                                field.onChange(value);
+                                form.setValue("chapterId", "");
+                                form.clearErrors("chapterId");
+                              }}
+                              disabled={isSubmitting}
+                              emptyLabel="No sections in this subject"
+                              error={
+                                fieldState.invalid
+                                  ? fieldState.error?.message
+                                  : undefined
+                              }
+                            />
                           )}
                         />
                       )}
 
-                      {needsChapter && (
+                      {needsChapter && watchedSectionId && (
                         <Controller
                           name="chapterId"
                           control={form.control}
                           render={({ field, fieldState }) => (
-                            <Field
-                              data-invalid={fieldState.invalid}
-                              className="min-w-0"
-                            >
-                              <FieldLabel htmlFor="custom-mock-chapter">
-                                Chapter{" "}
-                                <span className="text-destructive">*</span>
-                              </FieldLabel>
-                              <NativeSelect
-                                id="custom-mock-chapter"
-                                size="sm"
-                                value={field.value}
-                                disabled={!watchedSectionId || isSubmitting}
-                                className="w-full"
-                                onChange={(e) => field.onChange(e.target.value)}
-                              >
-                                <NativeSelectOption value="">
-                                  {!watchedSectionId
-                                    ? "Pick a section first"
-                                    : availableChapters.length === 0
-                                      ? "No chapters in this section"
-                                      : "Select a chapter"}
-                                </NativeSelectOption>
-                                {availableChapters.map((chapter) => (
-                                  <NativeSelectOption
-                                    key={chapter.id}
-                                    value={chapter.id}
-                                  >
-                                    {chapter.name}
-                                  </NativeSelectOption>
-                                ))}
-                              </NativeSelect>
-                              {fieldState.invalid && (
-                                <FieldError errors={[fieldState.error]} />
-                              )}
-                            </Field>
+                            <HierarchyFilterChips
+                              label="Chapter"
+                              required
+                              options={availableChapters}
+                              value={field.value}
+                              onChange={field.onChange}
+                              disabled={isSubmitting}
+                              emptyLabel="No chapters in this section"
+                              error={
+                                fieldState.invalid
+                                  ? fieldState.error?.message
+                                  : undefined
+                              }
+                            />
                           )}
                         />
                       )}

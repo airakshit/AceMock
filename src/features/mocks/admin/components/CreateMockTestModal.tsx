@@ -27,11 +27,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import { SearchInput } from "@/components/patterns/search-input";
+import { HierarchyFilterChips } from "@/components/patterns/hierarchy-filter-chips";
 import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
 import type { DocumentOptionForMockProjection } from "@/features/documents/dto/projections";
 import { MockTestScope } from "../../dto/projections";
@@ -590,93 +587,42 @@ export function CreateMockTestModal({
                 ))}
               </div>
 
-              {/* Cascading subject → section → chapter pickers */}
+              {/* Cascading subject → section → chapter — revealed one level at a time */}
               {needsSubject && (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground">
-                      Subject <span className="text-destructive">*</span>
-                    </label>
-                    <NativeSelect
-                      size="sm"
-                      value={subjectId}
-                      onChange={(e) => handleSubjectChange(e.target.value)}
-                      disabled={curriculum === null}
-                      className="w-full"
-                    >
-                      <NativeSelectOption value="">
-                        {curriculum === null
-                          ? "Loading subjects..."
-                          : "Select a subject"}
-                      </NativeSelectOption>
-                      {(curriculum?.subjects ?? []).map((subject) => (
-                        <NativeSelectOption key={subject.id} value={subject.id}>
-                          {subject.name}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </div>
+                <div className="space-y-2">
+                  <HierarchyFilterChips
+                    label="Subject"
+                    required
+                    options={curriculum?.subjects ?? []}
+                    value={subjectId}
+                    onChange={handleSubjectChange}
+                    loading={curriculum === null}
+                    disabled={curriculum === null || isSubmitting}
+                    emptyLabel="No subjects available"
+                  />
 
-                  {needsSection && (
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground">
-                        Section <span className="text-destructive">*</span>
-                      </label>
-                      <NativeSelect
-                        size="sm"
-                        value={sectionId}
-                        onChange={(e) => handleSectionChange(e.target.value)}
-                        disabled={!subjectId}
-                        className="w-full"
-                      >
-                        <NativeSelectOption value="">
-                          {!subjectId
-                            ? "Pick a subject first"
-                            : availableSections.length === 0
-                              ? "No sections in this subject"
-                              : "Select a section"}
-                        </NativeSelectOption>
-                        {availableSections.map((section) => (
-                          <NativeSelectOption
-                            key={section.id}
-                            value={section.id}
-                          >
-                            {section.name}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </div>
+                  {needsSection && subjectId && (
+                    <HierarchyFilterChips
+                      label="Section"
+                      required
+                      options={availableSections}
+                      value={sectionId}
+                      onChange={handleSectionChange}
+                      disabled={isSubmitting}
+                      emptyLabel="No sections in this subject"
+                    />
                   )}
 
-                  {needsChapter && (
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground">
-                        Chapter <span className="text-destructive">*</span>
-                      </label>
-                      <NativeSelect
-                        size="sm"
-                        value={chapterId}
-                        onChange={(e) => setChapterId(e.target.value)}
-                        disabled={!sectionId}
-                        className="w-full"
-                      >
-                        <NativeSelectOption value="">
-                          {!sectionId
-                            ? "Pick a section first"
-                            : availableChapters.length === 0
-                              ? "No chapters in this section"
-                              : "Select a chapter"}
-                        </NativeSelectOption>
-                        {availableChapters.map((chapter) => (
-                          <NativeSelectOption
-                            key={chapter.id}
-                            value={chapter.id}
-                          >
-                            {chapter.name}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </div>
+                  {needsChapter && sectionId && (
+                    <HierarchyFilterChips
+                      label="Chapter"
+                      required
+                      options={availableChapters}
+                      value={chapterId}
+                      onChange={setChapterId}
+                      disabled={isSubmitting}
+                      emptyLabel="No chapters in this section"
+                    />
                   )}
                 </div>
               )}
