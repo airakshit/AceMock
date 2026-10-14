@@ -21,7 +21,7 @@ const STATS = [
  */
 export function AuthBrandPanel() {
   return (
-    <aside className="absolute inset-0 overflow-hidden bg-brand-gradient lg:relative lg:flex lg:flex-col lg:justify-between lg:p-8 xl:p-10">
+    <aside className="absolute inset-0 overflow-clip bg-brand-gradient lg:relative lg:flex lg:flex-col lg:justify-between lg:p-8 xl:p-10">
       <AuthPanelBackdrop />
 
       {/* Top Header: Brand Logo */}
