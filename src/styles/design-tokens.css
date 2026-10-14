@@ -54,12 +54,14 @@
     --brand-accent: oklch(0.62 0.15 220);
     --brand-accent-foreground: oklch(0.99 0 0);
 
-    /* Signature gradients — calibrated to match sidebar green oklch(0.47 0.13 163) */
+    /* Signature gradient — the deep sidebar green oklch(0.31 0.075 163).
+       Pinned to the dark-theme values in BOTH themes: the sidebar ↔ app-icon
+       contrast is the app's signature and must never shift on theme switch. */
     --gradient-brand: linear-gradient(
         140deg,
-        oklch(0.38 0.12 163) 0%,
-        oklch(0.47 0.13 163) 48%,
-        oklch(0.55 0.14 163) 100%
+        oklch(0.25 0.08 163) 0%,
+        oklch(0.31 0.075 163) 48%,
+        oklch(0.40 0.10 163) 100%
     );
     --gradient-brand-soft: linear-gradient(
         135deg,
@@ -128,12 +130,8 @@
     --cat-math: oklch(0.75 0.13 300);
     --cat-general: oklch(0.76 0.01 260);
 
-    --gradient-brand: linear-gradient(
-        140deg,
-        oklch(0.25 0.08 163) 0%,
-        oklch(0.31 0.075 163) 48%,
-        oklch(0.40 0.10 163) 100%
-    );
+    /* --gradient-brand is intentionally NOT re-tuned in .dark — it is the
+       pinned deep sidebar green from :root, identical in both themes. */
     --gradient-brand-soft: linear-gradient(
         135deg,
         oklch(0.31 0.075 163 / 15%) 0%,

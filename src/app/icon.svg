@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
-    <!-- Background emerald gradient calibrated to sidebar token oklch(0.47 0.13 163) -->
+    <!-- Background emerald gradient calibrated to the pinned sidebar green oklch(0.31 0.075 163) -->
     <linearGradient id="epex-bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#064E3B"/>
       <stop offset="42%" stop-color="#047857"/>

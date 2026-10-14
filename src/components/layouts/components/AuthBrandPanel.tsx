@@ -8,7 +8,10 @@ const STATS = [
 ];
 
 /**
- * AuthBrandPanel — the emerald brand canvas behind the auth experience.
+ * AuthBrandPanel — the deep emerald brand canvas behind the auth experience.
+ * It reuses the exact sidebar green (pinned in both themes), so the
+ * sidebar ↔ app-icon contrast that anchors the app carries onto the auth
+ * screens regardless of theme.
  *
  * Large screens: the editorial hero beside the form (logo, headline, trust
  * stats), calibrated with the sidebar green and the e^x mark. Fits a single

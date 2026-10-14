@@ -15,8 +15,11 @@ export function AuthPanelBackdrop({ idPrefix = "auth" }: AuthPanelBackdropProps)
 
   return (
     <>
-      {/* Dynamic Background Elements: Blueprint Grid & Ambient Emerald Aura */}
-      <div className="pointer-events-none absolute inset-0 bg-grid-fade opacity-30" />
+      {/* Blueprint grid — bg-grid-fade samples --foreground, which flips to
+          near-black in the light theme; this canvas is always the deep
+          emerald, so pin it to the sidebar's ink locally for white grid
+          lines in both themes. */}
+      <div className="pointer-events-none absolute inset-0 bg-grid-fade opacity-30 [--foreground:oklch(0.97_0.01_260)]" />
 
       {/* Ambient glowing orbs */}
       <div className="pointer-events-none absolute -top-28 -left-28 size-105 rounded-full bg-emerald-400/20 blur-[100px]" />

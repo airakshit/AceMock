@@ -184,11 +184,13 @@
     --radius: 0.65rem;
 
     /* Sidebar — one solid emerald panel (white text/overlays on top).
-       Deeper than --success so white copy keeps AA contrast. */
-    --sidebar: oklch(0.47 0.13 163);
+       Pinned to the deep dark-theme green in BOTH themes: the sidebar ↔
+       app-icon contrast is the app's signature and must stay identical on
+       theme switch (it used to fade from 0.31 to 0.47 in light mode). */
+    --sidebar: oklch(0.31 0.075 163);
     --sidebar-foreground: oklch(0.98 0 0);
     --sidebar-primary: oklch(0.98 0 0);
-    --sidebar-primary-foreground: oklch(0.47 0.13 163);
+    --sidebar-primary-foreground: oklch(0.31 0.075 163);
     --sidebar-accent: oklch(1 0 0 / 14%);
     --sidebar-accent-foreground: oklch(0.99 0 0);
     --sidebar-border: oklch(1 0 0 / 18%);
@@ -225,7 +227,7 @@
     --chart-4: oklch(0.72 0.14 300);
     --chart-5: oklch(0.74 0.11 226);
 
-    /* Sidebar — same emerald, deepened for the faded dark theme. */
+    /* Sidebar — the same deep emerald as :root (pinned across themes). */
     --sidebar: oklch(0.31 0.075 163);
     --sidebar-foreground: oklch(0.97 0.01 260);
     --sidebar-primary: oklch(0.73 0.13 163);
