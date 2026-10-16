@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { ServerActionResult } from "@/features/shared/actions/types";
+import { applyMockTestFilterChange } from "../filter-state";
 import type { SearchMockTestsFiltersPayload } from "../dto/payloads";
 import type {
   MockTestListItemProjection,
@@ -15,8 +16,8 @@ import type { MockTestSearchResult } from "../dto/results";
 export const SEARCH_DEBOUNCE_MS = 350;
 
 /**
- * Raw `<select>` values of the hierarchy filters. Empty string means
- * "any"; `scope` holds a `MockTestScope` or "" for "all scopes".
+ * Raw values of the two filter levels. Empty string means "any"; `scope`
+ * holds a `MockTestScope` or "" for "All" (every type).
  */
 export interface MockTestsFilterState {
   scope: string;
@@ -173,51 +174,11 @@ export function useMockTestsSearch({
     return () => clearTimeout(timer);
   }, [searchQuery, debouncedSearch]);
 
+  // The type ↔ hierarchy rules live in `filter-state.ts` so the admin
+  // console filters exactly the same way.
   const handleFilterChange = useCallback(
     (key: keyof MockTestsFilterState, value: string) => {
-      setFilters((prev) => {
-        const next = { ...prev, [key]: value };
-        // Picking a parent invalidates every child filter below it.
-        if (key === "subjectId") {
-          next.sectionId = "";
-          next.chapterId = "";
-        }
-        if (key === "sectionId") {
-          next.chapterId = "";
-        }
-
-        if (key === "subjectId" || key === "sectionId" || key === "chapterId") {
-          // Selecting a level moves Test Type to it — a chapter pick means
-          // ChapterWise, a subject pick means SubjectWise — so the two
-          // controls never disagree. Clearing a level leaves Test Type alone
-          // rather than silently undoing an explicit choice; "Clear filters"
-          // resets both together.
-          if (value) {
-            next.scope = next.chapterId
-              ? "chapter"
-              : next.sectionId
-                ? "section"
-                : "subject";
-          }
-        } else if (key === "scope") {
-          // The reverse direction: a test type only stores the levels at or
-          // above it (an IOE Model test has no subject at all), so picking a
-          // shallower type trims the deeper picks rather than leaving a
-          // combination that could never match a row.
-          if (value === "ioe_model" || value === "miscellaneous") {
-            next.subjectId = "";
-            next.sectionId = "";
-            next.chapterId = "";
-          } else if (value === "subject") {
-            next.sectionId = "";
-            next.chapterId = "";
-          } else if (value === "section") {
-            next.chapterId = "";
-          }
-        }
-
-        return next;
-      });
+      setFilters((prev) => applyMockTestFilterChange(prev, key, value));
       setItems(null);
     },
     [],

@@ -24,6 +24,14 @@ export const SCOPE_OPTIONS: Array<{
 ];
 
 /**
+ * The same options shaped for the type tag chips in the search filter bars
+ * ({id, name} like `HierarchyOption`), so wording never drifts between the
+ * creation forms and the filters.
+ */
+export const SCOPE_CHIP_OPTIONS: Array<{ id: string; name: string }> =
+  SCOPE_OPTIONS.map((option) => ({ id: option.value, name: option.label }));
+
+/**
  * Client-side validation for the custom mock test form.
  *
  * Mirrors the rules `mockTestsService.createCustomMockTest` enforces

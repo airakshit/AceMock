@@ -37,6 +37,13 @@ import { MetricCard } from "@/components/patterns/metric-card";
 import { SearchInput } from "@/components/patterns/search-input";
 import { EmptyState } from "@/components/patterns/empty-state";
 import { HierarchyFilterChips } from "@/components/patterns/hierarchy-filter-chips";
+import {
+  applyMockTestFilterChange,
+  isHierarchyScope,
+} from "../../filter-state";
+// Same option list (and the same wording) the student bar and the
+// custom-test form show, so the three never drift apart.
+import { SCOPE_CHIP_OPTIONS } from "../../schemas";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
@@ -95,7 +102,7 @@ interface TestGroup {
   items: MockTestListItemProjection[];
 }
 
-/** Narrows a raw <select> value to a scope, or undefined for "all scopes". */
+/** Narrows a raw type-tag value to a scope, or undefined for all types. */
 const parseScope = (value: string): MockTestScope | undefined => {
   if (!value) return undefined;
   return value in SCOPE_GROUP_LABELS ? (value as MockTestScope) : undefined;
@@ -264,19 +271,10 @@ export function MockTestsAdminView() {
     runFirstPageSearch(buildQuery(null));
   }, [buildQuery, runFirstPageSearch]);
 
+  // The type ↔ hierarchy rules live in `filter-state.ts` so the student
+  // lists filter exactly the same way (incl. the byAdmin passthrough).
   const handleFilterChange = (key: keyof Filters, value: string) => {
-    setFilters((prev) => {
-      const next = { ...prev, [key]: value };
-      // Picking a parent invalidates every child filter below it.
-      if (key === "subjectId") {
-        next.sectionId = "";
-        next.chapterId = "";
-      }
-      if (key === "sectionId") {
-        next.chapterId = "";
-      }
-      return next;
-    });
+    setFilters((prev) => applyMockTestFilterChange(prev, key, value));
     setItems(null);
   };
 
@@ -419,7 +417,7 @@ export function MockTestsAdminView() {
       } else {
         toast.error(res.error.message || "Failed to delete mock test.");
       }
-    } catch (err) {
+    } catch {
       toast.error("An unexpected error occurred while deleting.");
     } finally {
       setIsDeleting(false);
@@ -501,30 +499,14 @@ export function MockTestsAdminView() {
         </div>
       </div>
 
-      {/* Search Filters — subjects first; sections and chapters reveal one level at a time */}
+      {/* Search Filters — level 1: type tags; level 2: subject → section →
+          chapter chips, revealed only under the *Wise types */}
       <div className="rounded-xl border border-border/80 bg-card p-3 shadow-card">
         <div className="flex flex-wrap items-center gap-2">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <ListFilter className="size-3.5" aria-hidden="true" />
             <span>Filters</span>
           </span>
-
-          <NativeSelect
-            size="sm"
-            value={filters.scope}
-            onChange={(e) => handleFilterChange("scope", e.target.value)}
-            aria-label="Scope"
-            className="w-40"
-          >
-            <NativeSelectOption value="">All scopes</NativeSelectOption>
-            <NativeSelectOption value="ioe_model">IOE Model</NativeSelectOption>
-            <NativeSelectOption value="subject">Subject</NativeSelectOption>
-            <NativeSelectOption value="section">Section</NativeSelectOption>
-            <NativeSelectOption value="chapter">Chapter</NativeSelectOption>
-            <NativeSelectOption value="miscellaneous">
-              Miscellaneous
-            </NativeSelectOption>
-          </NativeSelect>
 
           <NativeSelect
             size="sm"
@@ -553,37 +535,51 @@ export function MockTestsAdminView() {
 
         <div className="mt-1 space-y-1">
           <HierarchyFilterChips
-            label="Subject"
-            options={curriculum?.subjects ?? []}
-            value={filters.subjectId}
-            onChange={(value) => handleFilterChange("subjectId", value)}
-            allLabel="All subjects"
-            loading={curriculum === null}
-            emptyLabel={
-              curriculum === null ? "Loading subjects…" : "No subjects found"
-            }
+            label="Type"
+            options={SCOPE_CHIP_OPTIONS}
+            value={filters.scope}
+            onChange={(value) => handleFilterChange("scope", value)}
+            allLabel="All"
           />
 
-          {filters.subjectId && (
-            <HierarchyFilterChips
-              label="Section"
-              options={availableSections}
-              value={filters.sectionId}
-              onChange={(value) => handleFilterChange("sectionId", value)}
-              allLabel="All sections"
-              emptyLabel="No sections in this subject"
-            />
-          )}
+          {isHierarchyScope(filters.scope) && (
+            <>
+              <HierarchyFilterChips
+                label="Subject"
+                options={curriculum?.subjects ?? []}
+                value={filters.subjectId}
+                onChange={(value) => handleFilterChange("subjectId", value)}
+                allLabel="All subjects"
+                loading={curriculum === null}
+                emptyLabel={
+                  curriculum === null
+                    ? "Loading subjects…"
+                    : "No subjects found"
+                }
+              />
 
-          {filters.sectionId && (
-            <HierarchyFilterChips
-              label="Chapter"
-              options={availableChapters}
-              value={filters.chapterId}
-              onChange={(value) => handleFilterChange("chapterId", value)}
-              allLabel="All chapters"
-              emptyLabel="No chapters in this section"
-            />
+              {filters.subjectId && (
+                <HierarchyFilterChips
+                  label="Section"
+                  options={availableSections}
+                  value={filters.sectionId}
+                  onChange={(value) => handleFilterChange("sectionId", value)}
+                  allLabel="All sections"
+                  emptyLabel="No sections in this subject"
+                />
+              )}
+
+              {filters.sectionId && (
+                <HierarchyFilterChips
+                  label="Chapter"
+                  options={availableChapters}
+                  value={filters.chapterId}
+                  onChange={(value) => handleFilterChange("chapterId", value)}
+                  allLabel="All chapters"
+                  emptyLabel="No chapters in this section"
+                />
+              )}
+            </>
           )}
         </div>
       </div>
