@@ -26,10 +26,10 @@ export const questionReports = pgTable(
   {
     id: uuid("id").primaryKey(),
     userId: uuid("user_id")
-      .references(() => user.id)
+      .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
     questionId: uuid("question_id")
-      .references(() => questions.id)
+      .references(() => questions.id, { onDelete: "cascade" })
       .notNull(),
     reportType: questionReportTypeEnum("report_type").notNull(),
     description: text("description"),
