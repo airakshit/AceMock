@@ -65,7 +65,7 @@ export const extractQuestions = inngest.createFunction(
         );
       },
     );
-
+    
     if (!docData || !docData.files || docData.files.length === 0) {
       await step.run("mark-document-failed-no-files", async () => {
         await documentsRepository.updateFileProcessingStatus(db, {

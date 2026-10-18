@@ -35,14 +35,15 @@ export interface OcrPageEventData {
 }
 
 export const TOTAL_RETRIES = 2;
+export const PAGE_OCR_EVENT = "page/ocr";
 
 export const ocrPage = inngest.createFunction(
   {
     id: "ocr-page",
-    triggers: { event: "page/ocr" },
+    triggers: { event: PAGE_OCR_EVENT },
     retries: TOTAL_RETRIES,
     concurrency: {
-      limit: 2,
+      limit: 3,
     },
   },
 
@@ -52,7 +53,11 @@ export const ocrPage = inngest.createFunction(
 
     // 0. Update file page status to "running"
     await step.run("update-file-ocr-status", async () => {
-      await documentsRepository.updateFilePageStatusByPageId(db, pageId, "running" as FilePageOCRStatus);
+      await documentsRepository.updateFilePageStatusByPageId(
+        db,
+        pageId,
+        "running" as FilePageOCRStatus,
+      );
     });
 
     // 1. Generate a signed URL for the page image in Supabase storage
