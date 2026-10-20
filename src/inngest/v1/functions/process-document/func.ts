@@ -1,4 +1,4 @@
-import { inngest } from "../../client";
+import { inngest } from "../../../client";
 import { processFileBlob } from "./preprocessing";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { storagePaths } from "@/lib/supabase/storage-paths";

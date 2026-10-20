@@ -1,7 +1,7 @@
 import {
   StructuredSchemaParseResult,
   structuredOCRExtractionSchema,
-} from "../ocr-page/structured-question-schema";
+} from "./structured-question-schema";
 
 type StructuredOCRParseResult = {
   cleanedText: string | null;
@@ -18,7 +18,7 @@ const TRAILING_COMMA = /,\s*([\]}])/g;
  * Fallback: Pulls the JSON payload out of markdown fences, or the outermost {}.
  * Only needed when structured output is not used or the model wraps its response.
  */
-function extractJsonPayload(text: string): string {
+export function extractJsonPayload(text: string): string {
   const fenced = text.match(CODE_FENCE)?.[1];
   if (fenced) return fenced.trim();
 
@@ -28,7 +28,7 @@ function extractJsonPayload(text: string): string {
 }
 
 /** Parses JSON, retrying once with trailing commas stripped. */
-function tryParseJson(
+export function tryParseJson(
   text: string,
 ): { ok: true; json: unknown; source: string } | { ok: false; error: string } {
   try {

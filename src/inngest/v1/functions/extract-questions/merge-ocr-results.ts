@@ -18,6 +18,8 @@ interface MergedQuestionRecord {
   svgQuestion?: string;
   svgSolution?: string;
   svgOptionsMap: Partial<Record<"A" | "B" | "C" | "D", string>>;
+  /** Set on any item that flagged a figure, so stage 2 can target it. */
+  hasFigure: boolean;
   passageContent?: string | null;
   incomplete: boolean;
   optionIncomplete: boolean;
@@ -438,6 +440,7 @@ export function mergeOcrResults(
             svgQuestion: item.svgQuestion?.trim(),
             svgSolution: item.svgSolution?.trim(),
             svgOptionsMap,
+            hasFigure: Boolean(item.hasFigure),
             passageContent: itemPassageContent,
             incomplete: Boolean(item.incomplete),
             optionIncomplete: Boolean(item.optionIncomplete),
@@ -530,6 +533,13 @@ export function mergeOcrResults(
             existing.passageContent = itemPassageContent;
           }
 
+          // A question and its solution are separate items with the same
+          // serialNo, so the flag accumulates across them rather than being
+          // overwritten by a later item that has no figure.
+          if (item.hasFigure) {
+            existing.hasFigure = true;
+          }
+
           // Update continuation flags
           existing.incomplete = Boolean(item.incomplete);
           existing.optionIncomplete = Boolean(item.optionIncomplete);
@@ -578,12 +588,14 @@ export function mergeOcrResults(
       resolvedQuestions.push({
         serialNo: record.serialNo,
         fileId: record.fileId,
+        pageNos: record.pageNos,
         question: finalQuestionText,
         options,
         correctOption,
         marks: Math.max(1, record.marks || 1),
         difficulty: "medium",
         subject: record.subject,
+        hasFigure: record.hasFigure,
         solution: record.solution || null,
         hint: null,
         diagram_url: null,

@@ -8,7 +8,7 @@ export const OpenRouterModels = {
   THINKING_MACHINES_INKLING_SMALL: "thinkingmachines/inkling-small:free",
   THINKING_MACHINES_INKLING: "thinkingmachines/inkling:free",
 
-  MINIMAX_M3: "minimax/minimax-m3:free",
+  MINIMAX_M_3_1_FLASH: "minimax/minimax-m3.1-flash:free",
   NVIDIA_NEMOTRON_3_5_SUPER_VL: "nvidia/nemotron-3.5-super-vl:free",
   NEX_AGI_NEX_2_5_PRO: "nex-agi/nex-n2.5-pro:free",
 } as const;

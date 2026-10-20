@@ -1,10 +1,10 @@
-import { inngest } from "../../client";
+import { inngest } from "../../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import {
   structuredOutputExtractionPrompt,
   structuredOutputExtractionPromptV2,
   structuredOutputExtractionPromptV3,
-} from "@/services/llm/prompts";
+} from "@/inngest/v1/functions/ocr-page/prompts";
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { db } from "@/db";
 import { OcrPageResult } from "./types";
@@ -65,14 +65,14 @@ export const ocrPage = inngest.createFunction(
       return await supabaseStorageClient.getPageAccessUrl(storagePath);
     });
 
-    // const llmService = new GeminiLLMService(
-    //   env.GEMINI_API_KEY,
-    //   GeminiModels.GEMINI_3_FLASH,
-    // );
-    const llmService = new OpenRouterLLMService(
-      env.OPENROUTER_API_KEY!,
-      OpenRouterModels.DOTS_3_NOTE_PREVIEW,
+    const llmService = new GeminiLLMService(
+      env.GEMINI_API_KEY,
+      GeminiModels.GEMINI_3_5_FLASH_LITE,
     );
+    // const llmService = new OpenRouterLLMService(
+    //   env.OPENROUTER_API_KEY!,
+    //   OpenRouterModels.DOTS_3_NOTE_PREVIEW,
+    // );
     const extraction = await step.run(
       "llm-ocr-extraction",
       async (): Promise<{

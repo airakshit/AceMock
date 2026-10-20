@@ -1,4 +1,4 @@
-import { inngest } from "../../client";
+import { inngest } from "../../../client";
 import { db } from "@/db";
 import { questionsRepository } from "@/features/questions/repositories/questions.repository";
 import { classifyChapters, classifySections } from "./classify";
@@ -140,7 +140,11 @@ export const classifyQuestions = inngest.createFunction(
       }
 
       // 3b. Stage 1 — assign sections, in batches.
-      for (let offset = 0; offset < needsSection.length; offset += QUESTIONS_PER_BATCH) {
+      for (
+        let offset = 0;
+        offset < needsSection.length;
+        offset += QUESTIONS_PER_BATCH
+      ) {
         const batch = needsSection.slice(offset, offset + QUESTIONS_PER_BATCH);
 
         const sectionSlugs = await step.run(
@@ -165,7 +169,11 @@ export const classifyQuestions = inngest.createFunction(
           continue;
         }
 
-        for (let offset = 0; offset < batch.length; offset += QUESTIONS_PER_BATCH) {
+        for (
+          let offset = 0;
+          offset < batch.length;
+          offset += QUESTIONS_PER_BATCH
+        ) {
           const chunk = batch.slice(offset, offset + QUESTIONS_PER_BATCH);
 
           const chapterSlugs = await step.run(
@@ -182,7 +190,9 @@ export const classifyQuestions = inngest.createFunction(
           chapterSlugs.forEach((slug, index) => {
             if (!slug) return;
 
-            const chapter = section.chapters.find((entry) => entry.slug === slug);
+            const chapter = section.chapters.find(
+              (entry) => entry.slug === slug,
+            );
             if (!chapter) return;
 
             updates.push({

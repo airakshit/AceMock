@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { inngest } from "../../client";
+import { inngest } from "../../../client";
 import { documentQueries } from "@/features/documents/repositories/document-queries";
 import { storagePaths } from "@/lib/supabase/storage-paths";
 import { DocumentWithFilesProjection } from "@/features/documents/dto/projections";
@@ -15,6 +15,14 @@ import { mergeOcrResults } from "./merge-ocr-results";
 import type { ResolvedQuestion } from "./types";
 import { QuestionPersistError } from "./errors";
 import { ocrPage, OcrPageResult, OcrPageFailedError } from "../ocr-page";
+import { extractFigures } from "../extract-figures";
+import { FigureExtractionResult } from "../extract-figures/types";
+import { applyFigureResults, buildFigureRequests } from "./figures";
+import { hasExtractableFigure } from "../extract-figures/types";
+import {
+  uploadQuestionFigures,
+  type QuestionDiagramUploads,
+} from "./figure-uploads";
 import { CLASSIFY_QUESTIONS_EVENT } from "../classify-questions/func";
 import { FileProcessingStatus } from "@/features/documents/types";
 
@@ -65,7 +73,7 @@ export const extractQuestions = inngest.createFunction(
         );
       },
     );
-    
+
     if (!docData || !docData.files || docData.files.length === 0) {
       await step.run("mark-document-failed-no-files", async () => {
         await documentsRepository.updateFileProcessingStatus(db, {
@@ -284,6 +292,47 @@ export const extractQuestions = inngest.createFunction(
       "All pages merged and questions resolved successfully.",
     );
 
+    // Phase 2 — figures are extracted in a separate pass, so the page OCR call
+    // that reads the text never spends its output budget on SVG markup.
+    const figureRequests = buildFigureRequests({
+      pages: allDocPages,
+      resolvedQuestions,
+    });
+
+    if (figureRequests.length > 0) {
+      const { results: figureResults } = (await step.invoke(
+        "extract-question-figures",
+        {
+          function: extractFigures,
+          data: {
+            userId,
+            documentId,
+            requests: figureRequests,
+          },
+        },
+      )) as { results: FigureExtractionResult[] };
+
+      const appliedFigures = applyFigureResults(
+        resolvedQuestions,
+        figureResults,
+      );
+
+      logger.info(
+        {
+          documentId,
+          figureJobs: figureRequests.length,
+          figureResults: figureResults.length,
+          questionsWithFigures: appliedFigures,
+        },
+        "Figure extraction complete.",
+      );
+    } else {
+      logger.info(
+        { documentId },
+        "No items flagged as containing a figure; skipping figure extraction.",
+      );
+    }
+
     if (resolvedQuestions.length === 0) {
       logger.warn(
         { documentId },
@@ -337,15 +386,35 @@ export const extractQuestions = inngest.createFunction(
 
     const saveResult = await step.run("save-questions", async () => {
       try {
-        const payload: CreateQuestionItem[] = resolvedQuestions.map((q) => {
+        const payload: CreateQuestionItem[] = [];
+
+        for (const q of resolvedQuestions) {
+          const questionId = generateUUIDv7();
           const passageContent = q.passageContent?.trim() || null;
 
           const passageId = passageContent
             ? (passageMap[passageContent] ?? null)
             : null;
 
-          return {
-            id: generateUUIDv7(),
+          let diagrams: QuestionDiagramUploads = {
+            questionDiagram: null,
+            solutionDiagram: null,
+          };
+
+          // Figures reach storage here, whether they came back from the focused
+          // extraction pass or from the legacy inline OCR. Markup is reduced to
+          // a single svg document before anything is written.
+          if (hasExtractableFigure(q)) {
+            diagrams = await uploadQuestionFigures({
+              userId,
+              questionId,
+              questionSvg: q.svgQuestion ?? null,
+              solutionSvg: q.svgSolution ?? null,
+            });
+          }
+
+          payload.push({
+            id: questionId,
             chapterId: null,
             passageId,
 
@@ -356,12 +425,12 @@ export const extractQuestions = inngest.createFunction(
             marks: q.marks,
             difficulty: q.difficulty,
 
-            questionDiagram: q.diagram_url ?? null,
+            questionDiagram: diagrams.questionDiagram,
             hint: q.hint ?? null,
             solution: q.solution ?? null,
-            solutionDiagram: q.solution_diagram_url ?? null,
-          };
-        });
+            solutionDiagram: diagrams.solutionDiagram,
+          });
+        }
 
         const inserted = await questionsRepository.createMany(db, payload);
 

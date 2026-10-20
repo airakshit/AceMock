@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+// Should allow small a,b,c,d too so that it parses.
 const optionKeySchema = z.enum(["A", "B", "C", "D"]);
 
 const subjectSchema = z.enum([
@@ -57,11 +58,25 @@ const questionDataSchema = z
     // Step-by-step solution
     solution: z.string().optional(),
 
+    // Figure flag — the LLM must NOT draw figures; it only reports that one exists.
+    hasFigure: z
+      .boolean()
+      .optional()
+      .describe(
+        "Set true when this question, its solution, or any of its options contains a diagram/figure/graph that needs to be extracted separately.",
+      ),
+
     // Page/question continuation metadata
     optionIncomplete: z.boolean().optional(),
     incomplete: z.boolean().optional(),
     isContinuation: z.boolean().optional(),
 
+    /**
+     * NOTE: these are kept for backwards compatibility only. Pages OCR'd before
+     * figures were split into their own extraction stage stored inline SVG in
+     * `raw_text`, and `mergeOcrResults` still reads them so those documents keep
+     * their figures. The extraction prompt no longer asks for them.
+     */
     svgQuestion: z.string().optional(),
     svgSolution: z.string().optional(),
     svgOptions: z
@@ -160,22 +175,14 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
             },
             marks: { type: ["number", "null"] },
             solution: { type: ["string", "null"] },
+
+            // Figures are flagged, never drawn — they are extracted in a
+            // separate stage so the SVG does not compete for output tokens.
+            hasFigure: { type: ["boolean", "null"] },
+
             optionIncomplete: { type: ["boolean", "null"] },
             incomplete: { type: ["boolean", "null"] },
             isContinuation: { type: ["boolean", "null"] },
-
-            svgQuestion: { type: ["string", "null"] },
-            svgSolution: { type: ["string", "null"] },
-            svgOptions: {
-              type: ["object", "null"],
-              properties: {
-                A: { type: ["string", "null"] },
-                B: { type: ["string", "null"] },
-                C: { type: ["string", "null"] },
-                D: { type: ["string", "null"] },
-              },
-              additionalProperties: false,
-            },
           },
           required: ["serialNo"],
           anyOf: [
@@ -183,9 +190,6 @@ export const structuredOCRJsonSchema: StructuredJsonOptions = {
             { required: ["options"] },
             { required: ["answerKey"] },
             { required: ["solution"] },
-            { required: ["svgQuestion"] },
-            { required: ["svgSolution"] },
-            { required: ["svgOptions"] },
           ],
           additionalProperties: false,
         },

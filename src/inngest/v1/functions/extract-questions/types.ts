@@ -10,12 +10,16 @@ import type {
 export interface ResolvedQuestion {
   serialNo: number;
   fileId: string;
+  /** Every page that contributed text for this item, in read order. */
+  pageNos: number[];
   question: string;
   options: QuestionOption[];
   correctOption: string;
   marks: number;
   difficulty: QuestionDifficulty;
   subject?: string;
+  /** Opaque flag from stage 1: this item contains at least one figure. */
+  hasFigure?: boolean;
   hint?: string | null;
   solution?: string | null;
   diagram_url?: string | null;

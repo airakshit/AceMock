@@ -340,7 +340,7 @@ Each object inside \`data\` represents ONE individual question/solution/answerKe
 - \`incomplete\` 
 - \`optionIncomplete\` 
 - \`isContinuation\`
-- \`svgQuestion\`, \`svgSolution\`, \`svgOptions\`
+- \`hasFigure\`
 
 ⚠️ **STRICT HIERARCHY RULE**:
 - \`paragraph\`, \`sectionLabel\`, \`sectionStart\`, \`sectionEnd\`, \`eachMarks\`, \`isRelevant\` MUST NEVER appear inside objects in the \`data\` array. They are strictly PAGE-LEVEL fields at the root of the JSON object.
@@ -377,8 +377,12 @@ Each object inside \`data\` represents ONE individual question/solution/answerKe
 ### Options
 - Map all option labels (numeric, roman, lettered) to A, B, C, D.
 
-### Diagrams
-- If a question, solution, or option contains a diagram/figure/graph, generate an accurate <svg>...</svg> representation in the corresponding svg field (\`svgQuestion\`, \`svgSolution\`, or \`svgOptions\`).
+### Diagrams (FLAG figures, do not draw them) (CRITICAL)
+- Do NOT generate SVG. Figures are produced by a separate extraction stage and that stage needs the entire output budget.
+- If a question, its solution, or any of its options contains a diagram, figure, graph, illustration or drawn table, set \`hasFigure\` to \`true\` on that item.
+- Flag every figure: they are common in Physics and Maths and easy to overlook in a dense page. Do not flag plain text, math formulas, or typeset tables that contain no drawing.
+- \`hasFigure\` is a single boolean per item — never repeat it per figure, and never add a field describing what the figure contains.
+- Do not mention the figure in \`question\`, \`solution\`, or \`options\` (no "see figure", no placeholder text). Transcribe only the printed words.
 
 ### Data Array
 - All extracted entities (questions, solutions, answer keys) MUST be placed inside the \`data\` array.
@@ -547,7 +551,7 @@ Each object inside \`data\` represents ONE individual question/solution/answerKe
 - \`incomplete\` 
 - \`optionIncomplete\` 
 - \`isContinuation\`
-- \`svgQuestion\`, \`svgSolution\`, \`svgOptions\`
+- \`hasFigure\`
 
 ⚠️ **STRICT HIERARCHY RULE**:
 - \`paragraph\`, \`sectionLabel\`, \`sectionStart\`, \`sectionEnd\`, \`eachMarks\`, \`isRelevant\` MUST NEVER appear inside objects in the \`data\` array. They are strictly PAGE-LEVEL fields at the root of the JSON object.
@@ -584,8 +588,12 @@ Each object inside \`data\` represents ONE individual question/solution/answerKe
 ### Options
 - Map all option labels (numeric, roman, lettered) to A, B, C, D.
 
-### Diagrams
-- If a question, solution, or option contains a diagram/figure/graph, generate an accurate <svg>...</svg> representation in the corresponding svg field (\`svgQuestion\`, \`svgSolution\`, or \`svgOptions\`).
+### Diagrams (FLAG figures, do not draw them) (CRITICAL)
+- Do NOT generate SVG. Figures are produced by a separate extraction stage and that stage needs the entire output budget.
+- If a question, its solution, or any of its options contains a diagram, figure, graph, illustration or drawn table, set \`hasFigure\` to \`true\` on that item.
+- Flag every figure: they are common in Physics and Maths and easy to overlook in a dense page. Do not flag plain text, math formulas, or typeset tables that contain no drawing.
+- \`hasFigure\` is a single boolean per item — never repeat it per figure, and never add a field describing what the figure contains.
+- Do not mention the figure in \`question\`, \`solution\`, or \`options\` (no "see figure", no placeholder text). Transcribe only the printed words.
 
 ### Data Array
 - All extracted entities (questions, solutions, answer keys) MUST be placed inside the \`data\` array.
@@ -771,7 +779,7 @@ Each object inside \`data\` represents ONE individual question/solution/answerKe
 - \`incomplete\` 
 - \`optionIncomplete\` 
 - \`isContinuation\`
-- \`svgQuestion\`, \`svgSolution\`, \`svgOptions\`
+- \`hasFigure\`
 
 ⚠️ **STRICT HIERARCHY RULE**:
 - \`paragraph\`, \`sectionLabel\`, \`sectionStart\`, \`sectionEnd\`, \`eachMarks\`, \`isRelevant\` MUST NEVER appear inside objects in the \`data\` array. They are strictly PAGE-LEVEL fields at the root of the JSON object.
@@ -808,8 +816,12 @@ Each object inside \`data\` represents ONE individual question/solution/answerKe
 ### Options
 - Map all option labels (numeric, roman, lettered) to A, B, C, D.
 
-### Diagrams
-- If a question, solution, or option contains a diagram/figure/graph, generate an accurate <svg>...</svg> representation in the corresponding svg field (\`svgQuestion\`, \`svgSolution\`, or \`svgOptions\`).
+### Diagrams (FLAG figures, do not draw them) (CRITICAL)
+- Do NOT generate SVG. Figures are produced by a separate extraction stage and that stage needs the entire output budget.
+- If a question, its solution, or any of its options contains a diagram, figure, graph, illustration or drawn table, set \`hasFigure\` to \`true\` on that item.
+- Flag every figure: they are common in Physics and Maths and easy to overlook in a dense page. Do not flag plain text, math formulas, or typeset tables that contain no drawing.
+- \`hasFigure\` is a single boolean per item — never repeat it per figure, and never add a field describing what the figure contains.
+- Do not mention the figure in \`question\`, \`solution\`, or \`options\` (no "see figure", no placeholder text). Transcribe only the printed words.
 
 ### Data Array
 - All extracted entities (questions, solutions, answer keys) MUST be placed inside the \`data\` array.
