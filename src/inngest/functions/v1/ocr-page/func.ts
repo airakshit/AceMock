@@ -4,7 +4,7 @@ import {
   structuredOutputExtractionPrompt,
   structuredOutputExtractionPromptV2,
   structuredOutputExtractionPromptV3,
-} from "@/inngest/v1/functions/ocr-page/prompts";
+} from "@/inngest/functions/v1/ocr-page/prompts";
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { db } from "@/db";
 import { OcrPageResult } from "./types";

@@ -11,7 +11,7 @@ import { generateUUIDv7 } from "../shared/utils";
 import { supabaseStorageClient } from "../shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
 import { inngest } from "@/inngest/client";
-import { EXTRACT_QUESTIONS_EVENT } from "@/inngest/v1/functions/extract-questions/func";
+import { EXTRACT_QUESTIONS_EVENT } from "@/inngest/functions/v1/extract-questions/func";
 import {
   DocumentProcessingStatus,
   FileUploadStatus,
