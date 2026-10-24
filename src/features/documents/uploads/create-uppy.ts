@@ -12,7 +12,8 @@ export function createDocumentUppy() {
 
     restrictions: {
       maxNumberOfFiles: 20,
-      maxFileSize: 500 * 1024 * 1024,
+      // Keep in sync with the zod schema in ../schemas.ts (50 MB per file).
+      maxFileSize: UPPY_UPLOAD_CONFIG.MAX_FILE_SIZE_MB * 1024 * 1024,
     },
 
     allowMultipleUploadBatches: false,
@@ -26,7 +27,11 @@ export function createDocumentUppy() {
 
     uploadDataDuringCreation: true,
     removeFingerprintOnSuccess: true,
-    storeFingerprintForResuming: false,
+    // Remember the tus upload URL per fingerprint (localStorage) so that a
+    // restarted transfer for the same file (e.g. after a network drop or the
+    // "resume incomplete upload" flow) can continue from the last sent
+    // offset instead of starting over.
+    storeFingerprintForResuming: true,
 
     /**
      * Only these fields should become
@@ -63,24 +68,6 @@ export function createDocumentUppy() {
       error,
       "Response:",
       response,
-    );
-  });
-
-  uppy.on("upload-success", (file, response) => {
-    console.log(
-      "[uppy:upload-success] File:",
-      file?.name,
-      "Response:",
-      response,
-    );
-  });
-
-  uppy.on("upload-progress", (file, progress) => {
-    console.log(
-      "[uppy:upload-progress] File:",
-      file?.name,
-      "Progress:",
-      progress,
     );
   });
 

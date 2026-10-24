@@ -211,7 +211,7 @@ class SupabaseStorageClient {
     if (error) {
       console.log(
         `Error generating signed URLs: [MESSAGE]: ${error.message}, ` +
-        `[STATUS]: ${error.status}, [CAUSE]: ${error.cause}`,
+          `[STATUS]: ${error.status}, [CAUSE]: ${error.cause}`,
       );
 
       throw error;
@@ -223,10 +223,7 @@ class SupabaseStorageClient {
     }));
   }
 
-  async getPageAccessUrl(
-    objectPath: string,
-    expiresIn = 600,
-  ): Promise<string> {
+  async getPageAccessUrl(objectPath: string, expiresIn = 600): Promise<string> {
     const { data, error } = await this._supabaseClient.storage
       .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
       .createSignedUrl(objectPath, expiresIn);
@@ -261,6 +258,22 @@ class SupabaseStorageClient {
     }
 
     return data;
+  }
+
+  /**
+   * Checks whether an object exists in the storage bucket.
+   *
+   */
+  async objectExists(objectPath: string): Promise<boolean> {
+    const { data: exists, error } = await this._supabaseClient.storage
+      .from(env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET_NAME)
+      .exists(objectPath);
+
+    if (error) {
+      throw error;
+    }
+
+    return exists;
   }
 
   async deleteFiles(objectPaths: string[]): Promise<void> {

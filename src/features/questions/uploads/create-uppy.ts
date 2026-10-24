@@ -26,7 +26,10 @@ export function createQuestionUppy() {
 
     uploadDataDuringCreation: true,
     removeFingerprintOnSuccess: true,
-    storeFingerprintForResuming: false,
+    // Remember the tus upload URL per fingerprint (localStorage) so that a
+    // restarted transfer can continue from the last sent offset instead of
+    // starting over.
+    storeFingerprintForResuming: true,
 
     allowedMetaFields: QUESTION_UPPY_UPLOAD_CONFIG.ALLOWED_METADATA_FIELDS,
 
