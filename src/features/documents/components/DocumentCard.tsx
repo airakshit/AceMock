@@ -13,10 +13,12 @@ import {
   Image as ImageIcon,
   Layers,
   Loader2,
+  PauseCircle,
   Pencil,
   RefreshCw,
   Sparkles,
   Trash2,
+  UploadCloud,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +42,8 @@ import { getDocumentStatusAction } from "../actions/get-document-status";
 import { formatBytes, formatDate } from "../utils";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { FilePreviewDialog } from "./FilePreviewDialog";
+import { useDocumentUploaderContext } from "../uploads/document-uploader-provider";
+import { UPLOAD_HEARTBEAT_STALE_MS } from "../uploads/upload-session-constants";
 
 interface DocumentCardProps {
   document: DocumentItemDTO;
@@ -47,13 +51,44 @@ interface DocumentCardProps {
   onDocumentUpdated?: (updatedDoc: DocumentItemDTO) => void;
 }
 
+/**
+ * Client-facing file status. The server lifecycle intentionally separates
+ * "all bytes transferred" (`uploaded`) from "verified + committed"
+ * (`completed`) — but that is bookkeeping the user should not have to
+ * interpret: if the bytes are in storage, the file is simply uploaded.
+ * See UploadFlow.md.
+ */
+function clientFacingFileStatus(
+  status: DocumentFileDTO["uploadStatus"],
+): Exclude<DocumentFileDTO["uploadStatus"], "completed"> {
+  return status === "completed" ? "uploaded" : status;
+}
+
 export function DocumentCard({
   document,
   onDocumentDeleted,
   onDocumentUpdated,
 }: DocumentCardProps) {
+  const { startResume, isResumeBusy } = useDocumentUploaderContext();
   const [isFilesOpen, setIsFilesOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isStartingResume, setIsStartingResume] = useState(false);
+
+  /**
+   * Stale-ness clock. `Date.now()` cannot be called during render (React
+   * Compiler purity rules), so staleness is evaluated against this snapshot
+   * that listens for wall-clock updates while the card is mounted.
+   */
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => {
+    const update = () => setNowMs(Date.now());
+    const initial = setTimeout(update, 400);
+    const ticker = setInterval(update, 30_000);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(ticker);
+    };
+  }, []);
 
   // Editable fields
   const [title, setTitle] = useState(document.title);
@@ -106,7 +141,41 @@ export function DocumentCard({
   );
 
   const getDocumentStatus = () => {
-    // 1. If any file is actively uploading
+    const uploadSession = document.session;
+
+    /**
+     * Session-derived staleness: an ACTIVE upload session whose heartbeat
+     * is stale (>120s — browser closed/crashed) means the attempt is
+     * *interrupted*, not live: offer manual resume instead of a spinner.
+     */
+    const hasPendingTransferFiles = files.some(
+      (f) =>
+        f.uploadStatus === "pending" ||
+        f.uploadStatus === "uploading" ||
+        f.uploadStatus === "failed",
+    );
+
+    const isUploadInterruptedNow =
+      (uploadSession?.status === "active" &&
+        hasPendingTransferFiles &&
+        nowMs > 0 &&
+        nowMs - new Date(uploadSession.lastHeartbeatAt).getTime() >
+          UPLOAD_HEARTBEAT_STALE_MS) ||
+      (uploadSession !== null &&
+        uploadSession.status === "abandoned" &&
+        hasPendingTransferFiles);
+
+    if (isUploadInterruptedNow) {
+      return {
+        label: "Upload Interrupted",
+        icon: PauseCircle,
+        className: "border-warning/30 bg-warning/10 text-warning",
+        dot: "bg-warning",
+        spin: false,
+      };
+    }
+
+    // Live upload: heartbeat is fresh.
     const hasUploading = files.some((f) => f.uploadStatus === "uploading");
     if (hasUploading) {
       return {
@@ -194,6 +263,27 @@ export function DocumentCard({
   const statusInfo = getDocumentStatus();
   const StatusIcon = statusInfo.icon;
 
+  /**
+   * "Resume Upload" is offered whenever the (active) upload session is
+   * stale — the heartbeat stopped, so the browser was closed mid-upload
+   * and nothing re-opened the session since (requirement #2: resume ONLY
+   * on this explicit click; brand-new uploads never touch this path).
+   * Eligibility is still fully re-validated server-side by
+   * resumeDocumentUploadAction's recovery algorithm.
+   */
+  const isResumePending =
+    !isEditing &&
+    document.session?.status === "active" &&
+    nowMs > 0 &&
+    files.some(
+      (f) =>
+        f.uploadStatus === "pending" ||
+        f.uploadStatus === "uploading" ||
+        f.uploadStatus === "failed",
+    ) &&
+    nowMs - new Date(document.session.lastHeartbeatAt).getTime() >
+      UPLOAD_HEARTBEAT_STALE_MS;
+
   const handleRefreshStatus = async () => {
     try {
       setIsRefreshingStatus(true);
@@ -245,6 +335,26 @@ export function DocumentCard({
     setIsEditing(true);
     setIsFilesOpen(true); // Open files automatically in edit mode so files can be managed
   };
+
+  /**
+   * Manual resume of an interrupted upload — the ONLY path that re-opens
+   * an abandoned session (requirement: resume strictly on explicit click).
+   * The uploader provider hydrates the form above and continues the tus
+   * transfers.
+   */
+  const handleResumeUpload = async () => {
+    try {
+      setIsStartingResume(true);
+      await startResume(document.id);
+    } catch (error) {
+      toast.error("Failed to start the upload resume");
+      console.error(error);
+    } finally {
+      setIsStartingResume(false);
+    }
+  };
+
+  const isResumeDisabled = isResumeBusy || isStartingResume;
 
   const handleCancelEdit = () => {
     setTitle(document.title);
@@ -488,7 +598,7 @@ export function DocumentCard({
                   <TooltipContent
                     side="top"
                     align="start"
-                    className="max-w-sm break-words text-xs font-medium"
+                    className="max-w-sm wrap-break-word text-xs font-medium"
                   >
                     {document.title}
                   </TooltipContent>
@@ -539,6 +649,23 @@ export function DocumentCard({
 
           {/* Right section: Action Buttons */}
           <div className="flex flex-wrap items-center justify-start gap-1.5 border-t border-border/40 pt-3 sm:justify-end sm:border-t-0 sm:pt-0">
+            {isResumePending && !isEditing && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleResumeUpload}
+                disabled={isResumeDisabled}
+                className="h-8 px-3 text-xs gap-1.5 font-medium shadow-xs"
+                title="Continue the interrupted upload from where it stopped"
+              >
+                {isStartingResume ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <UploadCloud className="size-3.5" />
+                )}
+                <span>Resume Upload</span>
+              </Button>
+            )}
             {isEditing ? (
               <div className="flex flex-wrap items-center gap-1.5">
                 <Button
@@ -703,6 +830,7 @@ export function DocumentCard({
                   file.mimeType === "application/pdf" ||
                   file.filename.toLowerCase().endsWith(".pdf");
                 const FileIcon = isPdf ? FileText : ImageIcon;
+                const fileStatus = clientFacingFileStatus(file.uploadStatus);
 
                 return (
                   <div
@@ -748,30 +876,31 @@ export function DocumentCard({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {/* File status badge */}
+                      {/* File status badge — client-facing: `completed` is
+                          displayed as `uploaded` (the server-side lifecycle
+                          distinction is not exposed to the user). */}
                       <span
                         className={cn(
                           "rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase border",
-                          file.uploadStatus === "uploaded"
-                            ? colors.status.uploaded.badge
-                            : file.uploadStatus === "uploading"
-                              ? colors.status.uploading.badge
-                              : colors.status.failed.badge,
+                          colors.status[fileStatus].badge,
                         )}
                       >
-                        {file.uploadStatus}
+                        {fileStatus}
                       </span>
 
-                      {/* View / Preview File Button */}
+                      {/* View / Preview File Button — viewable whenever the
+                          bytes are in storage (client-status `uploaded`,
+                          i.e. transferred or committed). Everything else
+                          has no full object to preview. */}
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         onClick={() => handleViewFile(file)}
-                        disabled={file.uploadStatus !== "uploaded"}
+                        disabled={fileStatus !== "uploaded"}
                         className="size-7 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         title={
-                          file.uploadStatus === "uploaded"
+                          fileStatus === "uploaded"
                             ? `Preview "${file.filename}"`
                             : "Preview unavailable until file finishes uploading"
                         }

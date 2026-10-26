@@ -1,19 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useUppyState } from "@uppy/react";
-import { createDocumentUppy } from "./create-uppy";
+import type Uppy from "@uppy/core";
 import type { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import type { DocumentFileItem } from "../schemas";
-import type { FileProgressState, UploadStatus } from "./upload.types";
+import type {
+  DocumentUploadMeta,
+  FileProgressState,
+  UploadStatus,
+} from "./upload.types";
 import { env } from "@/config/env/client";
+import { attachOnUploadUrlAvailable } from "./create-uppy";
 
-export function useDocumentUploader() {
-  /**
-   * IMPORTANT: Uppy must only be created once.
-   */
-  const [uppy] = useState(createDocumentUppy);
-
+/**
+ * The single Uppy instance is created by `DocumentUploaderProvider` and
+ * shared across the whole documents view, so uploads survive component
+ * boundaries (form remounts, SPA navigation). The hook never destroys it:
+ * cancelling mid-flight would leave `document_files` rows stuck at
+ * "uploading" — see UploadFlow.md.
+ */
+export function useDocumentUploader(uppy: Uppy<DocumentUploadMeta>) {
   /**
    * Reactive Uppy files.
    */
@@ -201,9 +208,16 @@ export function useDocumentUploader() {
 
   /**
    * Attach server-signed credentials to Uppy files by clientFileId.
+   *
+   * `documentId` (optional, always passed by the create/resume flows) is
+   * stored on each file's meta and read by the upload session coordinator
+   * to key the Web Lock heartbeat and per-file completion per document.
    */
   const setCredentials = useCallback(
-    (credentialsList: SignedUrlResponseObject[]) => {
+    (
+      credentialsList: SignedUrlResponseObject[],
+      documentId?: string,
+    ) => {
       for (const cred of credentialsList) {
         const file = findUppyFile(cred.clientFileId);
         if (!file) {
@@ -220,7 +234,15 @@ export function useDocumentUploader() {
           objectName: cred.storagePath,
           contentType: file.type || "application/octet-stream",
           uploadToken: cred.token,
+          ...(documentId && { documentId }),
         });
+
+        /**
+         * Immediate ref-sync channel: attach the per-file
+         * `onUploadUrlAvailable` callback that fires the instant the
+         * TUS resource endpoint exists (see create-uppy.ts).
+         */
+        attachOnUploadUrlAvailable(uppy, file.id, cred.serverFileId);
       }
     },
     [uppy, findUppyFile],
@@ -271,12 +293,6 @@ export function useDocumentUploader() {
     }
     return stateMap;
   }, [files]);
-
-  useEffect(() => {
-    return () => {
-      uppy.cancelAll();
-    };
-  }, [uppy]);
 
   return {
     uppy,

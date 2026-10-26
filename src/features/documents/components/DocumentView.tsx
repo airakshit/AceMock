@@ -1,15 +1,18 @@
 import { DocumentForm } from "./DocumentForm";
 import { YourDocuments } from "./YourDocuments";
-import { createNewDocumentAction } from "../actions/create-document";
+import { createDocumentAction } from "../actions/create-document";
+import { DocumentUploaderProvider } from "../uploads/document-uploader-provider";
 
 export function DocumentView() {
   return (
-    <div className="space-y-8">
-      <section className="space-y-4">
-        <DocumentForm onSumbitAction={createNewDocumentAction} />
-      </section>
+    <DocumentUploaderProvider>
+      <div className="space-y-8">
+        <section className="space-y-4">
+          <DocumentForm onSumbitAction={createDocumentAction} />
+        </section>
 
-      <YourDocuments />
-    </div>
+        <YourDocuments />
+      </div>
+    </DocumentUploaderProvider>
   );
 }

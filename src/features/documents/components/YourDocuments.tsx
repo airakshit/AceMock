@@ -9,6 +9,7 @@ import { typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import type { DocumentItemDTO } from "../actions/types";
 import { getUserDocumentsAction } from "../actions/get-user-documents";
+import { useDocumentUploaderContext } from "../uploads/document-uploader-provider";
 import { DocumentCard } from "./DocumentCard";
 
 interface YourDocumentsProps {
@@ -16,6 +17,7 @@ interface YourDocumentsProps {
 }
 
 export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
+  const { notifyKnownDocuments } = useDocumentUploaderContext();
   const [documents, setDocuments] =
     useState<DocumentItemDTO[]>(initialDocuments);
   const [isLoading, setIsLoading] = useState(!initialDocuments.length);
@@ -26,6 +28,9 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
       const result = await getUserDocumentsAction();
       if (result.success && result.data) {
         setDocuments(result.data);
+        // Lets the uploader purge stale IndexedDB sessions for docs that
+        // no longer exist (deleted, or reclaimed by the stale-upload cron).
+        notifyKnownDocuments(result.data.map((d) => d.id));
       }
     } catch (error) {
       console.error("Failed to fetch user documents:", error);

@@ -1,7 +1,11 @@
 import { documentFiles, documents, filePages } from "@/db/schemas";
 import { and, asc, eq } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
-import { DocumentWithFilesProjection, DocumentFileProjection, FilePageProjection } from "../dto/projections";
+import {
+  DocumentWithFilesProjection,
+  DocumentFileProjection,
+  FilePageProjection,
+} from "../dto/projections";
 
 export class DocumentQueries {
   async getDocumentWithFiles(
@@ -21,9 +25,7 @@ export class DocumentQueries {
     if (rows.length === 0) return null;
 
     const document = rows[0].document;
-    const files = rows
-      .filter((r) => r.file)
-      .map((r) => r.file!);
+    const files = rows.filter((r) => r.file).map((r) => r.file!);
 
     return {
       id: document.id,
@@ -33,7 +35,9 @@ export class DocumentQueries {
       processingStatus: document.processingStatus,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
-      files: files.map(f => ({ ...f, pages: [] as FilePageProjection[] })),
+      // Attached by the service layer (getRelevantSession), not per-query.
+      session: null,
+      files: files.map((f) => ({ ...f, pages: [] as FilePageProjection[] })),
     };
   }
 
@@ -48,6 +52,16 @@ export class DocumentQueries {
         processingStatus: documents.processingStatus,
         fileId: documentFiles.id,
         fileName: documentFiles.filename,
+        fileMimeType: documentFiles.mimeType,
+        fileSize: documentFiles.fileSize,
+        fileStoragePath: documentFiles.storagePath,
+        fileUploadStatus: documentFiles.uploadStatus,
+        fileProcessingStatus: documentFiles.processingStatus,
+        fileSessionId: documentFiles.sessionId,
+        fileContentProbe: documentFiles.contentProbe,
+        fileUploadRef: documentFiles.uploadRef,
+        fileUploadRefCreatedAt: documentFiles.uploadRefCreatedAt,
+        fileCreatedAt: documentFiles.createdAt,
         page: filePages,
         userId: documents.userId,
         title: documents.title,
@@ -60,7 +74,10 @@ export class DocumentQueries {
       .leftJoin(filePages, eq(documentFiles.id, filePages.fileId))
       .where(and(eq(documents.id, documentId), eq(documents.userId, userId)));
 
-    const filesMap = new Map<string, DocumentFileProjection & { pages: FilePageProjection[] }>();
+    const filesMap = new Map<
+      string,
+      DocumentFileProjection & { pages: FilePageProjection[] }
+    >();
 
     for (const row of rows) {
       if (!row.fileId) continue;
@@ -72,13 +89,16 @@ export class DocumentQueries {
           id: row.fileId,
           documentId: row.documentId,
           filename: row.fileName as string,
-          mimeType: "",
-          fileSize: 0,
-          storagePath: "",
-          uploadStatus: "uploading",
-          processingStatus: "pending",
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          mimeType: row.fileMimeType ?? "",
+          fileSize: row.fileSize ?? 0,
+          storagePath: row.fileStoragePath ?? "",
+          sessionId: row.fileSessionId ?? null,
+          contentProbe: row.fileContentProbe ?? null,
+          uploadRef: row.fileUploadRef ?? null,
+          uploadRefCreatedAt: row.fileUploadRefCreatedAt ?? null,
+          uploadStatus: row.fileUploadStatus ?? "uploading",
+          processingStatus: row.fileProcessingStatus ?? "pending",
+          createdAt: row.fileCreatedAt ?? new Date(),
           pages: [],
         };
 
@@ -98,6 +118,8 @@ export class DocumentQueries {
       processingStatus: rows[0]?.processingStatus || "pending",
       createdAt: rows[0]?.createdAt || new Date(),
       updatedAt: rows[0]?.updatedAt || new Date(),
+      // Attached by the service layer (getRelevantSession), not per-query.
+      session: null,
       files: [...filesMap.values()],
     };
     return result;

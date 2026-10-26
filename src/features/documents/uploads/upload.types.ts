@@ -7,6 +7,19 @@ export interface DocumentUploadMeta extends Meta {
   clientFileId?: string;
 
   /**
+   * document_files.id (server identity). Set together with the signed
+   * credentials; the upload coordinator keys per-file completion and
+   * progress on it.
+   */
+  serverFileId?: string;
+
+  /**
+   * Owning document (set when credentials are attached) — the upload
+   * runtime keys heartbeats, finalization and blob cleanup on this.
+   */
+  documentId?: string;
+
+  /**
    * Supabase Storage bucket.
    */
   bucketName?: string;

@@ -14,7 +14,14 @@
 
 export type DifficultyLevel = "Easy" | "Medium" | "Hard";
 export type MetricAccent = "default" | "brand" | "success" | "info" | "warning";
-export type UploadStatus = "uploaded" | "uploading" | "failed";
+export type UploadStatus =
+  | "pending"
+  | "uploading"
+  | "uploaded"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "expired";
 
 export const colors = {
   /** Difficulty indicator badges & dots */
@@ -47,20 +54,40 @@ export const colors = {
 
   /** Document and file upload status pills */
   status: {
-    uploaded: {
-      badge: "bg-success/10 text-success border-success/25",
-      dot: "bg-success",
-      label: "Uploaded",
+    pending: {
+      badge: "bg-muted/60 text-muted-foreground border-border/50",
+      dot: "bg-muted-foreground",
+      label: "Pending",
     },
     uploading: {
       badge: "bg-warning/10 text-warning border-warning/25",
       dot: "bg-warning",
       label: "Uploading",
     },
+    uploaded: {
+      badge: "bg-success/10 text-success border-success/25",
+      dot: "bg-success",
+      label: "Uploaded",
+    },
+    completed: {
+      badge: "bg-success/10 text-success border-success/25",
+      dot: "bg-success",
+      label: "Completed",
+    },
     failed: {
       badge: "bg-danger/10 text-danger border-danger/25",
       dot: "bg-danger",
       label: "Failed",
+    },
+    cancelled: {
+      badge: "bg-muted/60 text-muted-foreground border-border/50",
+      dot: "bg-muted-foreground",
+      label: "Cancelled",
+    },
+    expired: {
+      badge: "bg-warning/10 text-warning border-warning/25",
+      dot: "bg-warning",
+      label: "Expired",
     },
   },
 } as const;

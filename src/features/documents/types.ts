@@ -3,6 +3,7 @@ import {
   filePageOCRStatusEnum,
   fileProcessingStatusEnum,
   fileUploadStatusEnum,
+  uploadSessionStatusEnum,
 } from "@/db/schemas";
 
 export type DocumentProcessingStatus =
@@ -12,6 +13,8 @@ export type FileProcessingStatus =
   (typeof fileProcessingStatusEnum.enumValues)[number];
 export type FilePageOCRStatus =
   (typeof filePageOCRStatusEnum.enumValues)[number];
+export type UploadSessionStatus =
+  (typeof uploadSessionStatusEnum.enumValues)[number];
 export enum SubjectsEnum {
   PHYSICS = "physics",
   CHEMISTRY = "chemistry",

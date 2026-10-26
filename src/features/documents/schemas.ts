@@ -16,10 +16,24 @@ export const pdfFileSchema = z.object({
       (file) => file.size <= MAX_FILE_SIZE,
       "PDF must be smaller than 50 MB",
     ),
+  /**
+   * File System Access handle captured on drag & drop (Chromium only).
+   * Lets a later session re-obtain the file WITHOUT storing any bytes —
+   * absent on `<input type=file>` picks and non-Chromium browsers, in
+   * which case the probe-verified re-select fallback is used.
+   */
+  fileHandle: z
+    .custom<FileSystemFileHandle | null>(() => true)
+    .nullable()
+    .optional(),
 });
 
 export const imageFileSchema = z.object({
   clientFileId: z.string().uuid(),
+  fileHandle: z
+    .custom<FileSystemFileHandle | null>(() => true)
+    .nullable()
+    .optional(),
   file: z
     .instanceof(File)
     .refine(

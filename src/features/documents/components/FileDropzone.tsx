@@ -24,9 +24,46 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DocumentFileItem } from "../schemas";
+import { captureFileHandleFromDropItem } from "../uploads/upload-session-storage";
 import type { FileProgressState } from "../uploads/upload.types";
 import { formatBytes } from "../utils";
 import { MobileFilePicker } from "./MobileFilePicker";
+
+/** Structural types for the File System Access picker (TS DOM lib versions differ). */
+interface ShowOpenFilePickerOptions {
+  multiple?: boolean;
+  types?: Array<{
+    description?: string;
+    accept: Record<string, string[]>;
+  }>;
+}
+
+/**
+ * Filter proposals for the FS Access picker, derived from the dropzone's
+ * `accept`. `image/*` wildcards are legal accept keys; extensions are
+ * hints that Windows/macOS pickers map to their type filter.
+ */
+function buildPickerTypes(
+  accept: string,
+  description: string,
+): ShowOpenFilePickerOptions["types"] {
+  if (accept === "application/pdf") {
+    return [{ description, accept: { "application/pdf": [".pdf"] } }];
+  }
+  if (accept.startsWith("image/")) {
+    return [
+      {
+        description,
+        accept: {
+          "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif"],
+        },
+      },
+    ];
+  }
+  // Unknown accepts → show everything; the form schema still validates the
+  // picked File (its type/size refinements run on submit).
+  return [{ description, accept: {} }];
+}
 
 interface FileDropzoneProps {
   id: string;
@@ -100,31 +137,94 @@ export function FileDropzone({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const openPicker = () => {
-    if (!disabled) {
+  /**
+   * Preferred picker flow: the File System Access picker (Chromium).
+   * Unlike the legacy `<input type="file">` — which structurally CANNOT
+   * yield handles for picked files — `showOpenFilePicker` returns
+   * restorable `FileSystemFileHandle`s, so a click-uploaded file can be
+   * re-opened by a later session without user re-selection. Everywhere
+   * the API is unavailable (Firefox, Safari, mobile) the legacy hidden
+   * input is used and those files take the probe-verified re-select
+   * fallback on resume.
+   */
+  const openPicker = async () => {
+    if (disabled) return;
+
+    const showOpenFilePicker = (
+      window as unknown as {
+        showOpenFilePicker?: (
+          options?: ShowOpenFilePickerOptions,
+        ) => Promise<FileSystemFileHandle[]>;
+      }
+    ).showOpenFilePicker;
+
+    if (typeof showOpenFilePicker !== "function") {
+      inputRef.current?.click();
+      return;
+    }
+
+    try {
+      const handles = await showOpenFilePicker({
+        multiple,
+        types: buildPickerTypes(accept, label),
+      });
+
+      const picked = await Promise.all(
+        handles.map(async (handle) => ({
+          handle,
+          file: await handle.getFile(),
+        })),
+      );
+      if (picked.length === 0) return;
+
+      processRawFiles(
+        picked.map((entry) => entry.file),
+        picked.map((entry) => Promise.resolve(entry.handle)),
+      );
+    } catch (error) {
+      // User dismissed the picker — a deliberate, silent no-op.
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      // Anything else: fall back to the legacy input so files can still
+      // be picked (they will resume through the re-select fallback).
       inputRef.current?.click();
     }
   };
 
-  const processRawFiles = (rawFiles: FileList | File[]) => {
+  const processRawFiles = (
+    rawFiles: FileList | File[],
+    handlePromises: Array<Promise<FileSystemFileHandle | null>>,
+  ) => {
     const fileList = Array.from(rawFiles);
     if (fileList.length === 0) return;
 
-    const newItems: DocumentFileItem[] = fileList.map((file) => ({
-      clientFileId: crypto.randomUUID(),
-      file,
-    }));
+    /**
+     * Handles are obtained from the DataTransferItem synchronously during
+     * the drop event itself (the items are invalidated when the handler
+     * returns) — they are awaited here, in the microtask right after.
+     * Only the handle (metadata) is kept; bytes never leave memory.
+     */
+    void Promise.all(
+      handlePromises.map((promise) => promise.catch(() => null)),
+    ).then((resolvedHandles) => {
+      const newItems: DocumentFileItem[] = fileList.map((file, index) => ({
+        clientFileId: crypto.randomUUID(),
+        file,
+        fileHandle: resolvedHandles[index] ?? null,
+      }));
 
-    const updatedValue = multiple ? [...value, ...newItems] : newItems;
-    onChange(updatedValue);
-    onFilesAdded?.(newItems);
+      const updatedValue = multiple ? [...value, ...newItems] : newItems;
+      onChange(updatedValue);
+      onFilesAdded?.(newItems);
+    });
   };
 
   const handleFileInputChange = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     if (event.target.files) {
-      processRawFiles(event.target.files);
+      processRawFiles(event.target.files, []);
       event.target.value = "";
     }
   };
@@ -151,7 +251,17 @@ export function FileDropzone({
     if (disabled) return;
 
     if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-      processRawFiles(event.dataTransfer.files);
+      // Capture File System Access handles synchronously — one per dropped
+      // file. Each promise is created NOW (inside the event); resolution
+      // happens in processRawFiles afterwards.
+      const items = Array.from(event.dataTransfer.items ?? []).filter(
+        (item) => item.kind === "file",
+      );
+      const handlePromises = items.map((item) =>
+        captureFileHandleFromDropItem(item),
+      );
+
+      processRawFiles(event.dataTransfer.files, handlePromises);
     }
   };
 
@@ -235,7 +345,7 @@ export function FileDropzone({
               accept={accept}
               multiple={multiple}
               disabled={disabled}
-              onFilesSelected={(files) => processRawFiles(files)}
+              onFilesSelected={(files) => processRawFiles(files, [])}
             />
           </div>
         </div>

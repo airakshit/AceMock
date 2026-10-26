@@ -5,6 +5,7 @@ import { extractQuestions } from "@/inngest/functions/v1/extract-questions";
 import { ocrPage } from "@/inngest/functions/v1/ocr-page";
 import { classifyQuestions } from "@/inngest/functions/v1/classify-questions";
 import { extractFigures } from "@/inngest/functions/v1/extract-figures";
+import { cleanupStaleUploads } from "@/inngest/functions/v1/cleanup-stale-uploads";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -14,5 +15,6 @@ export const { GET, POST, PUT } = serve({
     ocrPage,
     extractFigures,
     classifyQuestions,
+    cleanupStaleUploads,
   ],
 });

@@ -4,27 +4,32 @@ import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
 
 import {
-  CreateNewDocumentActionPayload,
-  CreateNewDocumentActionResponse,
+  CreateDocumentActionPayload,
+  CreateDocumentActionResponse,
 } from "./types";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 
-export async function createNewDocumentAction(
-  payload: CreateNewDocumentActionPayload,
-): Promise<ServerActionResult<CreateNewDocumentActionResponse>> {
+/**
+ * Creates the document + its first, server-owned upload session and returns
+ * per-file signed TUS credentials. The client then executes the plan
+ * returned here (see UploadFlow.md) — it never invents server state.
+ */
+export async function createDocumentAction(
+  payload: CreateDocumentActionPayload,
+): Promise<ServerActionResult<CreateDocumentActionResponse>> {
   try {
     const session = await requireSession();
 
-    const data: CreateNewDocumentActionResponse =
-      await documentsService.createNewDocument(session.user.id, {
+    const data: CreateDocumentActionResponse =
+      await documentsService.createDocument(session.user.id, {
         ...payload,
       });
 
     return {
       success: true,
       data: data,
-      message: "Document Created Succcessfully. Uploading..",
+      message: "Document created successfully. Uploading…",
     };
   } catch (error) {
     return handleActionError(error);

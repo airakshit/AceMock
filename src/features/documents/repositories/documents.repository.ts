@@ -18,9 +18,32 @@ import {
   CreateFilePageCommand,
   UpdateFilePageCommand,
   DeleteFilePageCommand,
+  UpdateFilesUploadStatusCommand,
+  SaveUploadReferenceCommand,
 } from "../dto/commands";
 import { DbExecutor } from "../../shared/types";
 import { DocumentProcessingStatus, FileProcessingStatus, FilePageOCRStatus } from "../types";
+
+/**
+ * Shared column selection for document_files read models (repo-internal).
+ * Upload bookkeeping (session_id / probe / TUS ref) is included because the
+ * recovery + reconciliation paths consume the same projection.
+ */
+const documentFileColumns = {
+  id: documentFiles.id,
+  documentId: documentFiles.documentId,
+  sessionId: documentFiles.sessionId,
+  filename: documentFiles.filename,
+  mimeType: documentFiles.mimeType,
+  fileSize: documentFiles.fileSize,
+  storagePath: documentFiles.storagePath,
+  contentProbe: documentFiles.contentProbe,
+  uploadRef: documentFiles.uploadRef,
+  uploadRefCreatedAt: documentFiles.uploadRefCreatedAt,
+  uploadStatus: documentFiles.uploadStatus,
+  processingStatus: documentFiles.processingStatus,
+  createdAt: documentFiles.createdAt,
+};
 
 export class DocumentsRepository {
   // ==================== COMMANDS (writes) ====================
@@ -67,18 +90,20 @@ export class DocumentsRepository {
   ): Promise<DocumentFileProjection[]> {
     if (data.length === 0) return [];
 
-    const values = data.map((file) => ({
-      id: file.id,
-      documentId: file.documentId,
-      filename: file.filename,
-      fileSize: file.fileSize,
-      mimeType: file.mimeType,
-      storagePath: file.storagePath,
-    }));
-
     const createdFiles = await db
       .insert(documentFiles)
-      .values(values)
+      .values(
+        data.map((file) => ({
+          id: file.id,
+          documentId: file.documentId,
+          sessionId: file.sessionId,
+          contentProbe: file.contentProbe,
+          filename: file.filename,
+          fileSize: file.fileSize,
+          mimeType: file.mimeType,
+          storagePath: file.storagePath,
+        })),
+      )
       .returning();
 
     return createdFiles;
@@ -143,7 +168,6 @@ export class DocumentsRepository {
       .update(documentFiles)
       .set({
         ...data,
-        updatedAt: new Date(),
       })
       .where(
         and(
@@ -154,6 +178,122 @@ export class DocumentsRepository {
       .returning();
 
     return file || null;
+  }
+
+  /**
+   * Persists the TUS resource reference created by the client, transitioning
+   * the file from `pending` to `uploading`. Idempotent for repeat saves.
+   */
+  async saveUploadReference(
+    db: DbExecutor,
+    data: SaveUploadReferenceCommand,
+  ): Promise<DocumentFileProjection | null> {
+    const [file] = await db
+      .update(documentFiles)
+      .set({
+        uploadRef: data.uploadRef,
+        uploadRefCreatedAt: new Date(),
+        uploadStatus: "uploading",
+      })
+      .where(
+        and(
+          eq(documentFiles.id, data.fileId),
+          eq(documentFiles.documentId, data.documentId),
+          inArray(documentFiles.uploadStatus, ["pending", "uploading"]),
+        ),
+      )
+      .returning();
+
+    return file || null;
+  }
+
+  /**
+   * Batch-flip uploadStatus for several files of one document.
+   */
+  async updateFilesUploadStatus(
+    db: DbExecutor,
+    data: UpdateFilesUploadStatusCommand,
+  ): Promise<DocumentFileProjection[]> {
+    if (data.fileIds.length === 0) return [];
+
+    const files = await db
+      .update(documentFiles)
+      .set({
+        uploadStatus: data.uploadStatus,
+      })
+      .where(
+        and(
+          eq(documentFiles.documentId, data.documentId),
+          inArray(documentFiles.id, data.fileIds),
+        ),
+      )
+      .returning();
+
+    return files;
+  }
+
+  /**
+   * Session-scoped file reads for the recovery algorithm.
+   */
+  async findFilesBySessionId(
+    db: DbExecutor,
+    sessionId: string,
+  ): Promise<DocumentFileProjection[]> {
+    return db
+      .select(documentFileColumns)
+      .from(documentFiles)
+      .where(eq(documentFiles.sessionId, sessionId))
+      .orderBy(desc(documentFiles.createdAt));
+  }
+
+  /**
+   * Storage-verification reconciliation: flip verified uploads to
+   * `completed` in one shot; `uploadedToRelax` are files that FAILED
+   * verification and must not be committed.
+   */
+  async reconcileVerifiedFiles(
+    db: DbExecutor,
+    data: {
+      documentId: string;
+      verifiedFileIds: string[];
+      failedFileIds: string[];
+    },
+  ): Promise<DocumentFileProjection[]> {
+    if (data.verifiedFileIds.length === 0 && data.failedFileIds.length === 0) {
+      return [];
+    }
+
+    const verified =
+      data.verifiedFileIds.length > 0
+        ? await db
+            .update(documentFiles)
+            .set({ uploadStatus: "completed"})
+            .where(
+              and(
+                eq(documentFiles.documentId, data.documentId),
+                inArray(documentFiles.id, data.verifiedFileIds),
+                eq(documentFiles.uploadStatus, "uploaded"),
+              ),
+            )
+            .returning()
+        : [];
+
+    const failed =
+      data.failedFileIds.length > 0
+        ? await db
+            .update(documentFiles)
+            .set({ uploadStatus: "failed"})
+            .where(
+              and(
+                eq(documentFiles.documentId, data.documentId),
+                inArray(documentFiles.id, data.failedFileIds),
+                eq(documentFiles.uploadStatus, "uploaded"),
+              ),
+            )
+            .returning()
+        : [];
+
+    return [...verified, ...failed];
   }
 
   async updateFileProcessingStatus(
@@ -327,18 +467,7 @@ export class DocumentsRepository {
     if (!document) return null;
 
     const files = await db
-      .select({
-        id: documentFiles.id,
-        documentId: documentFiles.documentId,
-        filename: documentFiles.filename,
-        mimeType: documentFiles.mimeType,
-        fileSize: documentFiles.fileSize,
-        storagePath: documentFiles.storagePath,
-        uploadStatus: documentFiles.uploadStatus,
-        processingStatus: documentFiles.processingStatus,
-        createdAt: documentFiles.createdAt,
-        updatedAt: documentFiles.updatedAt,
-      })
+      .select(documentFileColumns)
       .from(documentFiles)
       .where(eq(documentFiles.documentId, documentId))
       .orderBy(desc(documentFiles.createdAt));
@@ -366,6 +495,8 @@ export class DocumentsRepository {
       processingStatus: document.processingStatus,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
+      // Attached by the service layer (getRelevantSession), not per-query.
+      session: null,
       files: filesWithPages,
     };
   }
@@ -395,18 +526,7 @@ export class DocumentsRepository {
 
     const docIds = userDocs.map((d) => d.id);
     const files = await db
-      .select({
-        id: documentFiles.id,
-        documentId: documentFiles.documentId,
-        filename: documentFiles.filename,
-        mimeType: documentFiles.mimeType,
-        fileSize: documentFiles.fileSize,
-        storagePath: documentFiles.storagePath,
-        uploadStatus: documentFiles.uploadStatus,
-        processingStatus: documentFiles.processingStatus,
-        createdAt: documentFiles.createdAt,
-        updatedAt: documentFiles.updatedAt,
-      })
+      .select(documentFileColumns)
       .from(documentFiles)
       .where(inArray(documentFiles.documentId, docIds))
       .orderBy(desc(documentFiles.createdAt));
@@ -441,6 +561,8 @@ export class DocumentsRepository {
       processingStatus: doc.processingStatus,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
+      // Attached by the service layer (getRelevantSession), not per-query.
+      session: null,
       files: filesMap.get(doc.id)
         ? [filesMap.get(doc.id)!]
         : [],
@@ -452,18 +574,7 @@ export class DocumentsRepository {
     documentId: string,
   ): Promise<DocumentFileProjection[]> {
     const data = await db
-      .select({
-        id: documentFiles.id,
-        documentId: documentFiles.documentId,
-        filename: documentFiles.filename,
-        mimeType: documentFiles.mimeType,
-        fileSize: documentFiles.fileSize,
-        storagePath: documentFiles.storagePath,
-        uploadStatus: documentFiles.uploadStatus,
-        processingStatus: documentFiles.processingStatus,
-        createdAt: documentFiles.createdAt,
-        updatedAt: documentFiles.updatedAt,
-      })
+      .select(documentFileColumns)
       .from(documents)
       .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
       .where(eq(documents.id, documentId));
