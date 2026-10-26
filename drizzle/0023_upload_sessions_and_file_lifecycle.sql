@@ -16,7 +16,6 @@ CREATE TABLE "upload_sessions" (
 	"end_reason" text
 );
 --> statement-breakpoint
-ALTER TABLE "document_files" ALTER COLUMN "upload_status" SET DEFAULT 'pending';--> statement-breakpoint
 ALTER TABLE "document_files" ADD COLUMN "session_id" uuid;--> statement-breakpoint
 ALTER TABLE "document_files" ADD COLUMN "content_probe" text;--> statement-breakpoint
 ALTER TABLE "document_files" ADD COLUMN "upload_ref" text;--> statement-breakpoint
