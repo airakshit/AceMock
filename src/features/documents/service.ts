@@ -579,7 +579,7 @@ class DocumentsService {
         contentProbe: f.contentProbe ?? null,
         uploadStatus: f.uploadStatus,
         action,
-        token: action === "skip" || action === "verify-commit" ? null : token,
+        token: action === "skip" ? null : token,
         uploadRef: action === "resume" ? (f.uploadRef ?? null) : null,
         offsetBytes:
           action === "resume" && probe?.ok ? probe.offsetBytes : null,
@@ -604,80 +604,6 @@ class DocumentsService {
       canResume: true,
       reason: null,
       files: plans,
-    };
-  }
-
-  // =========================================================================
-  // completeDocumentFileUpload
-  // =========================================================================
-
-  /**
-   * The client's TUS transfer for one file reached its final offset — the
-   * SERVER records that fact (uploading → uploaded), it is not inferred
-   * from any client-side state. The file only becomes `completed` after
-   * storage verification in completeUploadSession.
-   */
-  async completeDocumentFileUpload(
-    userId: string,
-    payload: CompleteDocumentFileUploadActionPayload,
-  ): Promise<CompleteDocumentFileUploadActionResponse> {
-    const session = await uploadSessionsRepository.findByIdForUser(
-      db,
-      payload.sessionId,
-      userId,
-    );
-
-    if (!session) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "Upload session not found or access denied.",
-      );
-    }
-
-    if (session.status !== "active") {
-      throw new ServerActionError(
-        "CONFLICT",
-        `Upload session is not active (status: ${session.status}).`,
-      );
-    }
-
-    // Flip only files that belong to this session and are mid-transfer;
-    // a second call for the same file is an idempotent no-op.
-    const updated = await documentsRepository.updateFilesUploadStatus(db, {
-      documentId: session.documentId,
-      fileIds: [payload.documentFileId],
-      uploadStatus: "uploaded",
-    });
-
-    if (!updated.some((f) => f.id === payload.documentFileId)) {
-      const [file] = await db
-        .select({ uploadStatus: documentFiles.uploadStatus })
-        .from(documentFiles)
-        .where(
-          and(
-            eq(documentFiles.id, payload.documentFileId),
-            eq(documentFiles.documentId, session.documentId),
-            eq(documentFiles.sessionId, session.id),
-          ),
-        )
-        .limit(1);
-
-      if (!file) {
-        throw new ServerActionError(
-          "NOT_FOUND",
-          "File not found in this upload session.",
-        );
-      }
-
-      return {
-        documentFileId: payload.documentFileId,
-        uploadStatus: file.uploadStatus,
-      };
-    }
-
-    return {
-      documentFileId: payload.documentFileId,
-      uploadStatus: "uploaded",
     };
   }
 
@@ -811,6 +737,76 @@ class DocumentsService {
       sessionId: session.id,
       status: "completed",
       unreconciledFiles: [],
+    };
+  }
+
+  /**
+   * The client's TUS transfer for one file reached its final offset — the
+   * SERVER records that fact (uploading → uploaded), it is not inferred
+   * from any client-side state. The file only becomes `completed` after
+   * storage verification in completeUploadSession.
+   */
+  async completeDocumentFileUpload(
+    userId: string,
+    payload: CompleteDocumentFileUploadActionPayload,
+  ): Promise<CompleteDocumentFileUploadActionResponse> {
+    const session = await uploadSessionsRepository.findByIdForUser(
+      db,
+      payload.sessionId,
+      userId,
+    );
+
+    if (!session) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Upload session not found or access denied.",
+      );
+    }
+
+    if (session.status !== "active") {
+      throw new ServerActionError(
+        "CONFLICT",
+        `Upload session is not active (status: ${session.status}).`,
+      );
+    }
+
+    // Flip only files that belong to this session and are mid-transfer;
+    // a second call for the same file is an idempotent no-op.
+    const updated = await documentsRepository.updateFilesUploadStatus(db, {
+      documentId: session.documentId,
+      fileIds: [payload.documentFileId],
+      uploadStatus: "uploaded",
+    });
+
+    if (!updated.some((f) => f.id === payload.documentFileId)) {
+      const [file] = await db
+        .select({ uploadStatus: documentFiles.uploadStatus })
+        .from(documentFiles)
+        .where(
+          and(
+            eq(documentFiles.id, payload.documentFileId),
+            eq(documentFiles.documentId, session.documentId),
+            eq(documentFiles.sessionId, session.id),
+          ),
+        )
+        .limit(1);
+
+      if (!file) {
+        throw new ServerActionError(
+          "NOT_FOUND",
+          "File not found in this upload session.",
+        );
+      }
+
+      return {
+        documentFileId: payload.documentFileId,
+        uploadStatus: file.uploadStatus,
+      };
+    }
+
+    return {
+      documentFileId: payload.documentFileId,
+      uploadStatus: "uploaded",
     };
   }
 

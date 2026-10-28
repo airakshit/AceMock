@@ -4,14 +4,10 @@ import type Uppy from "@uppy/core";
 import type { UppyFile } from "@uppy/core";
 
 import type { DocumentUploadMeta } from "./upload.types";
-import {
-  completeDocumentFileUploadAction,
-} from "../actions/complete-document-file-upload";
+import { completeDocumentFileUploadAction } from "../actions/complete-document-file-upload";
 import { completeUploadSessionAction } from "../actions/complete-upload-session";
 import { heartbeatUploadSessionAction } from "../actions/heartbeat-upload-session";
-import {
-  UPLOAD_HEARTBEAT_INTERVAL_MS,
-} from "./upload-session-constants";
+import { UPLOAD_HEARTBEAT_INTERVAL_MS } from "./upload-session-constants";
 
 /**
  * Upload session coordinator (client side of the server-owned session).
@@ -109,10 +105,9 @@ export class UploadSessionCoordinator {
       return true;
     }
 
-    // If the first promise is not resolved before the second promise, it will await till 
+    // If the first promise is not resolved before the second promise, it will await till
     // is resolved.
     return await new Promise<boolean>((resolveStart) => {
-
       // locks.request returns a promise
       // void states that the promise is deliberately not awaited
       void locks.request(
@@ -143,7 +138,7 @@ export class UploadSessionCoordinator {
           await new Promise<void>((resolveLock) => {
             this.releaseLock = resolveLock;
           });
-          
+
           // Runs only after this.releaseLock() is called from somewhere.
           this.endLifecycle();
         },
@@ -173,7 +168,9 @@ export class UploadSessionCoordinator {
     );
 
     // Per-file completion from Uppy's authoritative success event.
-    const onUploadSuccess = (file?: UppyFile<DocumentUploadMeta, Record<string, never>>) => {
+    const onUploadSuccess = (
+      file?: UppyFile<DocumentUploadMeta, Record<string, never>>,
+    ) => {
       if (!file) return;
       void this.handleFileTransferred(file);
     };
@@ -212,9 +209,7 @@ export class UploadSessionCoordinator {
   }
 
   private sessionFiles() {
-    return this.uppy
-      .getFiles()
-      .filter((file) => file.meta?.serverFileId);
+    return this.uppy.getFiles().filter((file) => file.meta?.serverFileId);
   }
 
   /**
@@ -291,6 +286,7 @@ export class UploadSessionCoordinator {
     }
   }
 
+
   /**
    * Uppy batch ended. When nothing failed â†’ await outstanding per-file
    * completes â†’ commit (`completeUploadSession`). With failures â†’ leave
@@ -334,8 +330,9 @@ export class UploadSessionCoordinator {
       this.stop();
     } catch (error) {
       console.error("[upload-coordinator] session commit failed:", error);
-      this.onError("Finalizing the upload session failed â€” you can resume from the document list.");
+      this.onError(
+        "Finalizing the upload session failed â€” you can resume from the document list.",
+      );
     }
   }
 }
-

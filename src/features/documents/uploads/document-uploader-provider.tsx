@@ -443,8 +443,7 @@ export function DocumentUploaderProvider({
          */
         const restoreEntries = plans.filter(
           (plan) =>
-            plan.action !== "skip" &&
-            plan.action !== "verify-commit",
+            plan.action !== "skip"
         );
         const handleGrants = await ensureFSHandlesReadAccess(
           restoreEntries.map(
@@ -711,10 +710,10 @@ export function DocumentUploaderProvider({
         setResumeTarget((prev) =>
           prev
             ? {
-                ...prev,
-                files: [...prev.files, { ...view, file }],
-                filesNeedingReselect: remaining,
-              }
+              ...prev,
+              files: [...prev.files, { ...view, file }],
+              filesNeedingReselect: remaining,
+            }
             : prev,
         );
 

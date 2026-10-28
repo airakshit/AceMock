@@ -1,5 +1,9 @@
 import { SignedUrlResponseObject } from "@/features/shared/storage-service";
-import { DocumentProcessingStatus, FileUploadStatus, UploadSessionStatus } from "../types";
+import {
+  DocumentProcessingStatus,
+  FileUploadStatus,
+  UploadSessionStatus,
+} from "../types";
 import type { DocumentWithQuestionCountProjection } from "../dto/projections";
 import type { FileRecoveryAction } from "../uploads/recovery-decision";
 
@@ -45,7 +49,6 @@ export interface CreateDocumentActionResponse {
    */
   document: DocumentItemDTO;
 }
-
 
 export interface SaveUploadReferenceActionPayload {
   sessionId: string;
@@ -143,17 +146,9 @@ export interface ResumeDocumentUploadActionResponse {
   recoveryExpiresAt: Date;
   canResume: boolean;
   /** Populated when canResume=false — why. */
-  reason:
-    | "no-session"
-    | "session-terminal"
-    | "session-expired"
-    | null;
+  reason: "no-session" | "session-terminal" | "session-expired" | null;
   files: DocumentFileRecoveryPlan[];
 }
-
-// ===========================================================================
-// completeDocumentFileUpload / completeUploadSession / cancel
-// ===========================================================================
 
 export interface CompleteDocumentFileUploadActionPayload {
   sessionId: string;
@@ -173,7 +168,10 @@ export interface CompleteUploadSessionActionResponse {
   sessionId: string;
   status: UploadSessionStatus;
   // Files that could not be reconciled to "completed" — empty on success.
-  unreconciledFiles: Array<{ serverFileId: string; uploadStatus: FileUploadStatus }>;
+  unreconciledFiles: Array<{
+    serverFileId: string;
+    uploadStatus: FileUploadStatus;
+  }>;
 }
 
 export interface CancelUploadSessionActionPayload {

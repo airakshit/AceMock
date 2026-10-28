@@ -13,8 +13,6 @@ export type FileRecoveryAction =
   | "resume"
   /** No valid TUS resource — start a fresh upload (same storagePath, upsert). */
   | "reupload"
-  /** Bytes already in storage — verify then commit; no transfer. */
-  | "verify-commit"
   /** File is terminal — nothing to do. */
   | "skip";
 
@@ -36,14 +34,7 @@ export function decideFileRecoveryAction(
   snapshot: RecoveryFileSnapshot,
   probe: TusProbeOutcome,
 ): FileRecoveryAction {
-  // Terminal, already-committed state: nothing left to do for this file.
-  if (snapshot.uploadStatus === "completed") return "skip";
-
-  // Bytes believed fully in storage (client confirmed the final offset,
-  // server flipped the row): no transfer, verification happens at commit.
-  if (snapshot.uploadStatus === "uploaded") return "verify-commit";
-
-  // From here on the file has bytes left to move.
+  if (snapshot.uploadStatus === "uploaded") return "skip";
 
   if (snapshot.uploadStatus === "uploading") {
     const mayProbe =

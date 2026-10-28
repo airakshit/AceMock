@@ -270,31 +270,31 @@ export class DocumentsRepository {
     const verified =
       data.verifiedFileIds.length > 0
         ? await db
-            .update(documentFiles)
-            .set({ uploadStatus: "completed"})
-            .where(
-              and(
-                eq(documentFiles.documentId, data.documentId),
-                inArray(documentFiles.id, data.verifiedFileIds),
-                eq(documentFiles.uploadStatus, "uploaded"),
-              ),
-            )
-            .returning()
+          .update(documentFiles)
+          .set({ uploadStatus: "uploaded" })
+          .where(
+            and(
+              eq(documentFiles.documentId, data.documentId),
+              inArray(documentFiles.id, data.verifiedFileIds),
+              eq(documentFiles.uploadStatus, "uploaded"),
+            ),
+          )
+          .returning()
         : [];
 
     const failed =
       data.failedFileIds.length > 0
         ? await db
-            .update(documentFiles)
-            .set({ uploadStatus: "failed"})
-            .where(
-              and(
-                eq(documentFiles.documentId, data.documentId),
-                inArray(documentFiles.id, data.failedFileIds),
-                eq(documentFiles.uploadStatus, "uploaded"),
-              ),
-            )
-            .returning()
+          .update(documentFiles)
+          .set({ uploadStatus: "failed" })
+          .where(
+            and(
+              eq(documentFiles.documentId, data.documentId),
+              inArray(documentFiles.id, data.failedFileIds),
+              eq(documentFiles.uploadStatus, "uploaded"),
+            ),
+          )
+          .returning()
         : [];
 
     return [...verified, ...failed];

@@ -117,7 +117,7 @@ export function createDocumentUppy(): Uppy<DocumentUploadMeta> {
       const sessionId = file.meta.sessionId;
 
       if (serverFileId && sessionId && !pendingSaveTusRef.has(serverFileId)) {
-        const savePromise = (async () => {
+        const saveTusRefPromise = (async () => {
           const response = await fetch("/api/documents/upload-ref", {
             method: "POST",
             headers: {
@@ -144,7 +144,7 @@ export function createDocumentUppy(): Uppy<DocumentUploadMeta> {
           }
         })();
 
-        pendingSaveTusRef.set(serverFileId, savePromise);
+        pendingSaveTusRef.set(serverFileId, saveTusRefPromise);
       }
     },
 
@@ -158,9 +158,9 @@ export function createDocumentUppy(): Uppy<DocumentUploadMeta> {
         const serverFileId = (file?.meta as DocumentUploadMeta | undefined)
           ?.serverFileId;
         if (serverFileId) {
-          const savePromise = pendingSaveTusRef.get(serverFileId);
-          if (savePromise) {
-            await savePromise;
+          const saveTusRefPromise = pendingSaveTusRef.get(serverFileId);
+          if (saveTusRefPromise) {
+            await saveTusRefPromise;
           }
         }
       }

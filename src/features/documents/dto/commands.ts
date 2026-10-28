@@ -38,7 +38,7 @@ export interface UpdateFilesUploadStatusCommand {
   documentId: string;
   /** Files whose uploadStatus should be flipped. */
   fileIds: string[];
-  uploadStatus: "pending" | "uploading" | "uploaded" | "completed" | "failed" | "cancelled" | "expired";
+  uploadStatus: "pending" | "uploading" | "uploaded" | "failed" | "cancelled" | "expired";
 }
 
 export interface SaveUploadReferenceCommand {
