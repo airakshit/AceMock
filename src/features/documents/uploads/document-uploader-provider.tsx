@@ -23,6 +23,7 @@ import {
   saveSessionRecord,
   sweepSessionRecords,
   ensureFSHandleReadAccess,
+  ensureFSHandlesReadAccess,
   type PersistedUploadSessionRecord,
 } from "./upload-session-storage";
 import { UploadSessionCoordinator } from "./upload-coordinator";
@@ -40,7 +41,6 @@ import type { DocumentFileItem } from "../schemas";
 
 export interface ResumableFileView {
   clientFileId: string;
-  /** document_files.id — the server identity. */
   serverFileId: string;
   storagePath: string;
   filename: string;
@@ -79,9 +79,18 @@ export interface ResumeTarget {
 export type UploaderContextValue = ReturnType<typeof useDocumentUploader> & {
   /** Set while a resume session is being bootstrapped. */
   isResumeBusy: boolean;
-  /** Non-null after "Resume upload" was clicked (drives the form UI). */
+  /**
+   * The document whose upload session THIS tab currently coordinates
+   * (null when this tab owns no live upload). Cards use it to decide
+   * whether they render live progress or pure server data.
+   */
+  activeDocumentId: string | null;
+  /**
+   * Non-null while a resumed session has files pending re-selection —
+   * cleared when the session's coordinator finishes. The re-select UI's
+   * data source (its host component is decided by the view layer).
+   */
   resumeTarget: ResumeTarget | null;
-  clearResumeTarget: () => void;
   startResume: (documentId: string) => Promise<void>;
   /**
    * Attaches a user-reselected File to one of the session's files and
@@ -95,11 +104,6 @@ export type UploaderContextValue = ReturnType<typeof useDocumentUploader> & {
    * IndexedDB persistence, the Web Lock and the coordinator).
    */
   beginUploadSession: (params: BeginUploadSessionParams) => Promise<boolean>;
-  /**
-   * Stops coordinator tracking for the active session without cancelling
-   * server state — the attempt stays resumable from the document list.
-   */
-  endActiveSessionTracking: () => void;
   /**
    * Lets the documents list pass known doc ids through, so persisted
    * sessions for deleted/cron-cleaned documents get purged from IndexedDB.
@@ -193,9 +197,7 @@ async function restoreFileViaHandle(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
+
 
 export function DocumentUploaderProvider({
   children,
@@ -210,6 +212,14 @@ export function DocumentUploaderProvider({
 
   const [resumeTarget, setResumeTarget] = useState<ResumeTarget | null>(null);
   const [isResumeBusy, setIsResumeBusy] = useState(false);
+  /**
+   * The document whose upload session THIS tab currently coordinates
+   * (create or resume). The document card reads this to flip into its
+   * live "uploading" mode; cleared when the coordinator finishes.
+   */
+  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(
+    null,
+  );
 
   const uploader = useDocumentUploader(uppy);
 
@@ -262,10 +272,6 @@ export function DocumentUploaderProvider({
     };
   }, [uppy]);
 
-  const clearResumeTarget = useCallback(() => {
-    setResumeTarget(null);
-  }, []);
-
   const notifyKnownDocuments = useCallback((documentIds: string[]) => {
     void sweepSessionRecords(documentIds).catch((error) =>
       console.error("[DocumentUploaderProvider] sweep failed:", error),
@@ -290,7 +296,16 @@ export function DocumentUploaderProvider({
             // The attempt is DONE — the persistence record goes away and
             // the session is terminal server-side (never revived).
             void deleteSessionRecord(documentId);
+            // The list refetches so cards flip to the committed server
+            // statuses (uploaded/completed) without a manual refresh.
+            window.dispatchEvent(new Event("documents:refresh"));
           }
+          setActiveDocumentId((current) =>
+            current === documentId ? null : current,
+          );
+          setResumeTarget((current) =>
+            current?.documentId === documentId ? null : current,
+          );
           setUploadRefHandler(uppy, null);
           coordinatorRef.current = null;
           sessionMetaRef.current = null;
@@ -304,7 +319,11 @@ export function DocumentUploaderProvider({
       setUploadRefHandler(uppy, (serverFileId, uploadRef) => {
         void coordinator.saveUploadRef(serverFileId, uploadRef);
       });
-      return coordinator.start();
+      const acquired = await coordinator.start();
+      if (acquired) {
+        setActiveDocumentId(documentId);
+      }
+      return acquired;
     },
     [uppy],
   );
@@ -418,20 +437,28 @@ export function DocumentUploaderProvider({
         const needingReselect: ResumableFileView[] = [];
         const skippedServerFileIds: string[] = [];
 
-        for (const plan of plans) {
-          if (plan.action === "skip") {
-            skippedServerFileIds.push(plan.serverFileId);
-            continue;
-          }
+        /**
+         * Batched permission wave: request read access for EVERY
+         * restorable persisted handle in ONE concurrent burst inside
+         * this click's user activation (see ensureFSHandlesReadAccess).
+         * Doing it per file — after hashing each file's probe — risks
+         * the activation expiring mid-list and permissions getting
+         * denied/dismissed later in the loop.
+         */
+        const restoreEntries = plans.filter(
+          (plan) =>
+            plan.action !== "skip" &&
+            plan.action !== "verify-commit",
+        );
+        const handleGrants = await ensureFSHandlesReadAccess(
+          restoreEntries.map(
+            (plan) =>
+              persistedByDocumentFileId.get(plan.serverFileId)?.fileHandle ??
+              null,
+          ),
+        );
 
-          if (plan.action === "verify-commit") {
-            // Bytes are already in storage server-side; the session commit
-            // (completeUploadSession) verifies + finalizes them — no client
-            // transfer needed, so it is neither enqueue nor reselect.
-            skippedServerFileIds.push(plan.serverFileId);
-            continue;
-          }
-
+        for (const [entryIndex, plan] of restoreEntries.entries()) {
           const view: ResumableFileView = {
             clientFileId:
               persistedByDocumentFileId.get(plan.serverFileId)?.clientFileId ??
@@ -449,9 +476,17 @@ export function DocumentUploaderProvider({
             file: null,
           };
 
+          // Permission was refused (or no handle): do NOT prompt again
+          // per file — go straight to the re-select fallback.
+          const restorableHandle =
+            handleGrants[entryIndex] === true
+              ? (persistedByDocumentFileId.get(plan.serverFileId)?.fileHandle ??
+                null)
+              : null;
+
           const restoredFile = await restoreFileViaHandle(
             plan,
-            persistedByDocumentFileId.get(plan.serverFileId)?.fileHandle ?? null,
+            restorableHandle,
           );
 
           if (restoredFile) {
@@ -553,7 +588,8 @@ export function DocumentUploaderProvider({
           }
         }
 
-        // 6. Publish the resume target for the form, then start the batch.
+        // 6. Publish the resume target (the re-select flow's data source),
+        //    then start the batch.
         setResumeTarget({
           documentId: document.documentId,
           sessionId: result.data.sessionId,
@@ -705,38 +741,25 @@ export function DocumentUploaderProvider({
     [uppy, uploader, resumeTarget, startCoordinator],
   );
 
-  /**
-   * The user resets the form mid-session: stop tracking (Web Lock
-   * released, heartbeats stop) but keep server + persisted state — the
-   * attempt simply turns interrupted and stays resumable. Remote takeover
-   * waits for the lock, so closing the form cannot corrupt anything.
-   */
-  const endActiveSessionTracking = useCallback(() => {
-    coordinatorRef.current?.stop();
-    coordinatorRef.current = null;
-  }, []);
-
   const contextValue = useMemo<UploaderContextValue>(() => {
     return {
       ...uploader,
       isResumeBusy,
+      activeDocumentId,
       resumeTarget,
-      clearResumeTarget,
       startResume,
       attachReselectedFile,
       beginUploadSession,
-      endActiveSessionTracking,
       notifyKnownDocuments,
     };
   }, [
     uploader,
     isResumeBusy,
+    activeDocumentId,
     resumeTarget,
-    clearResumeTarget,
     startResume,
     attachReselectedFile,
     beginUploadSession,
-    endActiveSessionTracking,
     notifyKnownDocuments,
   ]);
 
@@ -747,9 +770,6 @@ export function DocumentUploaderProvider({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Context hook
-// ---------------------------------------------------------------------------
 
 export function useDocumentUploaderContext(): UploaderContextValue {
   const ctx = useContext(DocumentUploaderContext);

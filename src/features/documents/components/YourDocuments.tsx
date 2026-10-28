@@ -1,27 +1,34 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { FileStack, Loader2, RefreshCw } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { FileStack, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/patterns/empty-state";
-import { typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import type { DocumentItemDTO } from "../actions/types";
 import { getUserDocumentsAction } from "../actions/get-user-documents";
 import { useDocumentUploaderContext } from "../uploads/document-uploader-provider";
 import { DocumentCard } from "./DocumentCard";
+import { isDocumentItem } from "./document-card-view";
 
 interface YourDocumentsProps {
   initialDocuments?: DocumentItemDTO[];
 }
+
+/** Refetch signal (DocumentsNav refresh icon, coordinator completion). */
+const DOCUMENTS_REFRESH_EVENT = "documents:refresh";
+/** Instant-insert signal from the create form (full DTO in the detail). */
+const DOCUMENTS_CREATED_EVENT = "documents:created";
+
+/** How long the entrance animation flag stays on the newly added card. */
+const ENTRANCE_ANIMATION_MS = 600;
 
 export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
   const { notifyKnownDocuments } = useDocumentUploaderContext();
   const [documents, setDocuments] =
     useState<DocumentItemDTO[]>(initialDocuments);
   const [isLoading, setIsLoading] = useState(!initialDocuments.length);
-  const [isPending, startTransition] = useTransition();
+  /** Card id currently playing its one-shot entrance animation. */
+  const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
 
   const fetchDocuments = async () => {
     try {
@@ -41,13 +48,54 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
 
   useEffect(() => {
     fetchDocuments();
+
+    /**
+     * DocumentsNav's refresh icon re-runs the server pass AND signals the
+     * mounted list via this event (same pattern as the mocks refresh).
+     */
+    const handleRefresh = () => fetchDocuments();
+
+    /**
+     * Instant insertion from the create form: the payload is the EXACT
+     * DocumentItemDTO the create action returned (same query + mapper as
+     * this list uses), so the new card renders immediately with correct
+     * files/aggregates — before any upload byte moves. Deduped: a later
+     * refetch simply replaces it in place (no double entry, no re-animation).
+     */
+    const handleDocumentCreated = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      const created =
+        !!detail &&
+        typeof detail === "object" &&
+        isDocumentItem((detail as { document?: unknown }).document)
+          ? (detail as { document: DocumentItemDTO }).document
+          : null;
+      if (!created) return;
+
+      setDocuments((prev) =>
+        prev.some((d) => d.id === created.id) ? prev : [created, ...prev],
+      );
+      setRecentlyAddedId(created.id);
+    };
+
+    window.addEventListener(DOCUMENTS_REFRESH_EVENT, handleRefresh);
+    window.addEventListener(DOCUMENTS_CREATED_EVENT, handleDocumentCreated);
+    return () => {
+      window.removeEventListener(DOCUMENTS_REFRESH_EVENT, handleRefresh);
+      window.removeEventListener(DOCUMENTS_CREATED_EVENT, handleDocumentCreated);
+    };
   }, []);
 
-  const handleRefresh = () => {
-    startTransition(async () => {
-      await fetchDocuments();
-    });
-  };
+  // Retire the entrance-animation flag once it has played (setState in a
+  // timeout callback — not synchronously in the effect body).
+  useEffect(() => {
+    if (!recentlyAddedId) return;
+    const timer = setTimeout(
+      () => setRecentlyAddedId(null),
+      ENTRANCE_ANIMATION_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [recentlyAddedId]);
 
   const handleDocumentDeleted = (deletedId: string) => {
     setDocuments((prev) => prev.filter((d) => d.id !== deletedId));
@@ -60,37 +108,7 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
   };
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between gap-2 pb-1">
-        <div className="flex items-center gap-2.5">
-          <h3 className={typography.sectionTitle}>Your Documents</h3>
-          {documents.length > 0 && (
-            <Badge variant="secondary" className="text-xs font-medium border border-border/50">
-              {documents.length}{" "}
-              {documents.length === 1 ? "file" : "files"}
-            </Badge>
-          )}
-        </div>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isPending || isLoading}
-          className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
-          title="Refresh document list"
-        >
-          <RefreshCw
-            className={cn(
-              "size-3.5",
-              (isPending || isLoading) && "animate-spin",
-            )}
-          />
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
-      </div>
-
+    <section className="space-y-3">
       {isLoading ? (
         <div
           role="status"
@@ -106,17 +124,27 @@ export function YourDocuments({ initialDocuments = [] }: YourDocumentsProps) {
         <EmptyState
           icon={FileStack}
           title="No documents uploaded yet"
-          description="Upload syllabi, past question papers, or study notes above to automatically generate targeted mock questions."
+          titleSize="md"
+          // Plain-background variant for this page: no dashed placeholder
+          // box. min-height + the component's own centering keeps the
+          // message vertically centered in the remaining page space.
+          className="min-h-[45vh] rounded-none border-0 bg-transparent p-12"
         />
       ) : (
         <div className="space-y-3">
           {documents.map((doc) => (
-            <DocumentCard
+            <div
               key={doc.id}
-              document={doc}
-              onDocumentDeleted={handleDocumentDeleted}
-              onDocumentUpdated={handleDocumentUpdated}
-            />
+              className={cn(
+                doc.id === recentlyAddedId && "document-card-enter",
+              )}
+            >
+              <DocumentCard
+                document={doc}
+                onDocumentDeleted={handleDocumentDeleted}
+                onDocumentUpdated={handleDocumentUpdated}
+              />
+            </div>
           ))}
         </div>
       )}

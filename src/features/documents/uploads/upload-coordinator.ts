@@ -16,11 +16,7 @@ import {
 
 /**
  * Upload session coordinator (client side of the server-owned session).
- *
- * Hold the exclusive Web Lock `upload-session:{documentId}` for the
- * lifetime of an upload attempt in this browser. If another tab already
- * owns it, the lock is NOT available and this coordinator refuses to run
- * â†’ the user sees "uploading in another tab".
+ * Implements WebLock API to prevent simultaneous uplaods from different tabs.
  *
  * While the lock is held it:
  *  - heartbeats the server every 25s (progress snapshot included),
@@ -41,7 +37,7 @@ export interface UploadCoordinatorConfig {
   sessionId: string;
   /** The shared Uppy instance running the batch. */
   uppy: Uppy<DocumentUploadMeta>;
-  /** Called when the lock is owned by another tab â€” the batch must NOT start. */
+  /** Called when the lock is owned by another tab. */
   onLockUnavailable: () => void;
   /** Called once the session has been committed (or terminally lost). */
   onSessionFinished: (outcome: "completed" | "lost") => void;
@@ -66,8 +62,7 @@ export class UploadSessionCoordinator {
 
   /**
    * `serverFileId:uploadRef` keys whose TUS resource reference has been
-   * saved server-side — dedupes the immediate create-response hook
-   * against the heartbeat-tick fallback sweep.
+   * saved server-side
    */
   private savedRefKeys = new Set<string>();
   /** In-flight completeDocumentFileUpload requests (awaited before commit). */
@@ -75,7 +70,7 @@ export class UploadSessionCoordinator {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private detachFns: Array<() => void> = [];
   private isStopped = false;
-  /** Resolves the Web Lock request callback â†’ releasing the lock. */
+  /** Resolves the Web Lock request callback by releasing the lock. */
   private releaseLock: (() => void) | null = null;
   /**
    * Set even before the lock callback runs: if `stop()` wins the race
@@ -120,7 +115,12 @@ export class UploadSessionCoordinator {
       return true;
     }
 
+    // If the first promise is not resolved before the second promise, it will await till 
+    // is resolved.
     return await new Promise<boolean>((resolveStart) => {
+
+      // locks.request returns a promise
+      // void states that the promise is deliberately not awaited
       void locks.request(
         `${TUS_LOCK_PREFIX}${this.documentId}`,
         { ifAvailable: true },
@@ -145,10 +145,12 @@ export class UploadSessionCoordinator {
           // held until the session turns terminal or stop() resolves.
           resolveStart(true);
 
+          // Awaits till it is resolved. using this.releaseLock()
           await new Promise<void>((resolveLock) => {
             this.releaseLock = resolveLock;
           });
-
+          
+          // Runs only after this.releaseLock() is called from somewhere.
           this.endLifecycle();
         },
       );
@@ -167,10 +169,6 @@ export class UploadSessionCoordinator {
     this.releaseLock = null;
     this.endLifecycle();
   }
-
-  // -----------------------------------------------------------------------
-  // Upload-ref sync
-  // -----------------------------------------------------------------------
 
   /**
    * IMMEDIATE ref-sync: hand a freshly created TUS resource URL to the
@@ -206,9 +204,6 @@ export class UploadSessionCoordinator {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Lifecycle internals
-  // -----------------------------------------------------------------------
 
   private beginLifecycle() {
     this.isStopped = false;
@@ -237,6 +232,7 @@ export class UploadSessionCoordinator {
     };
     this.uppy.on("complete", onComplete);
 
+    // Removes the event listeners from uppy.
     this.detachFns = [
       () => this.uppy.off("upload-success", onUploadSuccess),
       () => this.uppy.off("complete", onComplete),

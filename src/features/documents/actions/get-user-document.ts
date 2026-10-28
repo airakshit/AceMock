@@ -3,19 +3,24 @@
 import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
 import {
-  GetDocumentStatusActionPayload,
-  GetDocumentStatusActionResponse,
+  GetUserDocumentActionPayload,
+  GetUserDocumentActionResponse,
 } from "./types";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 
-export async function getDocumentStatusAction(
-  payload: GetDocumentStatusActionPayload,
-): Promise<ServerActionResult<GetDocumentStatusActionResponse>> {
+/**
+ * Single-document fetch — returns exactly the same DTO shape as
+ * getUserDocumentsAction's items (DocumentItemDTO with files + relevant
+ * session). Used for in-place refreshes of one document card.
+ */
+export async function getUserDocumentAction(
+  payload: GetUserDocumentActionPayload,
+): Promise<ServerActionResult<GetUserDocumentActionResponse>> {
   try {
     const session = await requireSession();
 
-    const data = await documentsService.getDocumentStatus(
+    const data = await documentsService.getUserDocument(
       session.user.id,
       payload.documentId,
     );

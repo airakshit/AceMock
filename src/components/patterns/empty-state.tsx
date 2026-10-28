@@ -8,8 +8,20 @@ interface EmptyStateProps {
   description?: string;
   /** Optional action buttons rendered below the description. */
   children?: React.ReactNode;
+  /**
+   * Title font size — lets full-page empty states opt into larger type
+   * while compact in-list states keep the small default.
+   * @default "sm"
+   */
+  titleSize?: "sm" | "md" | "lg";
   className?: string;
 }
+
+const TITLE_SIZE_CLASSES = {
+  sm: "text-sm",
+  md: "text-base",
+  lg: "text-lg",
+} as const;
 
 /**
  * EmptyState — the single pattern for "nothing here yet" / "no results".
@@ -22,6 +34,7 @@ export function EmptyState({
   title,
   description,
   children,
+  titleSize = "sm",
   className,
 }: EmptyStateProps) {
   return (
@@ -35,7 +48,9 @@ export function EmptyState({
       <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-brand-muted text-brand">
         <Icon className="size-5" aria-hidden="true" />
       </div>
-      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className={cn("font-semibold text-foreground", TITLE_SIZE_CLASSES[titleSize])}>
+        {title}
+      </p>
       {description ? (
         <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
           {description}

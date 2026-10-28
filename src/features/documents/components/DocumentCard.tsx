@@ -2,21 +2,14 @@
 
 import { useState, useEffect } from "react";
 import {
-  AlertTriangle,
   Check,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
-  Eye,
   FileText,
   Image as ImageIcon,
-  Layers,
   Loader2,
-  PauseCircle,
   Pencil,
   RefreshCw,
-  Sparkles,
   Trash2,
   UploadCloud,
   X,
@@ -25,7 +18,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { colors, typography } from "@/lib/design-system";
+import { typography } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -38,12 +31,21 @@ import { deleteDocumentFileAction } from "../actions/delete-document-file";
 import { updateDocumentAction } from "../actions/update-document";
 import { getDocumentFileAccessUrlAction } from "../actions/get-file-access-url";
 import { processDocumentAction } from "../actions/process-document";
-import { getDocumentStatusAction } from "../actions/get-document-status";
+import { getUserDocumentAction } from "../actions/get-user-document";
 import { formatBytes, formatDate } from "../utils";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 import { useDocumentUploaderContext } from "../uploads/document-uploader-provider";
 import { UPLOAD_HEARTBEAT_STALE_MS } from "../uploads/upload-session-constants";
+import {
+  LIVE_RESUME_STATUS_VIEW,
+  LIVE_UPLOAD_STATUS_VIEW,
+  areAllFilesUploaded,
+  resolveDocumentCardMode,
+  resolveDocumentStatusView,
+  summarizeFiles,
+} from "./document-card-view";
+import { DocumentFilesList } from "./DocumentFilesList";
 
 interface DocumentCardProps {
   document: DocumentItemDTO;
@@ -52,30 +54,52 @@ interface DocumentCardProps {
 }
 
 /**
- * Client-facing file status. The server lifecycle intentionally separates
- * "all bytes transferred" (`uploaded`) from "verified + committed"
- * (`completed`) — but that is bookkeeping the user should not have to
- * interpret: if the bytes are in storage, the file is simply uploaded.
- * See UploadFlow.md.
+ * DocumentCard — renders one document in exactly ONE of three explicit
+ * modes (see `resolveDocumentCardMode` in document-card-view.ts):
+ *
+ * - `display`  — pure projection of the server DTO from
+ *   get-user-documents. No live upload state exists in this tab for it.
+ *   "Resume Upload" is offered only as an explicit ACTION (R2) when the
+ *   session heartbeat has gone stale.
+ * - `uploading` — THIS tab's coordinator owns the session (created here
+ *   or resumed here): animated border, live overall/per-file progress and
+ *   batch controls, status badge overridden by live truth.
+ * - `resuming`  — a resume bootstrap is running for this document, or it
+ *   is waiting for the user to re-select files (content-verified).
+ *
+ * Separation of concerns:
+ * - mode + status resolution → document-card-view.ts (pure, no JSX)
+ * - expanded files section (rows + live overlay + re-select rows)
+ *   → DocumentFilesList.tsx
+ * - this file: identity, actions, dialogs, mode wiring only.
  */
-function clientFacingFileStatus(
-  status: DocumentFileDTO["uploadStatus"],
-): Exclude<DocumentFileDTO["uploadStatus"], "completed"> {
-  return status === "completed" ? "uploaded" : status;
-}
-
 export function DocumentCard({
   document,
   onDocumentDeleted,
   onDocumentUpdated,
 }: DocumentCardProps) {
-  const { startResume, isResumeBusy } = useDocumentUploaderContext();
+  const {
+    startResume,
+    isResumeBusy,
+    activeDocumentId,
+    uploadStatesByServerFileId,
+    totalProgress,
+    pauseFile,
+    resumeFile,
+    retryFile,
+    pauseAll,
+    resumeAll,
+    retryAll,
+    resumeTarget,
+    attachReselectedFile,
+  } = useDocumentUploaderContext();
+
   const [isFilesOpen, setIsFilesOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isStartingResume, setIsStartingResume] = useState(false);
 
   /**
-   * Stale-ness clock. `Date.now()` cannot be called during render (React
+   * Staleness clock. `Date.now()` cannot be called during render (React
    * Compiler purity rules), so staleness is evaluated against this snapshot
    * that listens for wall-clock updates while the card is mounted.
    */
@@ -124,144 +148,46 @@ export function DocumentCard({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const pdfCount = files.filter(
-    (f) =>
-      f.mimeType === "application/pdf" ||
-      f.filename.toLowerCase().endsWith(".pdf"),
-  ).length;
-  const imageCount = files.filter(
-    (f) =>
-      f.mimeType.startsWith("image/") ||
-      (!f.mimeType.includes("pdf") &&
-        !f.filename.toLowerCase().endsWith(".pdf")),
-  ).length;
-  const totalSize = files.reduce(
-    (acc, f) => acc + (f.fileSize || 0),
-    0,
-  );
+  // -----------------------------------------------------------------------
+  // Mode + status resolution — the pure logic lives in document-card-view.ts;
+  // this block is the single wiring point (kept at the top so the rest of
+  // the component can be read against one explicit `mode`).
+  // -----------------------------------------------------------------------
+  const mode = resolveDocumentCardMode({
+    documentId: document.id,
+    activeDocumentId,
+    isResumingThisDocument:
+      isStartingResume || resumeTarget?.documentId === document.id,
+  });
 
-  const getDocumentStatus = () => {
-    const uploadSession = document.session;
+  const isLiveMode = mode !== "display";
 
-    /**
-     * Session-derived staleness: an ACTIVE upload session whose heartbeat
-     * is stale (>120s — browser closed/crashed) means the attempt is
-     * *interrupted*, not live: offer manual resume instead of a spinner.
-     */
-    const hasPendingTransferFiles = files.some(
-      (f) =>
-        f.uploadStatus === "pending" ||
-        f.uploadStatus === "uploading" ||
-        f.uploadStatus === "failed",
-    );
+  /**
+   * Badge: while THIS tab owns the session the live truth overrides the
+   * (necessarily stale) server snapshot entirely; display mode resolves
+   * from the server DTO.
+   */
+  const statusView =
+    mode === "uploading"
+      ? LIVE_UPLOAD_STATUS_VIEW
+      : mode === "resuming"
+        ? LIVE_RESUME_STATUS_VIEW
+        : resolveDocumentStatusView({
+            processingStatus,
+            files,
+            session: document.session,
+            nowMs,
+          });
+  const StatusIcon = statusView.icon;
 
-    const isUploadInterruptedNow =
-      (uploadSession?.status === "active" &&
-        hasPendingTransferFiles &&
-        nowMs > 0 &&
-        nowMs - new Date(uploadSession.lastHeartbeatAt).getTime() >
-          UPLOAD_HEARTBEAT_STALE_MS) ||
-      (uploadSession !== null &&
-        uploadSession.status === "abandoned" &&
-        hasPendingTransferFiles);
+  const { pdfCount, imageCount, totalSize } = summarizeFiles(files);
 
-    if (isUploadInterruptedNow) {
-      return {
-        label: "Upload Interrupted",
-        icon: PauseCircle,
-        className: "border-warning/30 bg-warning/10 text-warning",
-        dot: "bg-warning",
-        spin: false,
-      };
-    }
-
-    // Live upload: heartbeat is fresh.
-    const hasUploading = files.some((f) => f.uploadStatus === "uploading");
-    if (hasUploading) {
-      return {
-        label: "Uploading Files",
-        icon: Loader2,
-        className: "border-info/30 bg-info/10 text-info",
-        dot: "bg-info",
-        spin: true,
-      };
-    }
-
-    const hasUploadFailed = files.some((f) => f.uploadStatus === "failed");
-    if (hasUploadFailed) {
-      return {
-        label: "Upload Failed",
-        icon: AlertTriangle,
-        className: "border-danger/30 bg-danger/10 text-danger",
-        dot: "bg-danger",
-        spin: false,
-      };
-    }
-
-    // 2. Document Processing Statuses
-    if (processingStatus === "processing_files") {
-      return {
-        label: "Processing Files...",
-        icon: Loader2,
-        className: "border-info/40 bg-info/15 text-info font-medium",
-        dot: "bg-info",
-        spin: true,
-      };
-    }
-
-    if (processingStatus === "extracting_questions") {
-      return {
-        label: "Extracting Questions...",
-        icon: Sparkles,
-        className:
-          "border-brand/40 bg-brand/15 text-brand font-medium animate-pulse",
-        dot: "bg-brand",
-        spin: true,
-      };
-    }
-
-    if (processingStatus === "merging_questions") {
-      return {
-        label: "Merging Questions...",
-        icon: Layers,
-        className:
-          "border-brand/40 bg-brand/15 text-brand font-medium animate-pulse",
-        dot: "bg-brand",
-        spin: true,
-      };
-    }
-
-    if (processingStatus === "completed") {
-      return {
-        label: "Completed",
-        icon: CheckCircle2,
-        className: "border-success/30 bg-success/10 text-success font-medium",
-        dot: "bg-success",
-        spin: false,
-      };
-    }
-
-    if (processingStatus === "failed") {
-      return {
-        label: "Processing Failed",
-        icon: AlertTriangle,
-        className: "border-danger/30 bg-danger/10 text-danger font-medium",
-        dot: "bg-danger",
-        spin: false,
-      };
-    }
-
-    return {
-      label: "Pending",
-      icon: Clock,
-      className: "border-warning/30 bg-warning/10 text-warning font-medium",
-      dot: "bg-warning",
-      spin: false,
-    };
-  };
-
-  const statusInfo = getDocumentStatus();
-  const StatusIcon = statusInfo.icon;
+  /**
+   * Process is offered ONLY when every file's bytes are in storage — a
+   * partially-uploaded document shows "Resume Upload" instead, never both
+   * actions at once.
+   */
+  const canProcess = areAllFilesUploaded(files);
 
   /**
    * "Resume Upload" is offered whenever the (active) upload session is
@@ -287,7 +213,7 @@ export function DocumentCard({
   const handleRefreshStatus = async () => {
     try {
       setIsRefreshingStatus(true);
-      const res = await getDocumentStatusAction({ documentId: document.id });
+      const res = await getUserDocumentAction({ documentId: document.id });
 
       if (!res.success) {
         toast.error(res.error.message || "Failed to refresh document status");
@@ -486,6 +412,8 @@ export function DocumentCard({
           isEditing
             ? "border-brand/60 bg-card/95 ring-2 ring-brand/40"
             : "hover:border-brand/25 hover:shadow-card-hover",
+          // Moving border beam while THIS tab uploads/resumes this doc.
+          isLiveMode && "upload-beam-border",
         )}
       >
         {/* Main horizontal content row */}
@@ -493,38 +421,20 @@ export function DocumentCard({
           {/* Left section: Info, Title, Badges */}
           <div className="space-y-2.5 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Status Badge with semantic colors and document-level refresh */}
+              {/* Status Badge — live view while this tab uploads/resumes,
+                  server-derived view in display mode */}
               <div className="inline-flex items-center gap-1">
                 <span
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-xs font-medium transition-all shadow-2xs",
-                    statusInfo.className,
+                    statusView.className,
                   )}
                 >
                   <StatusIcon
-                    className={cn("size-3.5", statusInfo.spin && "animate-spin")}
+                    className={cn("size-3.5", statusView.spin && "animate-spin")}
                   />
-                  <span>{statusInfo.label}</span>
+                  <span>{statusView.label}</span>
                 </span>
-
-                {/* Document level refresh button for processing status */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRefreshStatus}
-                  disabled={isRefreshingStatus}
-                  className="size-7 -my-1 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-md transition-colors"
-                  title="Refresh document processing status"
-                >
-                  <RefreshCw
-                    className={cn(
-                      "size-3",
-                      isRefreshingStatus && "animate-spin text-brand",
-                    )}
-                  />
-                  <span className="sr-only">Refresh Status</span>
-                </Button>
               </div>
 
               {isEditing && (
@@ -696,71 +606,61 @@ export function DocumentCard({
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-1.5">
-                {/* Process / Extract Questions Button */}
-                <Button
-                  type="button"
-                  variant={
-                    processingStatus === "failed"
-                      ? "destructive"
-                      : processingStatus === "completed"
-                        ? "outline"
-                        : "default"
-                  }
-                  size="sm"
-                  onClick={handleTriggerProcess}
-                  disabled={
-                    isProcessing ||
+                {/* Process / Extract Questions Button — only when every
+                    file is uploaded; interrupted uploads show Resume
+                    Upload instead (never both). */}
+                {canProcess && (
+                  <Button
+                    type="button"
+                    variant={
+                      processingStatus === "failed"
+                        ? "destructive"
+                        : processingStatus === "completed"
+                          ? "outline"
+                          : "default"
+                    }
+                    size="sm"
+                    onClick={handleTriggerProcess}
+                    disabled={
+                      isProcessing ||
+                      processingStatus === "processing_files" ||
+                      processingStatus === "extracting_questions" ||
+                      processingStatus === "merging_questions"
+                    }
+                    className={cn(
+                      "h-8 px-2.5 sm:px-3 text-xs gap-1.5 font-medium transition-all shadow-xs",
+                      processingStatus === "pending" &&
+                      "bg-brand hover:bg-brand/90 text-primary-foreground",
+                      processingStatus === "completed" &&
+                      "border-success/30 text-success hover:bg-success/10",
+                    )}
+                    title="Trigger question extraction"
+                  >
+                    {isProcessing ||
                     processingStatus === "processing_files" ||
                     processingStatus === "extracting_questions" ||
-                    processingStatus === "merging_questions" ||
-                    files.length === 0
-                  }
-                  className={cn(
-                    "h-8 px-2.5 sm:px-3 text-xs gap-1.5 font-medium transition-all shadow-xs",
-                    processingStatus === "pending" &&
-                    "bg-brand hover:bg-brand/90 text-primary-foreground",
-                    processingStatus === "completed" &&
-                    "border-success/30 text-success hover:bg-success/10",
-                  )}
-                  title={
-                    files.length === 0
-                      ? "Upload files first to process"
-                      : "Trigger question extraction"
-                  }
-                >
-                  {isProcessing ||
-                  processingStatus === "processing_files" ||
-                  processingStatus === "extracting_questions" ||
-                  processingStatus === "merging_questions" ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin" />
-                      <span>
-                        {processingStatus === "processing_files"
-                          ? "Processing..."
-                          : processingStatus === "extracting_questions"
-                            ? "Extracting..."
-                            : processingStatus === "merging_questions"
-                              ? "Merging..."
-                              : "Working..."}
-                      </span>
-                    </>
-                  ) : processingStatus === "completed" ? (
-                    <>
-                      <Sparkles className="size-3.5 text-success" />
+                    processingStatus === "merging_questions" ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" />
+                        <span>
+                          {processingStatus === "processing_files"
+                            ? "Processing..."
+                            : processingStatus === "extracting_questions"
+                              ? "Extracting..."
+                              : processingStatus === "merging_questions"
+                                ? "Merging..."
+                                : "Working..."}
+                        </span>
+                      </>
+                    ) : processingStatus === "completed" ? (
                       <span>Re-process</span>
-                    </>
-                  ) : processingStatus === "failed" ? (
-                    <>
-                      <Sparkles className="size-3.5" />
+                    ) : processingStatus === "failed" ? (
                       <span>Retry</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="size-3.5 text-warning" />
+                    ) : (
                       <span>Process</span>
-                    </>
-                  )}
-                </Button>
+                    )}
+                  </Button>
+                )}
 
                 {/* Edit Button */}
                 <Button
@@ -788,8 +688,30 @@ export function DocumentCard({
                   <span className="hidden sm:inline">Delete</span>
                 </Button>
 
-                {/* View/Hide Files Toggle */}
-                {files.length > 0 && (
+                {/* Document-level Refresh Button — re-fetches this document
+                    with the same DTO the list uses (getUserDocumentAction). */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshStatus}
+                  disabled={isRefreshingStatus}
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="Refresh document status and files"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "size-3.5",
+                      isRefreshingStatus && "animate-spin text-brand",
+                    )}
+                  />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+
+                {/* View/Hide Files Toggle — hidden while this tab uploads or
+                    resumes: the section stays pinned open so live progress
+                    is always visible. */}
+                {files.length > 0 && !isLiveMode && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -810,124 +732,36 @@ export function DocumentCard({
           </div>
         </div>
 
-        {/* Expandable Files List */}
-        {isFilesOpen && files.length > 0 && (
-          <div className="border-t border-border/50 bg-muted/20 p-4 space-y-2.5">
-            <div className="flex items-center justify-between px-1">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Attached Files ({files.length})
-              </p>
-              {isEditing && (
-                <p className="text-[11px] text-muted-foreground/80 italic">
-                  Click the delete icon on any file to remove it
-                </p>
-              )}
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-              {files.map((file) => {
-                const isPdf =
-                  file.mimeType === "application/pdf" ||
-                  file.filename.toLowerCase().endsWith(".pdf");
-                const FileIcon = isPdf ? FileText : ImageIcon;
-                const fileStatus = clientFacingFileStatus(file.uploadStatus);
-
-                return (
-                  <div
-                    key={file.id}
-                    className={cn(
-                      "flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card p-2.5 text-xs transition-colors hover:bg-muted/40",
-                      isEditing && "border-dashed",
-                    )}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex size-7 items-center justify-center rounded-md border border-border/50 bg-background shrink-0">
-                        <FileIcon
-                          className={cn(
-                            "size-3.5",
-                            isPdf ? "text-danger" : "text-info",
-                          )}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <p
-                                className="font-medium text-foreground truncate max-w-36 sm:max-w-48 cursor-default"
-                                title={file.filename}
-                              />
-                            }
-                          >
-                            {file.filename}
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side="top"
-                            align="start"
-                            className="max-w-xs sm:max-w-sm break-all text-xs font-medium"
-                          >
-                            {file.filename}
-                          </TooltipContent>
-                        </Tooltip>
-                        <p className="text-[10px] text-muted-foreground font-mono">
-                          {formatBytes(file.fileSize)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* File status badge — client-facing: `completed` is
-                          displayed as `uploaded` (the server-side lifecycle
-                          distinction is not exposed to the user). */}
-                      <span
-                        className={cn(
-                          "rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase border",
-                          colors.status[fileStatus].badge,
-                        )}
-                      >
-                        {fileStatus}
-                      </span>
-
-                      {/* View / Preview File Button — viewable whenever the
-                          bytes are in storage (client-status `uploaded`,
-                          i.e. transferred or committed). Everything else
-                          has no full object to preview. */}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleViewFile(file)}
-                        disabled={fileStatus !== "uploaded"}
-                        className="size-7 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                        title={
-                          fileStatus === "uploaded"
-                            ? `Preview "${file.filename}"`
-                            : "Preview unavailable until file finishes uploading"
-                        }
-                      >
-                        <Eye className="size-3.5" />
-                        <span className="sr-only">Preview file</span>
-                      </Button>
-
-                      {/* Delete File Button in Edit Mode */}
-                      {isEditing && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setFileToDelete(file)}
-                          className="size-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          title={`Delete "${file.filename}"`}
-                        >
-                          <Trash2 className="size-3.5" />
-                          <span className="sr-only">Delete file</span>
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* Expandable Files List — pinned open while this tab uploads or
+            resumes so live progress stays visible. All row rendering
+            (pure + live overlay + re-select rows) lives in
+            DocumentFilesList. */}
+        {(isFilesOpen || isLiveMode) && files.length > 0 && (
+          <div className="border-t border-border/50 bg-muted/20 p-4">
+            <DocumentFilesList
+              documentId={document.id}
+              files={files}
+              isEditing={isEditing}
+              mode={mode}
+              onViewFile={handleViewFile}
+              onDeleteFile={setFileToDelete}
+              live={
+                isLiveMode
+                  ? {
+                      statesByServerFileId: uploadStatesByServerFileId,
+                      totalProgress,
+                      resumeTarget,
+                      onPauseAll: pauseAll,
+                      onResumeAll: resumeAll,
+                      onRetryAll: retryAll,
+                      onPauseFile: pauseFile,
+                      onResumeFile: resumeFile,
+                      onRetryFile: retryFile,
+                      onAttachReselectedFile: attachReselectedFile,
+                    }
+                  : undefined
+              }
+            />
           </div>
         )}
       </div>

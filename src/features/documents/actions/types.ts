@@ -38,6 +38,12 @@ export interface CreateDocumentActionResponse {
   /** Server-owned upload session created for this attempt. */
   sessionId: string;
   files: SignedUrlResponseObject[];
+  /**
+   * The created document EXACTLY as get-user-documents returns it
+   * (DocumentItemDTO — same query, same mapper), so the client can render
+   * the new card from this response without a second fetch.
+   */
+  document: DocumentItemDTO;
 }
 
 
@@ -77,10 +83,6 @@ export interface HeartbeatUploadSessionActionResponse {
   /** Whether the heartbeat was accepted or the recovery window elapsed. */
   accepted: boolean;
 }
-
-// ===========================================================================
-// getUploadSessionStatus
-// ===========================================================================
 
 export interface UploadSessionDTO {
   id: string;
@@ -229,11 +231,11 @@ export interface ProcessDocumentActionResponse {
   message: string;
 }
 
-export interface GetDocumentStatusActionPayload {
+export interface GetUserDocumentActionPayload {
   documentId: string;
 }
 
-export interface GetDocumentStatusActionResponse {
+export interface GetUserDocumentActionResponse {
   document: DocumentItemDTO;
 }
 

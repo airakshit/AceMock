@@ -146,14 +146,18 @@ export class DocumentsRepository {
     db: DbExecutor,
     data: UpdateDocumentCommand,
   ): Promise<DocumentProjection | null> {
+    const { documentId, userId, title, description, status } = data;
+
     const [document] = await db
       .update(documents)
       .set({
-        ...data,
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(status !== undefined && { processingStatus: status }),
         updatedAt: new Date(),
       })
       .where(
-        and(eq(documents.id, data.documentId), eq(documents.userId, data.userId)),
+        and(eq(documents.id, documentId), eq(documents.userId, userId)),
       )
       .returning();
 
@@ -531,25 +535,42 @@ export class DocumentsRepository {
       .where(inArray(documentFiles.documentId, docIds))
       .orderBy(desc(documentFiles.createdAt));
 
-    const filesMap = new Map<string, (typeof files)[number] & { pages: FilePageProjection[] }>();
-    for (const file of files) {
-      const existing = filesMap.get(file.documentId) || { ...file, pages: [] as FilePageProjection[] };
-      existing.pages = []; // Will be populated below
-      filesMap.set(file.documentId, existing);
+    /**
+     * Group EVERY file under its document. The map is keyed by documentId
+     * and holds an ARRAY — a single-object map here silently overwrote
+     * entries per document, so each document surfaced only its last file
+     * (wrong counts, missing files) until a per-document refresh ran.
+     */
+    const filesByDocument = new Map<
+      string,
+      Array<(typeof files)[number] & { pages: FilePageProjection[] }>
+    >();
+    for (const docId of docIds) {
+      filesByDocument.set(docId, []);
     }
 
-    // Fetch pages for all files
-    const fileIds = files.map((f) => f.id);
-    const allPages = await db
-      .select()
-      .from(filePages)
-      .where(inArray(filePages.fileId, fileIds))
-      .orderBy(desc(filePages.createdAt));
+    const fileById = new Map<
+      string,
+      (typeof files)[number] & { pages: FilePageProjection[] }
+    >();
+    for (const file of files) {
+      const entry = { ...file, pages: [] as FilePageProjection[] };
+      filesByDocument.get(file.documentId)?.push(entry);
+      fileById.set(file.id, entry);
+    }
 
-    for (const page of allPages) {
-      const file = filesMap.get(page.fileId);
-      if (file) {
-        file.pages.push(page as FilePageProjection);
+    // Fetch pages for all files in one pass (skip when there are none —
+    // `inArray` with an empty list must not reach the DB).
+    if (files.length > 0) {
+      const fileIds = files.map((f) => f.id);
+      const allPages = await db
+        .select()
+        .from(filePages)
+        .where(inArray(filePages.fileId, fileIds))
+        .orderBy(desc(filePages.createdAt));
+
+      for (const page of allPages) {
+        fileById.get(page.fileId)?.pages.push(page as FilePageProjection);
       }
     }
 
@@ -563,9 +584,7 @@ export class DocumentsRepository {
       updatedAt: doc.updatedAt,
       // Attached by the service layer (getRelevantSession), not per-query.
       session: null,
-      files: filesMap.get(doc.id)
-        ? [filesMap.get(doc.id)!]
-        : [],
+      files: filesByDocument.get(doc.id) ?? [],
     }));
   }
 

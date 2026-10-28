@@ -3,6 +3,9 @@
 import {
   CheckCircle2,
   CircleAlert,
+  File,
+  FileText,
+  Image as ImageIcon,
   Loader2,
   Pause,
   Play,
@@ -27,7 +30,7 @@ import type { DocumentFileItem } from "../schemas";
 import { captureFileHandleFromDropItem } from "../uploads/upload-session-storage";
 import type { FileProgressState } from "../uploads/upload.types";
 import { formatBytes } from "../utils";
-import { MobileFilePicker } from "./MobileFilePicker";
+import { CameraPicker } from "./CameraPicker";
 
 /** Structural types for the File System Access picker (TS DOM lib versions differ). */
 interface ShowOpenFilePickerOptions {
@@ -39,37 +42,56 @@ interface ShowOpenFilePickerOptions {
 }
 
 /**
- * Filter proposals for the FS Access picker, derived from the dropzone's
- * `accept`. `image/*` wildcards are legal accept keys; extensions are
- * hints that Windows/macOS pickers map to their type filter.
+ * Filter proposal for the FS Access picker, derived from the dropzone's
+ * `accept` (a comma-separated MIME list, e.g. "application/pdf,image/*").
+ *
+ * ONE descriptor with a COMBINED accept map — separate descriptors make
+ * Windows/macOS dialogs show a filter dropdown that defaults to the first
+ * entry (PDF), hiding the images. A single entry lists every allowed type
+ * at once, so the file manager shows PDFs and images together.
  */
 function buildPickerTypes(
   accept: string,
   description: string,
 ): ShowOpenFilePickerOptions["types"] {
-  if (accept === "application/pdf") {
-    return [{ description, accept: { "application/pdf": [".pdf"] } }];
+  const acceptMap: NonNullable<
+    ShowOpenFilePickerOptions["types"]
+  >[number]["accept"] = {};
+
+  for (const mime of accept.split(",").map((value) => value.trim())) {
+    if (mime === "application/pdf") {
+      acceptMap["application/pdf"] = [".pdf"];
+    } else if (mime.startsWith("image/")) {
+      acceptMap["image/*"] = [
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".avif",
+      ];
+    }
+    // Unknown mimes are skipped here; the form schema still validates the
+    // picked File (its type/size refinements run on submit).
   }
-  if (accept.startsWith("image/")) {
-    return [
-      {
-        description,
-        accept: {
-          "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif"],
-        },
-      },
-    ];
-  }
-  // Unknown accepts → show everything; the form schema still validates the
-  // picked File (its type/size refinements run on submit).
-  return [{ description, accept: {} }];
+
+  if (Object.keys(acceptMap).length === 0) return undefined;
+
+  return [{ description, accept: acceptMap }];
 }
 
 interface FileDropzoneProps {
   id: string;
   label: string;
   title: string;
-  description: string;
+  description?: string;
+  /**
+   * Eye-catchers rendered under the title in the empty state (compact
+   * badge-style chips). Takes precedence over `description` when set, so
+   * the allow-list reads as scannable pills rather than a sentence.
+   */
+  hints?: React.ReactNode;
   accept: string;
   multiple?: boolean;
   disabled?: boolean;
@@ -119,6 +141,7 @@ export function FileDropzone({
   label,
   title,
   description,
+  hints,
   accept,
   multiple = true,
   disabled = false,
@@ -309,45 +332,53 @@ export function FileDropzone({
             "cursor-not-allowed opacity-60 hover:bg-transparent hover:border-muted-foreground/25",
         )}
       >
-        <div className="flex flex-col items-center justify-center gap-3 py-4">
+        <div className="flex flex-col items-center justify-center gap-4 px-4 py-6">
           <div className="flex size-12 items-center justify-center rounded-xl border bg-background/80 shadow-xs transition-transform group-hover:scale-105">
             <Icon className="size-5 text-brand" />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-2">
             <p className="text-sm font-semibold tracking-tight">{title}</p>
-            <p className="text-xs text-muted-foreground max-w-xs">
-              {description}
-            </p>
+            {hints ??
+              (description ? (
+                <p className="text-xs text-muted-foreground max-w-xs">
+                  {description}
+                </p>
+              ) : null)}
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={disabled}
-            className="mt-1 shadow-2xs sm:flex"
-            onClick={(event) => {
-              event.stopPropagation();
-              openPicker();
-            }}
-          >
-            <Upload className="mr-2 size-3.5" />
-            Browse {label.toLowerCase()}
-          </Button>
-
-          {/* Touch-optimized mobile camera/photos/documents picker (only visible on mobile screens) */}
-          <div
-            className="w-full pt-2 block sm:hidden"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <MobileFilePicker
-              accept={accept}
-              multiple={multiple}
+          {/*
+           * The ONLY two actions this zone offers: browse the file manager
+           * (same as clicking the zone itself) and — phones only — a direct
+           * camera capture. Nothing else; no duplicate entry points.
+           */}
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               disabled={disabled}
-              onFilesSelected={(files) => processRawFiles(files, [])}
-            />
+              className="shadow-2xs"
+              onClick={(event) => {
+                event.stopPropagation();
+                openPicker();
+              }}
+            >
+              <Upload className="mr-2 size-3.5" />
+              Browse files
+            </Button>
+
+            <div className="sm:hidden">
+              <CameraPicker
+                disabled={disabled}
+                onFilesSelected={(files) => processRawFiles(files, [])}
+              />
+            </div>
           </div>
+
+          <p className="text-[11px] text-muted-foreground/80">
+            or drag &amp; drop them here
+          </p>
         </div>
 
         {hiddenInput}
@@ -400,6 +431,15 @@ export function FileDropzone({
           const isComplete = status === "success";
           const hasError = status === "error";
 
+          // Mixed-dropzone rows show their own type icon instead of the
+          // zone's generic one (PDF vs image at a glance).
+          const RowIcon =
+            item.file.type === "application/pdf"
+              ? FileText
+              : item.file.type.startsWith("image/")
+                ? ImageIcon
+                : File;
+
           return (
             <div
               key={item.clientFileId}
@@ -418,7 +458,7 @@ export function FileDropzone({
                 )}
 
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
-                  <Icon className="size-4 text-muted-foreground" />
+                  <RowIcon className="size-4 text-muted-foreground" />
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-0.5">

@@ -16,7 +16,7 @@ import {
   Plus,
   Repeat2,
   RotateCcw,
-  Sparkles,
+  ClipboardList,
   X,
 } from "lucide-react";
 
@@ -341,7 +341,7 @@ export function CustomMockTestForm() {
       >
         <CollapsibleTrigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 text-left select-none focus:outline-none">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-muted text-brand">
-            <Sparkles className="size-5" />
+            <ClipboardList className="size-5" />
           </span>
           <span className="min-w-0">
             <span className="block truncate font-heading text-lg font-bold tracking-tight sm:text-xl">
@@ -1080,7 +1080,7 @@ export function CustomMockTestForm() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 size-4" />
+                    <ClipboardList className="mr-2 size-4" />
                     Create Custom Test
                   </>
                 )}

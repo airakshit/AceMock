@@ -249,13 +249,20 @@ export function useDocumentUploader(uppy: Uppy<DocumentUploadMeta>) {
   );
 
   /**
-   * Reactive progress map per clientFileId for UI synchronization.
+   * Reactive progress maps for UI synchronization.
+   *
+   * `uploadStates` is keyed by clientFileId (form-side identity);
+   * `uploadStatesByServerFileId` is keyed by document_files.id (server
+   * identity, from the credentials' meta) — the document card uses it to
+   * join live progress onto its server file rows.
    */
-  const uploadStates = useMemo(() => {
+  const { uploadStates, uploadStatesByServerFileId } = useMemo(() => {
     const stateMap: Record<string, FileProgressState> = {};
+    const byServerFileId: Record<string, FileProgressState> = {};
     for (const uppyFile of Object.values(files)) {
       const clientFileId =
         (uppyFile.meta?.clientFileId as string) || uppyFile.id;
+      const serverFileId = uppyFile.meta?.serverFileId as string | undefined;
       const progress = uppyFile.progress;
       const isComplete = Boolean(progress?.uploadComplete);
       const isStarted = Boolean(progress?.uploadStarted);
@@ -273,8 +280,9 @@ export function useDocumentUploader(uppy: Uppy<DocumentUploadMeta>) {
         status = "uploading";
       }
 
-      stateMap[clientFileId] = {
+      const state: FileProgressState = {
         clientFileId,
+        serverFileId,
         status,
         percentage:
           typeof progress?.percentage === "number" ? progress.percentage : 0,
@@ -290,14 +298,20 @@ export function useDocumentUploader(uppy: Uppy<DocumentUploadMeta>) {
         isPaused,
         isComplete,
       };
+
+      stateMap[clientFileId] = state;
+      if (serverFileId) {
+        byServerFileId[serverFileId] = state;
+      }
     }
-    return stateMap;
+    return { uploadStates: stateMap, uploadStatesByServerFileId: byServerFileId };
   }, [files]);
 
   return {
     uppy,
     files,
     uploadStates,
+    uploadStatesByServerFileId,
     totalProgress,
     currentUploads,
     addFiles,

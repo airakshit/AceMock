@@ -247,3 +247,93 @@ export async function ensureFSHandleReadAccess(
     return false;
   }
 }
+
+/**
+ * BATCHED variant for whole-resume restores.
+ *
+ * The File System Access spec has no single "request access to N files"
+ * call — one `requestPermission()` per handle — but batch WAVES of the
+ * phase get the important benefits:
+ *
+ *   Phase 1 — ALL `queryPermission()` calls run concurrently first. No
+ *   prompts, no User Activation needed, so already-granted handles are
+ *   separated for free.
+ *
+ *   Phase 2 — ALL pending `requestPermission()` calls fire
+ *   CONCURRENTLY inside the same User Activation (the "Resume Upload"
+ *   click). Firing them together keeps every request well inside the
+ *   activation window — a sequential request after hashing each file's
+ *   probe could expire it and get denied — and Chromium coalesces /
+ *   fast-fires the prompts natively (it serializes the dialogs but they
+ *   all belong to one decision burst, so one "Allow" typically answers
+ *   handles picked from the same picker/drop).
+ *
+ * Returns a granted boolean per input index (null handles count as
+ * granted — nothing to prompt for; the restore path treats a missing
+ * handle via its own fallback). Never throws.
+ */
+export async function ensureFSHandlesReadAccess(
+  handles: Array<FileSystemFileHandle | null>,
+): Promise<boolean[]> {
+  const results: boolean[] = new Array<boolean>(handles.length).fill(false);
+
+  // Phase 1: batched queries (no activation required).
+  const pendingRequests: Array<Promise<void>> = [];
+  const capableMap = new Map<number, PermissionCapableHandle>();
+
+  handles.forEach((handle, index) => {
+    if (!handle) {
+      // Nothing to prompt for; the restore path ignores null handles.
+      results[index] = true;
+      return;
+    }
+
+    const capable = handle as unknown as PermissionCapableHandle;
+
+    if (typeof capable.queryPermission !== "function") {
+      // No permission API: attempt optimistically.
+      results[index] = true;
+      return;
+    }
+
+    pendingRequests.push(
+      capable
+        .queryPermission.call(handle, { mode: "read" })
+        .then((state) => {
+          if (state === "granted") {
+            results[index] = true;
+          } else {
+            capableMap.set(index, capable);
+          }
+        })
+        .catch(() => {
+          results[index] = false;
+        }),
+    );
+  });
+
+  await Promise.all(pendingRequests);
+
+  // Phase 2: batched requests, one shot, same activation.
+  await Promise.all(
+    Array.from(capableMap.entries()).map(([index, capable]) => {
+      // Only non-null handles reach this map.
+      const handle = handles[index] as FileSystemFileHandle;
+
+      if (typeof capable.requestPermission !== "function") {
+        return Promise.resolve();
+      }
+
+      return capable
+        .requestPermission.call(handle, { mode: "read" })
+        .then((state) => {
+          results[index] = state === "granted";
+        })
+        .catch(() => {
+          results[index] = false;
+        });
+    }),
+  );
+
+  return results;
+}

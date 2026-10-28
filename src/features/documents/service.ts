@@ -198,10 +198,34 @@ class DocumentsService {
       })),
     );
 
+    /**
+     * Re-read the just-created document through the SAME repository query
+     * and the SAME DTO mapper that getUserDocuments uses — the response's
+     * `document` is therefore exactly what the documents list renders
+     * (files + relevant session included), never a hand-built lookalike.
+     */
+    const createdDocument = await documentsRepository.findByIdForUserWithFiles(
+      db,
+      documentId,
+      userId,
+    );
+
+    if (!createdDocument) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "Document not found right after creation.",
+      );
+    }
+
     return {
       documentId,
       sessionId,
       files: signedUrls,
+      document: await this.toDocumentItemDTO(
+        createdDocument.id,
+        userId,
+        createdDocument,
+      ),
     };
   }
 
@@ -1192,7 +1216,7 @@ class DocumentsService {
     };
   }
 
-  async getDocumentStatus(userId: string, documentId: string) {
+  async getUserDocument(userId: string, documentId: string) {
     const document = await documentsRepository.findByIdForUserWithFiles(
       db,
       documentId,

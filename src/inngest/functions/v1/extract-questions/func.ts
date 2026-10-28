@@ -24,7 +24,6 @@ import {
   type QuestionDiagramUploads,
 } from "./figure-uploads";
 import { CLASSIFY_QUESTIONS_EVENT } from "../classify-questions/func";
-import { FileProcessingStatus } from "@/features/documents/types";
 
 export interface ExtractDocumentQuestionEventData {
   userId: string;
@@ -43,15 +42,16 @@ export const extractQuestions = inngest.createFunction(
         | undefined;
       const documentId = eventData?.documentId;
 
-      if (documentId) {
+      if (documentId && eventData?.userId) {
         logger.error(
           { documentId },
           "Extract questions workflow failed permanently. Marking document as failed.",
         );
         await step.run("mark-document-failed-on-error", async () => {
-          await documentsRepository.updateFileProcessingStatus(db, {
+          await documentsRepository.update(db, {
             documentId,
-            status: "failed" as FileProcessingStatus,
+            userId: eventData.userId,
+            status: "failed",
           });
         });
       }
@@ -76,9 +76,10 @@ export const extractQuestions = inngest.createFunction(
 
     if (!docData || !docData.files || docData.files.length === 0) {
       await step.run("mark-document-failed-no-files", async () => {
-        await documentsRepository.updateFileProcessingStatus(db, {
+        await documentsRepository.update(db, {
           documentId,
-          status: "failed" as FileProcessingStatus,
+          userId,
+          status: "failed",
         });
       });
 
@@ -463,9 +464,14 @@ export const extractQuestions = inngest.createFunction(
     });
 
     await step.run("mark-document-completed", async () => {
-      await documentsRepository.updateFileProcessingStatus(db, {
+      // DOCUMENT-level completion — the file-level updater writes
+      // document_files.processing_status (already "completed" since
+      // preprocessing) and never flips the DOCUMENT, leaving it stuck at
+      // "merging_questions" on every refresh.
+      await documentsRepository.update(db, {
         documentId,
-        status: "completed" as FileProcessingStatus,
+        userId,
+        status: "completed",
       });
     });
 

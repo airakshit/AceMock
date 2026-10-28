@@ -532,6 +532,72 @@ span.katex > .katex-mathml {
  * Collapses decorative transitions and animations while keeping functional
  * loaders (spinners) alive so progress states remain readable.
  * ────────────────────────────────────────────────────────────────────────── */
+/* ---------------------------------------------------------------------------
+ * Documents — upload activity effects
+ *
+ * .upload-beam-border  — a soft brand-colored light segment traveling around
+ *   the card border while THIS browser tab is uploading/resuming the
+ *   document. Implemented as an animated conic gradient masked to the
+ *   border ring: @property lets the angle itself animate, so no JS or DOM
+ *   work happens per frame. Decorative — collapsed by the reduced-motion
+ *   rules below.
+ *
+ * .document-card-enter — subtle one-shot entrance for a newly created
+ *   document card (inserted directly from the create action's response).
+ * ------------------------------------------------------------------------- */
+@property --upload-beam-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes upload-beam-rotate {
+  to {
+    --upload-beam-angle: 360deg;
+  }
+}
+
+.upload-beam-border {
+  position: relative;
+}
+
+.upload-beam-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--upload-beam-angle),
+    transparent 0deg,
+    transparent 280deg,
+    var(--brand) 330deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: upload-beam-rotate 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes document-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.document-card-enter {
+  animation: document-card-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

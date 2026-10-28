@@ -57,6 +57,12 @@ export type UploadStatus =
 
 export interface FileProgressState {
   clientFileId: string;
+  /**
+   * document_files.id (server identity) — set once credentials are
+   * attached. The document card joins live progress onto its server file
+   * rows through this key.
+   */
+  serverFileId?: string;
   status: UploadStatus;
   percentage: number;
   bytesUploaded: number;

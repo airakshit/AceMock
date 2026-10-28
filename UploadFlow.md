@@ -149,8 +149,23 @@ src/features/documents/
   uploads/use-document-uploader.ts                 Uppy bindings (addFiles, credentials…)
   uploads/create-uppy.ts                           6 MiB chunks, x-upsert, no fingerprints
                                                    + immediate upload-ref sync hook (§4.2)
-  components/DocumentForm.tsx                      orchestration + reselect UI
-  components/DocumentCard.tsx                      staleness from session heartbeat
+  components/DocumentForm.tsx                      PURE create form - no upload
+                                                     state; fires documents:created
+                                                     (instant list insert with the
+                                                     create response DTO) and hands
+                                                     off to the provider
+  components/DocumentCard.tsx                      orchestrator: resolves ONE of
+                                                     three modes (display /
+                                                     uploading / resuming); status
+                                                     badge; animated border beam in
+                                                     live modes; explicit resume
+  components/document-card-view.ts                PURE card logic (no JSX): mode
+                                                     resolver, status view resolver,
+                                                     file summary, live badge map
+  components/DocumentFilesList.tsx                expanded files section: server
+                                                     rows + live overlay (per-file
+                                                     progress, pause/resume/retry,
+                                                     batch panel, re-select rows)
   components/FileDropzone.tsx                      FS handle capture (drag & drop + FS Access picker)
 src/lib/supabase/tus-probe.ts                      server-side HEAD probe of a TUS ref
 src/inngest/functions/v1/cleanup-stale-uploads/    24h abandonment sweep (hourly cron)
@@ -264,15 +279,53 @@ User submits (Create)
       • persist IndexedDB record (metadata + FS handles — no bytes)
       • uppy.addFiles + setCredentials(credentials, documentId)
         (attaches the per-file onUploadUrlAvailable ref-sync callback)
-      • coordinator.start() — Web Lock acquired
+      • coordinator.start() — Web Lock acquired; provider sets
+        activeDocumentId (the card's live-progress switch)
       • uppy.upload() — TUS: POST → 201 + Location →
         onUploadUrlAvailable → saveUploadReference fires IMMEDIATELY
         (server owns the ref before any chunk) →
         PATCH chunks (≤6 MiB, 3 concurrent)
+  → the FORM is done: it resets and closes the popup. Closing the popup
+    at ANY point (even immediately after Create) changes nothing — the
+    create flow runs in a closure and the upload is provider-owned.
+    BEFORE the bootstrap the form fires `documents:created` carrying the
+    create response's full DocumentItemDTO (same query + mapper as
+    get-user-documents): YourDocuments inserts the card instantly with a
+    subtle entrance animation — no refetch wait, correct files and
+    aggregates from the first paint. (`documents:refresh` is fired only
+    in the lock-unavailable branch, to reconcile with the other tab.)
+    The card starts in display mode ("Uploading Files" via the
+    fresh-heartbeat fallback) and flips to live mode the moment the
+    coordinator acquires the lock.
   → per-file: upload-success → completeDocumentFileUploadAction
   → batch complete → completeUploadSessionAction → session COMPLETED
-  → IndexedDB record deleted; router.refresh() shows "uploaded/completed".
+  → IndexedDB record deleted; the provider fires `documents:refresh`
+    and the card flips to the committed server statuses
+    ("uploaded"/"completed").
 ```
+
+#### Card display modes (DocumentCard)
+
+The card renders in exactly ONE of three modes, resolved in one place
+(`resolveDocumentCardMode`, pure module `document-card-view.ts`):
+
+- `display` — pure server DTO; this tab holds no live state for the
+  document. Status badge comes from `resolveDocumentStatusView` (the
+  server snapshot + heartbeat staleness).
+- `uploading` — THIS tab's coordinator owns the session
+  (`activeDocumentId === document.id`): animated border beam
+  (`.upload-beam-border`), live overall/per-file progress, batch
+  pause/resume/retry, badge overridden to "Uploading Files".
+- `resuming` — a resume bootstrap is running for this document, or it is
+  waiting for content-verified re-selections (`resumeTarget`).
+
+Live Uppy state is joined onto the server file rows by
+`document_files.id` (`uploadStatesByServerFileId` — the hook mirrors each
+Uppy file's `meta.serverFileId`). All live UI lives in
+`DocumentFilesList.tsx`; the card shell stays mode-wiring only. New cards
+enter the list with a subtle one-shot animation
+(`.document-card-enter`); both effects are decorative and collapse under
+`prefers-reduced-motion`.
 
 ### 6.2 Network failure during upload (R1, same session, no user action)
 
@@ -307,16 +360,21 @@ Resume Upload click → startResume(documentId)
   → resumeDocumentUploadAction        ← ALL eligibility decided SERVER-side
   → per-file plan (§7) + fresh 2h tokens + document meta
   → provider loads IndexedDB record:
-      • FS-handle files: queryPermission → requestPermission (resume
-        click gesture, only if not already granted) → handle.getFile() →
-        probe re-verified →
+      • FS-handle files: BATCHED permission wave first — all
+        queryPermission calls concurrent, then all pending
+        requestPermission calls fire together inside the Resume-click
+        user activation (Chromium coalesces the prompts) — granted
+        handles → getFile() → probe re-verified →
         addFiles + setCredentials + (plan="resume") inject
         uppy.setFileState(id, {tus: {uploadUrl: plan.uploadRef}})
-      • files without handles → reselect UI
+      • files without handles → re-select rows rendered on the DOCUMENT
+        CARD (the card owns all upload UI now)
   → files with probe-matched bytes: upload continues the server-probed TUS
     resource at plan.offsetBytes (or reuploads from scratch, incl. x-upsert)
-  → reselect rows: user picks the file again → isProbeVerified (exact
-    content expected) → enqueued with the same server plan → batch resumes.
+  → the card auto-expands (activeDocumentId) and shows live per-file
+    progress; reselect rows sit under the file grid until every file is
+    re-picked → isProbeVerified (exact content expected) → enqueued with
+    the same server plan → batch resumes.
   → One active session keeps its identity; no new session is created.
 ```
 
