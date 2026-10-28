@@ -14,6 +14,11 @@ export interface DocumentUploadMeta extends Meta {
   serverFileId?: string;
 
   /**
+   * Owning upload session ID.
+   */
+  sessionId?: string;
+
+  /**
    * Owning document (set when credentials are attached) — the upload
    * runtime keys heartbeats, finalization and blob cleanup on this.
    */
@@ -44,7 +49,7 @@ export interface DocumentUploadMeta extends Meta {
 
 export type DocumentUppyFile = UppyFile<
   DocumentUploadMeta,
-  Record<string, unknown>
+  Record<string, never>
 >;
 
 export type UploadStatus =

@@ -13,7 +13,6 @@ import {
 import { toast } from "sonner";
 import {
   createDocumentUppy,
-  setUploadRefHandler,
 } from "./create-uppy";
 import { useDocumentUploader } from "./use-document-uploader";
 import { isProbeVerified } from "./upload-probe";
@@ -237,7 +236,6 @@ export function DocumentUploaderProvider({
       // Unmount of the whole provider (full page leave): stop the
       // coordinator — the server session simply goes quiet and stays
       // resumable. We must NOT cancel in-flight uploads here.
-      setUploadRefHandler(uppy, null);
       coordinatorRef.current?.stop();
     },
     [uppy],
@@ -306,7 +304,6 @@ export function DocumentUploaderProvider({
           setResumeTarget((current) =>
             current?.documentId === documentId ? null : current,
           );
-          setUploadRefHandler(uppy, null);
           coordinatorRef.current = null;
           sessionMetaRef.current = null;
         },
@@ -314,11 +311,6 @@ export function DocumentUploaderProvider({
       });
 
       coordinatorRef.current = coordinator;
-      // Immediate ref-sync: TUS resource-created events dispatch to this
-      // coordinator while it owns the session.
-      setUploadRefHandler(uppy, (serverFileId, uploadRef) => {
-        void coordinator.saveUploadRef(serverFileId, uploadRef);
-      });
       const acquired = await coordinator.start();
       if (acquired) {
         setActiveDocumentId(documentId);
@@ -369,7 +361,11 @@ export function DocumentUploaderProvider({
         clientFileId: item.clientFileId,
         file: item.file,
       })));
-      uploader.setCredentials(params.credentials, params.documentId);
+      uploader.setCredentials(
+        params.credentials,
+        params.documentId,
+        params.sessionId,
+      );
 
       const acquired = await startCoordinator(
         params.sessionId,
@@ -564,6 +560,7 @@ export function DocumentUploaderProvider({
               ),
             ),
             documentId,
+            result.data.sessionId,
           );
 
           // Server-decided continuation URLs, injected per file — the
@@ -670,6 +667,7 @@ export function DocumentUploaderProvider({
             ),
           ],
           documentId,
+          resumeTarget.sessionId,
         );
 
         // A re-selected file whose server plan says "resume" must STILL

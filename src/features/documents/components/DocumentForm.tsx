@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Files, Loader2, Plus, X } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
@@ -98,6 +98,7 @@ export function DocumentForm({
   }, [open, form]);
 
   const onSubmit = async (data: DocumentFormData) => {
+    if (isCreatingDoc) return;
     if (data.files.length === 0) {
       toast.error("Please add at least one PDF or image file.");
       return;
@@ -154,7 +155,16 @@ export function DocumentForm({
       }
 
       /**
-       * The document enters the list INSTANTLY — straight from the create
+       * 1. Automatically close the form and reset it immediately now that
+       * the initial server action succeeded. Closing the form does not
+       * stop the upload or request.
+       */
+      onOpenChange(false);
+      form.reset({ title: "", description: "", files: [] });
+      setShowDescription(false);
+
+      /**
+       * 2. The document enters the list INSTANTLY — straight from the create
        * response (same DTO the list renders), before the upload bootstrap
        * even starts. This ordering is what makes "create then immediately
        * close the popup" safe: the event has already fired, and everything
@@ -168,13 +178,14 @@ export function DocumentForm({
       );
 
       /**
-       * From here on the SERVER owns the attempt (upload session id, tokens,
+       * 3. From here on the SERVER owns the attempt (upload session id, tokens,
        * TUS references). The provider persists identity metadata — never
        * bytes — acquires the cross-tab Web Lock and starts the coordinator
        * (heartbeats, ref-sync, per-file completion, session commit). The
        * form's job ends here: the card in the list takes over the display.
+       * Run in background so dialog closure does not block or wait for bytes.
        */
-      const started = await beginUploadSession({
+      void beginUploadSession({
         documentId: result.data.documentId,
         sessionId: result.data.sessionId,
         title: data.title,
@@ -184,23 +195,21 @@ export function DocumentForm({
         fileHandles,
         credentials: result.data.files,
         onLocked: () => {},
-      });
-
-      if (!started) {
-        // Lock was unavailable (another tab owns this session). The
-        // document still exists server-side — the list shows it, and a
-        // refetch reconciles the card with the other tab's live truth.
-        toast.info(
-          "This upload is already running in another tab — progress is shown on its document card.",
-        );
-        window.dispatchEvent(new Event(DOCUMENTS_REFRESH_EVENT));
-      }
-
-      // The form is done and gets out of the way (no-op if the popup was
-      // already closed — closing never cancels the running upload).
-      form.reset({ title: "", description: "", files: [] });
-      setShowDescription(false);
-      onOpenChange(false);
+      })
+        .then((started) => {
+          if (!started) {
+            // Lock was unavailable (another tab owns this session). The
+            // document still exists server-side — the list shows it, and a
+            // refetch reconciles the card with the other tab's live truth.
+            toast.info(
+              "This upload is already running in another tab — progress is shown on its document card.",
+            );
+            window.dispatchEvent(new Event(DOCUMENTS_REFRESH_EVENT));
+          }
+        })
+        .catch((uploadError) => {
+          console.error("[DocumentForm] Background upload error:", uploadError);
+        });
     } catch (error) {
       toast.error("Failed to create document upload.");
       console.error(error);

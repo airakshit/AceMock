@@ -1,48 +1,70 @@
 "use client";
 
-import Uppy from "@uppy/core";
+import Uppy, { type UppyFile } from "@uppy/core";
 import Tus from "@uppy/tus";
+import type { HttpRequest, HttpResponse } from "tus-js-client";
 import { env } from "@/config/env/client";
 import { UPPY_UPLOAD_CONFIG } from "./upload.config";
 import { DocumentUploadMeta } from "./upload.types";
 
 /**
- * Fires the moment a new TUS resource URL is learned, with the server
- * identity of the file it belongs to.
+ * Decodes the TUS `Upload-Metadata` header value.
+ * Value format: comma-separated `key base64Value` pairs.
  */
-export type UploadRefCreatedHandler = (
-  serverFileId: string,
-  uploadRef: string,
-) => void;
+function parseTusMetadata(headerValue?: string | null): Record<string, string> {
+  if (!headerValue) return {};
+  const result: Record<string, string> = {};
+  for (const pair of headerValue.split(",")) {
+    const [key, b64Value] = pair.trim().split(" ");
+    if (key && b64Value) {
+      try {
+        result[key] = atob(b64Value);
+      } catch {
+        // Ignore malformed base64
+      }
+    }
+  }
+  return result;
+}
 
 /**
- * Late-bound sink for the immediate upload-ref sync. The uppy/TUS
- * transport is session-agnostic (created once per provider mount), while
- * the UploadSessionCoordinator is per-session — so the coordinator
- * registers itself here for the time it owns the session
- * (setUploadRefHandler / clearUploadRefHandler).
- *
- * WeakMap keyed by the uppy instance: no React refs involved (never read
- * during render) and no leak if the provider remounts.
+ * Finds the corresponding Uppy file for a TUS request by
+ * decoding the TUS `Upload-Metadata` header.
  */
-const uploadRefHandlers = new WeakMap<
-  Uppy<DocumentUploadMeta>,
-  UploadRefCreatedHandler
->();
+export function findFileByRequest(
+  req: HttpRequest,
+  uppy: Uppy<DocumentUploadMeta>,
+): UppyFile<DocumentUploadMeta, Record<string, never>> | undefined {
+  const metadata = parseTusMetadata(req.getHeader("Upload-Metadata"));
+  const files = uppy.getFiles();
 
-/** Minimal structural shape of the installed @uppy/tus plugin. */
-interface TusPluginLike {
-  /** Public per-file tus.Upload instances kept by the plugin. */
-  uploaders: Record<string, { url?: string | null } | null>;
+  if (metadata.serverFileId) {
+    const file = files.find((f) => f.meta.serverFileId === metadata.serverFileId);
+    if (file) return file;
+  }
+
+  // Matches the object name
+  if (metadata.objectName) {
+    const file = files.find((f) => f.meta.objectName?.trim() === metadata.objectName.trim());
+    if (file) return file;
+  }
+
+  return undefined;
 }
 
 export function createDocumentUppy(): Uppy<DocumentUploadMeta> {
+  /**
+   * Tracks in-flight or completed DB persistence promises for TUS endpoints.
+   * Keyed by serverFileId to prevent redundant network and DB calls.
+   * Scoped to this Uppy instance to prevent state bleeding across batches.
+   */
+  const pendingSaveTusRef = new Map<string, Promise<void>>();
+
   const uppy = new Uppy<DocumentUploadMeta>({
     autoProceed: false,
 
     restrictions: {
       maxNumberOfFiles: 20,
-      // Keep in sync with the zod schema in ../schemas.ts (50 MB per file).
       maxFileSize: UPPY_UPLOAD_CONFIG.MAX_FILE_SIZE_MB * 1024 * 1024,
     },
 
@@ -57,11 +79,8 @@ export function createDocumentUppy(): Uppy<DocumentUploadMeta> {
     storeFingerprintForResuming: false,
 
     /**
-     * Only these fields should become
-     * TUS metadata.
-     *
-     * uploadToken must NOT be sent as
-     * TUS metadata.
+     * Only these fields should become TUS metadata.
+     * uploadToken must NOT be sent as TUS metadata.
      */
     allowedMetaFields: UPPY_UPLOAD_CONFIG.ALLOWED_METADATA_FIELDS,
 
@@ -76,6 +95,75 @@ export function createDocumentUppy(): Uppy<DocumentUploadMeta> {
         "x-signature": token,
         "x-upsert": "true",
       };
+    },
+
+    /**
+     * Captures TUS endpoint immediately when Supabase returns 201 Created
+     * on the initial POST and triggers saving the endpoint reference in parallel.
+     * Uses an API route instead of a Next.js Server Action to allow concurrent requests.
+     */
+    onAfterResponse: async (req: HttpRequest, res: HttpResponse) => {
+      if (req.getMethod() !== "POST" || res.getStatus() !== 201) return;
+
+      const location = res.getHeader("Location");
+      if (!location) return;
+
+      const file = findFileByRequest(req, uppy);
+      if (!file) {
+        console.warn("[uppy:tus] File cannot be identified from request metadata in onAfterResponse");
+        return;
+      }
+      const serverFileId = file.meta.serverFileId;
+      const sessionId = file.meta.sessionId;
+
+      if (serverFileId && sessionId && !pendingSaveTusRef.has(serverFileId)) {
+        const savePromise = (async () => {
+          const response = await fetch("/api/documents/upload-ref", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              sessionId,
+              documentFileId: serverFileId,
+              uploadRef: location,
+            }),
+          });
+
+          const result = await response.json().catch(() => null);
+
+          if (!response.ok || !result?.success) {
+            const errorMsg =
+              result?.error?.message ||
+              `HTTP ${response.status}: Failed to save TUS endpoint`;
+            console.error(
+              "[uppy:tus] Failed to save TUS endpoint reference:",
+              result?.error ?? errorMsg,
+            );
+            throw new Error(errorMsg);
+          }
+        })();
+
+        pendingSaveTusRef.set(serverFileId, savePromise);
+      }
+    },
+
+    /**
+     * Synchronization Barrier:
+     * Never allow ANY byte chunk (PATCH) to be sent until the TUS endpoint
+     * has been confirmed and saved in the database!
+     */
+    onBeforeRequest: async (req, file) => {
+      if (req.getMethod() === "PATCH") {
+        const serverFileId = (file?.meta as DocumentUploadMeta | undefined)
+          ?.serverFileId;
+        if (serverFileId) {
+          const savePromise = pendingSaveTusRef.get(serverFileId);
+          if (savePromise) {
+            await savePromise;
+          }
+        }
+      }
     },
   });
 
@@ -94,72 +182,9 @@ export function createDocumentUppy(): Uppy<DocumentUploadMeta> {
     );
   });
 
-  return uppy;
-}
-
-/**
- * Route TUS `POST → 201 + Location` events to the given coordinator
- * while it owns the session. Pass `null` to detach.
- */
-export function setUploadRefHandler(
-  uppy: Uppy<DocumentUploadMeta>,
-  handler: UploadRefCreatedHandler | null,
-): void {
-  if (handler) {
-    uploadRefHandlers.set(uppy, handler);
-  } else {
-    uploadRefHandlers.delete(uppy);
-  }
-}
-
-/**
- * IMMEDIATE upload-ref sync, wiring per FILE.
- *
- * tus-js-client exposes exactly the moment the TUS endpoint exists:
- * inside `_createUpload`, right after `this.url = resolveUrl(...)` (the
- * create request's `Location` header), it invokes
- * `options.onUploadUrlAvailable()` — synchronously, before any chunk is
- * PATCHed, on every resource creation (fresh upload AND upload-retry).
- *
- * The callback receives NO arguments, so the file mapping is resolved by
- * attaching a SUB-CALLBACK PER FILE here, before the batch starts. The
- * per-file options reach tus-js-client through @uppy/tus's per-file
- * merge (`...(file.tus || {})` in startUpload), and the closure reads
- * the fresh URL from the plugin's public `uploaders[uppyFileId].url` —
- * already assigned at callback time. Continuing an EXISTING resource
- * (resume/PATCH) never fires it, so a resumed plan cannot double-save.
- *
- * Fire-and-forget by construction: the sink (`saveUploadRef`) owns the
- * server action asynchronously. After the create the per-file state
- * read by the heartbeat-tick fallback sweep is the authority anyway.
- */
-export function attachOnUploadUrlAvailable(
-  uppy: Uppy<DocumentUploadMeta>,
-  uppyFileId: string,
-  serverFileId: string,
-): void {
-  const plugin = uppy.getPlugin("Tus") as TusPluginLike | null;
-  if (!plugin) return;
-
-  uppy.setFileState(uppyFileId, {
-    tus: {
-      // Preserve any per-file tus options already set.
-      ...(uppy.getFile(uppyFileId)?.tus ?? {}),
-      onUploadUrlAvailable: () => {
-        try {
-          const uploadRef = plugin.uploaders[uppyFileId]?.url;
-          if (!uploadRef) return;
-
-          // No sink registered (no active session coordinator)? Then
-          // nothing is fired and the heartbeat-tick sweep stays the
-          // fallback.
-          uploadRefHandlers.get(uppy)?.(serverFileId, uploadRef);
-        } catch (error) {
-          // A broken hook must never break the upload itself; the
-          // coordinator's heartbeat ref-sync is the fallback.
-          console.error("[uppy:tus] upload-ref hook failed:", error);
-        }
-      },
-    },
+  uppy.on("cancel-all", () => {
+    pendingSaveTusRef.clear();
   });
+
+  return uppy;
 }

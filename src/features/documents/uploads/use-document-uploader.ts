@@ -11,7 +11,6 @@ import type {
   UploadStatus,
 } from "./upload.types";
 import { env } from "@/config/env/client";
-import { attachOnUploadUrlAvailable } from "./create-uppy";
 
 /**
  * The single Uppy instance is created by `DocumentUploaderProvider` and
@@ -217,6 +216,7 @@ export function useDocumentUploader(uppy: Uppy<DocumentUploadMeta>) {
     (
       credentialsList: SignedUrlResponseObject[],
       documentId?: string,
+      sessionId?: string,
     ) => {
       for (const cred of credentialsList) {
         const file = findUppyFile(cred.clientFileId);
@@ -235,14 +235,8 @@ export function useDocumentUploader(uppy: Uppy<DocumentUploadMeta>) {
           contentType: file.type || "application/octet-stream",
           uploadToken: cred.token,
           ...(documentId && { documentId }),
+          ...(sessionId && { sessionId }),
         });
-
-        /**
-         * Immediate ref-sync channel: attach the per-file
-         * `onUploadUrlAvailable` callback that fires the instant the
-         * TUS resource endpoint exists (see create-uppy.ts).
-         */
-        attachOnUploadUrlAvailable(uppy, file.id, cred.serverFileId);
       }
     },
     [uppy, findUppyFile],

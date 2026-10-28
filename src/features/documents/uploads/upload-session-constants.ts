@@ -34,8 +34,4 @@ export const UPLOAD_HEARTBEAT_STALE_MS = 120_000;
  */
 export const UPLOAD_TUS_RESOURCE_LIFETIME_MS = 23.5 * 60 * 60 * 1000;
 
-/**
- * Maximum number of files uploading concurrently (browser-side TUS limit;
- * mirrored in Uppy's `limit`).
- */
-export const UPLOAD_MAX_CONCURRENCY = 3;
+export const UPLOAD_MAX_CONCURRENCY = 4;

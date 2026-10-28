@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type Uppy from "@uppy/core";
 import type { UppyFile } from "@uppy/core";
@@ -9,7 +9,6 @@ import {
 } from "../actions/complete-document-file-upload";
 import { completeUploadSessionAction } from "../actions/complete-upload-session";
 import { heartbeatUploadSessionAction } from "../actions/heartbeat-upload-session";
-import { saveUploadReferenceAction } from "../actions/save-upload-reference";
 import {
   UPLOAD_HEARTBEAT_INTERVAL_MS,
 } from "./upload-session-constants";
@@ -60,11 +59,6 @@ export class UploadSessionCoordinator {
   private readonly onSessionFinished: (outcome: "completed" | "lost") => void;
   private readonly onError: (message: string) => void;
 
-  /**
-   * `serverFileId:uploadRef` keys whose TUS resource reference has been
-   * saved server-side
-   */
-  private savedRefKeys = new Set<string>();
   /** In-flight completeDocumentFileUpload requests (awaited before commit). */
   private pendingCompletions = new Set<Promise<unknown>>();
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -170,49 +164,8 @@ export class UploadSessionCoordinator {
     this.endLifecycle();
   }
 
-  /**
-   * IMMEDIATE ref-sync: hand a freshly created TUS resource URL to the
-   * server the moment it exists.
-   *
-   * Uppy's TUS plugin fires this the instant Supabase's create request
-   * returns `201 + Location` (see create-uppy.ts onAfterResponse). Waiting
-   * for the next heartbeat tick would leave the uploadRef unknown to the
-   * server for up to 25s — a tab close inside that window would lose a
-   * perfectly good resumable resource and degrade its resume path to a
-   * full re-upload (TUS resources live ~24h, tokens 2h).
-   *
-   * The heartbeat tick keeps calling this too as a safety-net sweep; the
-   * `serverFileId:uploadRef` key makes the two paths mutually idempotent.
-   */
-  async saveUploadRef(serverFileId: string, uploadRef: string): Promise<void> {
-    if (this.isStopped || this.stopRequested) return;
-
-    const key = `${serverFileId}:${uploadRef}`;
-    if (this.savedRefKeys.has(key)) return;
-    this.savedRefKeys.add(key);
-
-    try {
-      await saveUploadReferenceAction({
-        sessionId: this.sessionId,
-        documentFileId: serverFileId,
-        uploadRef,
-      });
-    } catch (error) {
-      // The heartbeat sweep remains the safety net; a missed ref only
-      // degrades the next resume to the re-upload path.
-      console.error("[upload-coordinator] saveUploadReference failed:", error);
-    }
-  }
-
-
   private beginLifecycle() {
     this.isStopped = false;
-
-    // Fallback ref-sync sweep shortly after the batch starts — the
-    // authoritative refs arrive via the TUS create-response hook
-    // (saveUploadRef), this catches anything the hook might have missed
-    // and then double-checks every UPLOAD_HEARTBEAT_INTERVAL_MS.
-    setTimeout(() => this.tick(), 1500);
 
     this.heartbeatTimer = setInterval(
       () => void this.tick(),
@@ -272,22 +225,7 @@ export class UploadSessionCoordinator {
 
     const files = this.sessionFiles();
 
-    // 1. Ref-sync fallback sweep: push any TUS resource URL known to
-    // Uppy's file state that the immediate create-response hook has not
-    // already saved (deduped by savedRefKeys inside saveUploadRef).
-    if (!options.flushOnly) {
-      for (const file of files) {
-        const uploadRef = file.tus?.uploadUrl;
-        if (!uploadRef) continue;
-
-        await this.saveUploadRef(
-          file.meta.serverFileId as string,
-          uploadRef,
-        );
-      }
-    }
-
-    // 2. Progress snapshot heartbeat.
+    // Progress snapshot heartbeat.
     const progress: ProgressSnapshot[] = files.map((file) => ({
       documentFileId: file.meta.serverFileId as string,
       status: file.progress?.uploadComplete
