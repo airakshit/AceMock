@@ -7,6 +7,7 @@ import {
   ChevronUp,
   FileText,
   Image as ImageIcon,
+  ListChecks,
   Loader2,
   Pencil,
   RefreshCw,
@@ -652,12 +653,21 @@ export function DocumentCard({
                                 : "Working..."}
                         </span>
                       </>
-                    ) : processingStatus === "completed" ? (
-                      <span>Re-process</span>
+                      ) : processingStatus === "completed" ? (
+                      <>
+                        <ListChecks className="size-3.5 text-success" />
+                        <span>Re-process</span>
+                      </>
                     ) : processingStatus === "failed" ? (
-                      <span>Retry</span>
+                      <>
+                        <ListChecks className="size-3.5" />
+                        <span>Retry</span>
+                      </>
                     ) : (
-                      <span>Process</span>
+                      <>
+                        <ListChecks className="size-3.5 text-white" />
+                        <span>Process</span>
+                      </>
                     )}
                   </Button>
                 )}
