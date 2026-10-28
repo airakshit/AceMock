@@ -9,16 +9,11 @@ import {
 import { documents } from "./documents";
 import { uploadSessions } from "./upload-sessions";
 
-/**
- * File upload lifecycle (server-owned state machine):
- *   pending → uploading → uploaded → completed
- *   failing paths: failed / cancelled / expired
- */
+
 export const fileUploadStatusEnum = pgEnum("file_upload_status_enum", [
   "pending",
   "uploading",
   "uploaded",
-  "completed",
   "failed",
   "cancelled",
   "expired",

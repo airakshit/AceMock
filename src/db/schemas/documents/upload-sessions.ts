@@ -26,12 +26,7 @@ export const uploadSessionStatusEnum = pgEnum("upload_session_status_enum", [
 ]);
 
 /**
- * One row per document-upload attempt.
- *
- * The server owns the upload session: it authorizes recovery, tracks
- * liveness (see lastHeartbeatAt) and enforces the business rule
- * "at most one ACTIVE session per document" via the partial unique index
- * below. Historical (terminal) sessions are kept for auditability.
+ * A table recording a upload session per document. (not per file)
  */
 export const uploadSessions = pgTable(
   "upload_sessions",
@@ -67,7 +62,7 @@ export const uploadSessions = pgTable(
     endedAt: timestamp("ended_at", { withTimezone: true }),
     endReason: text("end_reason"),
   },
-  
+
   (table) => [
     // Business rule: at most one active session per document.
     uniqueIndex("uq_active_upload_session_per_document")

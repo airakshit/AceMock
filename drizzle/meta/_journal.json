@@ -176,6 +176,13 @@
       "when": 1793028567835,
       "tag": "0024_tense_dreadnoughts",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793201269077,
+      "tag": "0025_bent_strong_guy",
+      "breakpoints": true
     }
   ]
 }
