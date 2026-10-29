@@ -1,10 +1,11 @@
 // Database write models consumed by repository insert/update operations
 // Accessed by: services and repositories
 
-import { DocumentProcessingStatus } from "../types";
-
-export type FileProcessingStatus = "pending" | "running" | "completed" | "failed";
-export type FilePageOCRStatus = "pending" | "running" | "completed" | "failed";
+import {
+  DocumentProcessingStatus,
+  FileProcessingStatus,
+  FilePageOCRStatus,
+} from "../types";
 
 // ===========================================================================
 // Upload sessions
@@ -31,22 +32,8 @@ export interface TouchUploadSessionCommand {
 }
 
 // ===========================================================================
-// Document files
+// Document files & uploads
 // ===========================================================================
-
-export interface UpdateFilesUploadStatusCommand {
-  documentId: string;
-  /** Files whose uploadStatus should be flipped. */
-  fileIds: string[];
-  uploadStatus: "pending" | "uploading" | "uploaded" | "failed" | "cancelled" | "expired";
-}
-
-export interface SaveUploadReferenceCommand {
-  fileId: string;
-  documentId: string;
-  /** TUS upload resource URL created by the client. */
-  uploadRef: string;
-}
 
 export interface CreateDocumentCommand {
   documentId: string;
@@ -59,9 +46,9 @@ export interface CreateDocumentFileCommand {
   id: string;
   documentId: string;
   /** Upload session that owns this in-flight upload. */
-  sessionId: string;
+  sessionId?: string | null;
   /** Content fingerprint of the selected file (client-computed). */
-  contentProbe: string;
+  contentProbe?: string | null;
   filename: string;
   mimeType: string;
   fileSize: number;
@@ -91,6 +78,42 @@ export interface UpdateDocumentFileProcessingStatusCommand {
   status: FileProcessingStatus;
 }
 
+export interface UpdateFilesUploadStatusCommand {
+  documentId: string;
+  /** Files whose uploadStatus should be flipped. */
+  fileIds: string[];
+  uploadStatus:
+    | "pending"
+    | "uploading"
+    | "uploaded"
+    | "failed"
+    | "cancelled"
+    | "expired";
+}
+
+export interface SaveUploadReferenceCommand {
+  fileId: string;
+  documentId: string;
+  /** TUS upload resource URL created by the client. */
+  uploadRef: string;
+}
+
+export interface ReconcileVerifiedFilesCommand {
+  documentId: string;
+  verifiedFileIds: string[];
+  failedFileIds: string[];
+}
+
+// ===========================================================================
+// File pages
+// ===========================================================================
+
+export interface CreateFilePageCommand {
+  id: string;
+  fileId: string;
+  pageNo: number;
+}
+
 export interface UpdateFilePageCommand {
   pageId: string;
   fileId: string;
@@ -100,7 +123,32 @@ export interface UpdateFilePageCommand {
   survivedValidation?: boolean;
   ocrModel?: string;
   isRelevant?: boolean;
+  /**
+   * Internal only: which inngest function version produced this page's
+   * data. Never surfaced to users.
+   */
+  fnVersion?: number;
 }
+
+export interface UpdateFilePageStatusCommand {
+  fileId: string;
+  ocrStatus: FilePageOCRStatus;
+}
+
+export interface UpdateFilePageStatusByPageIdCommand {
+  pageId: string;
+  ocrStatus: FilePageOCRStatus;
+}
+
+export interface UpdateFilePagesStatusCommand {
+  fileId: string;
+  pageIds: string[];
+  status: FilePageOCRStatus;
+}
+
+// ===========================================================================
+// Deletions
+// ===========================================================================
 
 export interface DeleteDocumentCommand {
   documentId: string;
@@ -115,10 +163,4 @@ export interface DeleteDocumentFileCommand {
 export interface DeleteFilePageCommand {
   pageId: string;
   fileId: string;
-}
-
-export interface CreateFilePageCommand {
-  id: string;
-  fileId: string;
-  pageNo: number;
 }

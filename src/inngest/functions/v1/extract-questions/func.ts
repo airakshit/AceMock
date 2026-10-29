@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { inngest } from "../../../client";
 import { documentQueries } from "@/features/documents/repositories/document-queries";
-import { storagePaths } from "@/lib/supabase/storage-paths";
+import { PDFStoragePathsRetriever } from "@/lib/supabase/storage-paths";
 import { DocumentWithFilesProjection } from "@/features/documents/dto/projections";
 import { JsonifyObject } from "inngest/types";
 
@@ -30,7 +30,7 @@ export interface ExtractDocumentQuestionEventData {
   documentId: string;
 }
 
-export const EXTRACT_QUESTIONS_EVENT = "documents/extract" as const;
+export const EXTRACT_QUESTIONS_EVENT = "v1/documents/extract" as const;
 
 export const extractQuestions = inngest.createFunction(
   {
@@ -106,11 +106,11 @@ export const extractQuestions = inngest.createFunction(
 
     docData.files.forEach((file) => {
       file.pages.forEach((page) => {
-        const pageStoragePath = storagePaths.getDocumentFilePageSourceUrl(
+        const pageStoragePath = PDFStoragePathsRetriever.getDocumentFilePageSourceUrl(
           userId,
           documentId,
           file.id,
-          file.filename,
+
           "webp",
           page.pageNo,
         );
@@ -371,18 +371,18 @@ export const extractQuestions = inngest.createFunction(
     const passageMap: Record<string, string> =
       distinctPassages.length > 0
         ? await step.run("create-passages", async () => {
-            const results = await questionsRepository.createManyPassages(
-              db,
-              distinctPassages,
-            );
+          const results = await questionsRepository.createManyPassages(
+            db,
+            distinctPassages,
+          );
 
-            return Object.fromEntries(
-              results.map((result) => [
-                normalizePassage(result.content),
-                result.id,
-              ]),
-            );
-          })
+          return Object.fromEntries(
+            results.map((result) => [
+              normalizePassage(result.content),
+              result.id,
+            ]),
+          );
+        })
         : {};
 
     const saveResult = await step.run("save-questions", async () => {
@@ -455,8 +455,7 @@ export const extractQuestions = inngest.createFunction(
         );
 
         throw new QuestionPersistError(
-          `Failed to persist questions to database: ${
-            err instanceof Error ? err.message : String(err)
+          `Failed to persist questions to database: ${err instanceof Error ? err.message : String(err)
           }`,
           err,
         );

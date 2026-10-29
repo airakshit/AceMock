@@ -10,17 +10,6 @@ import {
 } from "../types";
 
 /**
- * Read model for mock test creation - document options with question count.
- * Used by the mocks feature.
- */
-export interface DocumentOptionForMockProjection {
-  id: string;
-  title: string;
-  createdAt: Date;
-  questionCount: number;
-}
-
-/**
  * Per-file progress snapshot cached on the session row (jsonb).
  * Kept narrow (no `unknown`) so projections stay JSON-mappable downstream
  * (e.g. Inngest step serialization via JsonifyObject).
@@ -92,16 +81,14 @@ export interface FilePageProjection {
   createdAt: Date;
 }
 
-/**
- * Read model projection for documents with aggregated question count.
- * Used by repository read queries such as `findRecentDocumentsWithQuestions`.
- */
+
 export interface DocumentWithQuestionCountProjection {
   id: string;
   title: string;
   createdAt: Date;
   questionCount: number;
 }
+
 
 /**
  * Read model projection for a document with its files and pages.

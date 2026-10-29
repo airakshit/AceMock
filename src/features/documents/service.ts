@@ -15,12 +15,10 @@ import {
   CompleteDocumentFileUploadActionResponse,
   CompleteUploadSessionActionPayload,
   CompleteUploadSessionActionResponse,
-  CancelUploadSessionActionPayload,
-  CancelUploadSessionActionResponse,
   DocumentFileDTO,
   DocumentItemDTO,
 } from "./actions/types";
-import { documentsRepository } from "./repositories/documents.repository";
+import { documentRepository } from "./repositories/documents.repository";
 import {
   uploadSessionsRepository,
   type UploadSessionRow,
@@ -30,7 +28,10 @@ import type {
   DocumentWithFilesProjection,
 } from "./dto/projections";
 import { documentQueries } from "./repositories/document-queries";
-import { storagePaths } from "@/lib/supabase/storage-paths";
+import {
+  PDFStoragePathsRetriever,
+  ImageStoragePathsRetriever,
+} from "@/lib/supabase/storage-paths";
 import { generateUUIDv7 } from "../shared/utils";
 import { supabaseStorageClient } from "../shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
@@ -105,7 +106,7 @@ class DocumentsService {
   }
 
   private requireVerifiedDocument(userId: string, documentId: string) {
-    return documentsRepository.findByIdForUser(db, documentId, userId);
+    return documentRepository.queries.findByIdForUser(db, documentId, userId);
   }
 
   // =========================================================================
@@ -141,12 +142,20 @@ class DocumentsService {
         filename: file.name,
         mimeType: file.type,
         fileSize: file.size,
-        storagePath: storagePaths.getDocumentFileSourceUrl(
-          userId,
-          documentId,
-          documentFileId,
-          file.name,
-        ),
+        storagePath:
+          file.type === "application/pdf"
+            ? PDFStoragePathsRetriever.getDocumentFileSourceUrl(
+              userId,
+              documentId,
+              documentFileId,
+              file.name,
+            )
+            : ImageStoragePathsRetriever.getDocumentFileSourceUrl(
+              userId,
+              documentId,
+              documentFileId,
+              file.name,
+            ),
       };
     });
 
@@ -157,7 +166,7 @@ class DocumentsService {
      * racing attempt for the same document cannot create a second session.
      */
     await db.transaction(async (tx) => {
-      await documentsRepository.create(tx, {
+      await documentRepository.commands.create(tx, {
         documentId: documentId,
         userId,
         title: payload.title,
@@ -172,7 +181,7 @@ class DocumentsService {
         recoveryExpiresAt,
       });
 
-      await documentsRepository.createManyFiles(
+      await documentRepository.commands.createManyFiles(
         tx,
         fileModels.map((f) => ({
           id: f.serverFileId,
@@ -204,7 +213,7 @@ class DocumentsService {
      * `document` is therefore exactly what the documents list renders
      * (files + relevant session included), never a hand-built lookalike.
      */
-    const createdDocument = await documentsRepository.findByIdForUserWithFiles(
+    const createdDocument = await documentRepository.queries.findByIdForUserWithFiles(
       db,
       documentId,
       userId,
@@ -282,7 +291,7 @@ class DocumentsService {
       );
     }
 
-    const updated = await documentsRepository.saveUploadReference(db, {
+    const updated = await documentRepository.commands.saveUploadReference(db, {
       fileId: payload.documentFileId,
       documentId: session.documentId,
       uploadRef: payload.uploadRef,
@@ -361,11 +370,11 @@ class DocumentsService {
     const progress =
       payload.files && payload.files.length > 0
         ? Object.fromEntries(
-            payload.files.map((f) => [
-              f.documentFileId,
-              { status: f.status, offsetBytes: f.offsetBytes ?? null },
-            ]),
-          )
+          payload.files.map((f) => [
+            f.documentFileId,
+            { status: f.status, offsetBytes: f.offsetBytes ?? null },
+          ]),
+        )
         : undefined;
 
     const updated = await uploadSessionsRepository.touchHeartbeat(db, {
@@ -505,7 +514,7 @@ class DocumentsService {
       };
     }
 
-    const files = await documentsRepository.findFilesBySessionId(
+    const files = await documentRepository.queries.findFilesBySessionId(
       db,
       session.id,
     );
@@ -647,7 +656,7 @@ class DocumentsService {
       );
     }
 
-    const files = await documentsRepository.findFilesBySessionId(
+    const files = await documentRepository.queries.findFilesBySessionId(
       db,
       session.id,
     );
@@ -695,7 +704,7 @@ class DocumentsService {
       .filter((v) => !v.verified)
       .map((v) => v.serverFileId);
 
-    await documentsRepository.reconcileVerifiedFiles(db, {
+    await documentRepository.commands.reconcileVerifiedFiles(db, {
       documentId: session.documentId,
       verifiedFileIds,
       failedFileIds: unverifiableFileIds,
@@ -772,7 +781,7 @@ class DocumentsService {
 
     // Flip only files that belong to this session and are mid-transfer;
     // a second call for the same file is an idempotent no-op.
-    const updated = await documentsRepository.updateFilesUploadStatus(db, {
+    const updated = await documentRepository.commands.updateFilesUploadStatus(db, {
       documentId: session.documentId,
       fileIds: [payload.documentFileId],
       uploadStatus: "uploaded",
@@ -810,82 +819,8 @@ class DocumentsService {
     };
   }
 
-  /**
-   * Explicit, idempotent user cancellation. Terminal immediately; partial
-   * TUS resources of in-flight files are cleaned up best-effort. Fully
-   * uploaded files of a cancelled attempt keep their bytes in storage
-   * (deleting verified user data on cancel would be destructive); the
-   * attempt simply ends without ever committing the document processing.
-   */
-  async cancelUploadSession(
-    userId: string,
-    payload: CancelUploadSessionActionPayload,
-  ): Promise<CancelUploadSessionActionResponse> {
-    const session = await uploadSessionsRepository.findByIdForUser(
-      db,
-      payload.sessionId,
-      userId,
-    );
-
-    if (!session) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "Upload session not found or access denied.",
-      );
-    }
-
-    // Idempotent: cancelling a terminal session is a no-op.
-    if (session.status === "active") {
-      const files = await documentsRepository.findFilesBySessionId(
-        db,
-        session.id,
-      );
-
-      // Flip in-flight files to cancelled, then clean up their partial data.
-      const inFlight = files.filter(
-        (f) => f.uploadStatus === "pending" || f.uploadStatus === "uploading",
-      );
-
-      if (inFlight.length > 0) {
-        await documentsRepository.updateFilesUploadStatus(db, {
-          documentId: session.documentId,
-          fileIds: inFlight.map((f) => f.id),
-          uploadStatus: "cancelled",
-        });
-      }
-
-      // Safe cleanup: only folders of files that never finished transferring.
-      await Promise.all(
-        inFlight.map(async (f) => {
-          try {
-            await supabaseStorageClient.deleteFolder(
-              `user/${userId}/documents/${session.documentId}/files/${f.id}`,
-            );
-          } catch (storageError) {
-            // Cleanup is best-effort; the storage sweep covers orphans.
-            console.error(
-              `Failed to clean partial upload for file ${f.id}:`,
-              storageError,
-            );
-          }
-        }),
-      );
-
-      await uploadSessionsRepository.updateStatus(db, {
-        sessionId: session.id,
-        status: "cancelled",
-        endReason: "user-cancelled",
-      });
-    }
-
-    return {
-      sessionId: session.id,
-      status: "cancelled",
-    };
-  }
-
   async getUserDocuments(userId: string): Promise<DocumentItemDTO[]> {
-    const docs = await documentsRepository.findByUserWithFiles(db, userId);
+    const docs = await documentRepository.queries.findByUserWithFiles(db, userId);
 
     return Promise.all(
       docs.map(async (doc) => this.toDocumentItemDTO(doc.id, userId, doc)),
@@ -922,14 +857,14 @@ class DocumentsService {
   async getDocumentsSummary(
     userId: string,
   ): Promise<DocumentWithQuestionCountProjection[]> {
-    return documentsRepository.findDocumentsWithQuestionsCountForUser(
+    return documentRepository.queries.findDocumentsWithQuestionsCountForUser(
       db,
       userId,
     );
   }
 
   async deleteDocument(userId: string, documentId: string) {
-    const existingDocument = await documentsRepository.findByIdForUser(
+    const existingDocument = await documentRepository.queries.findByIdForUser(
       db,
       documentId,
       userId,
@@ -955,7 +890,7 @@ class DocumentsService {
 
     // 2. Delete database record of document.
     // Foreign key cascade (onDelete: "cascade") automatically deletes associated document_files and file_pages.
-    const deletedDocument = await documentsRepository.delete(db, {
+    const deletedDocument = await documentRepository.commands.delete(db, {
       documentId,
       userId,
     });
@@ -973,7 +908,7 @@ class DocumentsService {
   }
 
   async deleteDocumentFile(userId: string, documentId: string, fileId: string) {
-    const existingDocument = await documentsRepository.findByIdForUser(
+    const existingDocument = await documentRepository.queries.findByIdForUser(
       db,
       documentId,
       userId,
@@ -1005,7 +940,7 @@ class DocumentsService {
     }
 
     // 1. Delete storage folder for this file
-    const fileStorageFolder = storagePaths._getDocumentFilePath(
+    const fileStorageFolder = PDFStoragePathsRetriever.getDocumentFilePath(
       userId,
       documentId,
       fileId,
@@ -1029,7 +964,7 @@ class DocumentsService {
     }
 
     // 2. Delete file record from DB.
-    await documentsRepository.deleteFile(db, {
+    await documentRepository.commands.deleteFile(db, {
       fileId,
       documentId,
     });
@@ -1045,7 +980,7 @@ class DocumentsService {
     documentId: string,
     payload: { title: string; description?: string },
   ) {
-    const existingDocument = await documentsRepository.findByIdForUser(
+    const existingDocument = await documentRepository.queries.findByIdForUser(
       db,
       documentId,
       userId,
@@ -1066,14 +1001,14 @@ class DocumentsService {
       );
     }
 
-    await documentsRepository.update(db, {
+    await documentRepository.commands.update(db, {
       documentId,
       userId,
       title: trimmedTitle,
       description: payload.description?.trim() || undefined,
     });
 
-    const userDocs = await documentsRepository.findByUserWithFiles(db, userId);
+    const userDocs = await documentRepository.queries.findByUserWithFiles(db, userId);
     const updatedDoc = userDocs.find((doc) => doc.id === documentId);
 
     if (!updatedDoc) {
@@ -1094,31 +1029,9 @@ class DocumentsService {
     fileId: string,
     expiresIn = 3600,
   ) {
-    const existingDocument = await documentsRepository.findByIdForUser(
-      db,
-      documentId,
-      userId,
-    );
+    const file = await documentRepository.queries.findFileById(db, fileId)
 
-    if (!existingDocument) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "Document not found or access denied.",
-      );
-    }
-
-    const file = await db
-      .select()
-      .from(documentFiles)
-      .where(
-        and(
-          eq(documentFiles.id, fileId),
-          eq(documentFiles.documentId, documentId),
-        ),
-      )
-      .limit(1);
-
-    if (!file[0]) {
+    if (!file) {
       throw new ServerActionError(
         "NOT_FOUND",
         "File not found or does not belong to this document.",
@@ -1126,21 +1039,21 @@ class DocumentsService {
     }
 
     const signedUrl = await supabaseStorageClient.getPageAccessUrl(
-      file[0].storagePath,
+      file.storagePath,
       expiresIn,
     );
 
     return {
-      fileId: file[0].id,
-      filename: file[0].filename,
-      mimeType: file[0].mimeType,
-      fileSize: file[0].fileSize,
+      fileId: file.id,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      fileSize: file.fileSize,
       signedUrl,
     };
   }
 
   async processDocument(userId: string, documentId: string) {
-    const document = await documentsRepository.findByIdForUser(
+    const document = await documentRepository.queries.findByIdForUser(
       db,
       documentId,
       userId,
@@ -1193,7 +1106,7 @@ class DocumentsService {
       });
     }
 
-    const updatedDoc = await documentsRepository.findByIdForUserWithFiles(
+    const updatedDoc = await documentRepository.queries.findByIdForUserWithFiles(
       db,
       documentId,
       userId,
@@ -1213,7 +1126,7 @@ class DocumentsService {
   }
 
   async getUserDocument(userId: string, documentId: string) {
-    const document = await documentsRepository.findByIdForUserWithFiles(
+    const document = await documentRepository.queries.findByIdForUserWithFiles(
       db,
       documentId,
       userId,

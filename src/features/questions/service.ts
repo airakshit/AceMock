@@ -41,7 +41,7 @@ import {
   encodeBookmarkCursor,
   encodeReportedQuestionCursor,
 } from "./utils";
-import { storagePaths } from "@/lib/supabase/storage-paths";
+import { AdminQuestionStoragePathRetriever } from "@/lib/supabase/storage-paths";
 import { generateUUIDv7, isValidUUID } from "../shared/utils";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
@@ -78,7 +78,7 @@ class QuestionsService {
     );
 
     const diagramStoragePath = diagramFile
-      ? storagePaths.getQuestionDiagramPath(
+      ? AdminQuestionStoragePathRetriever.getQuestionDiagramPath(
           userId,
           questionId,
           diagramFile.name,
@@ -86,7 +86,7 @@ class QuestionsService {
       : null;
 
     const solutionDiagramStoragePath = solutionDiagramFile
-      ? storagePaths.getQuestionSolutionDiagramPath(
+      ? AdminQuestionStoragePathRetriever.getQuestionDiagramPath(
           userId,
           questionId,
           solutionDiagramFile.name,
@@ -525,30 +525,32 @@ class QuestionsService {
     }
     const urlMap = await this.signStoragePaths(pathsToSign);
 
-    const questions = page.map((q): ReportedQuestionProjection => ({
-      questionId: q.questionId,
-      latestReportAt: q.latestReportAt,
-      reports: q.reports,
-      reportCount: q.reportCount,
-      reporterCount: q.reporterCount,
-      question: q.question,
-      options: q.options,
-      correctOption: q.correctOption as OptionKey,
-      marks: q.marks,
-      difficulty: q.difficulty,
-      questionDiagramUrl: q.questionDiagram
-        ? urlMap.get(q.questionDiagram) || q.questionDiagram
-        : null,
-      hasSolution: q.hasSolution,
-      solution: q.solution,
-      solutionDiagramUrl: q.solutionDiagram
-        ? urlMap.get(q.solutionDiagram) || q.solutionDiagram
-        : null,
-      chapterName: q.chapterName,
-      sectionName: q.sectionName,
-      subjectName: q.subjectName,
-      subjectSlug: q.subjectSlug,
-    }));
+    const questions = page.map(
+      (q): ReportedQuestionProjection => ({
+        questionId: q.questionId,
+        latestReportAt: q.latestReportAt,
+        reports: q.reports,
+        reportCount: q.reportCount,
+        reporterCount: q.reporterCount,
+        question: q.question,
+        options: q.options,
+        correctOption: q.correctOption as OptionKey,
+        marks: q.marks,
+        difficulty: q.difficulty,
+        questionDiagramUrl: q.questionDiagram
+          ? urlMap.get(q.questionDiagram) || q.questionDiagram
+          : null,
+        hasSolution: q.hasSolution,
+        solution: q.solution,
+        solutionDiagramUrl: q.solutionDiagram
+          ? urlMap.get(q.solutionDiagram) || q.solutionDiagram
+          : null,
+        chapterName: q.chapterName,
+        sectionName: q.sectionName,
+        subjectName: q.subjectName,
+        subjectSlug: q.subjectSlug,
+      }),
+    );
 
     const lastRow = page[page.length - 1];
     return {
@@ -573,9 +575,8 @@ class QuestionsService {
    * Every `question_report_type_enum` value is present, zero-filled.
    */
   async getQuestionReportsSummary(): Promise<QuestionReportsSummaryResult> {
-    const { totals, byType } = await questionReportsRepository.summarizeReports(
-      db,
-    );
+    const { totals, byType } =
+      await questionReportsRepository.summarizeReports(db);
 
     const zeroFilled = (): Record<QuestionReportType, number> =>
       QUESTION_REPORT_OPTIONS.reduce(

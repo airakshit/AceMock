@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { storagePaths } from "@/lib/supabase/storage-paths";
+import { AdminQuestionStoragePathRetriever } from "@/lib/supabase/storage-paths";
 import { firstSvgDocument } from "../extract-figures/svg";
 
 export interface QuestionDiagramUploads {
@@ -31,13 +31,13 @@ export async function uploadQuestionFigures(data: {
   const [questionDiagram, solutionDiagram] = await Promise.all([
     questionSvgDoc
       ? uploadSvg(
-          storagePaths.getQuestionDiagramPath(userId, questionId, "figure.svg"),
+          AdminQuestionStoragePathRetriever.getQuestionDiagramPath(userId, questionId, "figure.svg"),
           questionSvgDoc,
         )
       : Promise.resolve(null),
     solutionSvgDoc
       ? uploadSvg(
-          storagePaths.getQuestionSolutionDiagramPath(
+          AdminQuestionStoragePathRetriever.getQuestionSolutionDiagramPath(
             userId,
             questionId,
             "figure.svg",

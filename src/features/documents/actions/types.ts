@@ -174,15 +174,6 @@ export interface CompleteUploadSessionActionResponse {
   }>;
 }
 
-export interface CancelUploadSessionActionPayload {
-  sessionId: string;
-}
-
-export interface CancelUploadSessionActionResponse {
-  sessionId: string;
-  status: UploadSessionStatus;
-}
-
 // ===========================================================================
 // Shared DTOs
 // ===========================================================================

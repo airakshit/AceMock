@@ -1,20 +1,26 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
 import { processDocument } from "@/inngest/functions/v1/process-document";
-import { extractQuestions } from "@/inngest/functions/v1/extract-questions";
-import { ocrPage } from "@/inngest/functions/v1/ocr-page";
+import { extractQuestions as extractQuestionsV1 } from "@/inngest/functions/v1/extract-questions";
+import { ocrPage as ocrPageV1 } from "@/inngest/functions/v1/ocr-page";
 import { classifyQuestions } from "@/inngest/functions/v1/classify-questions";
 import { extractFigures } from "@/inngest/functions/v1/extract-figures";
 import { cleanupStaleUploads } from "@/inngest/functions/v1/cleanup-stale-uploads";
+import { extractQuestions as extractQuestionsV2 } from "@/inngest/functions/v2/extract-questions";
+import { ocrPage as ocrPageV2 } from "@/inngest/functions/v2/ocr-page";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
     processDocument,
-    extractQuestions,
-    ocrPage,
+    extractQuestionsV1,
+    ocrPageV1,
     extractFigures,
     classifyQuestions,
     cleanupStaleUploads,
+
+    // V2 functions
+    extractQuestionsV2,
+    ocrPageV2,
   ],
 });

@@ -35,7 +35,10 @@ export interface OcrPageEventData {
 }
 
 export const TOTAL_RETRIES = 2;
-export const PAGE_OCR_EVENT = "page/ocr";
+export const PAGE_OCR_EVENT = "v1/page/ocr";
+
+/** Internal: stamped onto file_pages.fn_version when this function saves. Set in case of later reprocessing. */
+export const OCR_FN_VERSION = 1;
 
 export const ocrPage = inngest.createFunction(
   {
@@ -186,6 +189,7 @@ export const ocrPage = inngest.createFunction(
         ocrModel: llmService.model,
         survivedValidation: extraction.survivedValidation,
         isRelevant: extraction.isRelevant,
+        fnVersion: OCR_FN_VERSION,
       });
     });
 

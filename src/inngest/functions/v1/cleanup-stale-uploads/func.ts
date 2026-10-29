@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { inngest } from "../../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { storagePaths } from "@/lib/supabase/storage-paths";
+import { PDFStoragePathsRetriever } from "@/lib/supabase/storage-paths";
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { uploadSessionsRepository } from "@/features/documents/repositories/upload-sessions.repository";
 import type { FileUploadStatus } from "@/features/documents/types";
@@ -68,7 +68,7 @@ export const cleanupStaleUploads = inngest.createFunction(
         //    attempt), delete their partial bytes.
         for (const file of unfinished) {
           await step.run(`cleanup-file-${file.id}`, async () => {
-            const fileStorageFolder = storagePaths._getDocumentFilePath(
+            const fileStorageFolder = PDFStoragePathsRetriever.getDocumentFilePath(
               session.userId,
               session.documentId,
               file.id,

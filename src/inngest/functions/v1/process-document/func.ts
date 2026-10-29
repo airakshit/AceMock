@@ -1,7 +1,7 @@
 import { inngest } from "../../../client";
 import { processFileBlob } from "./preprocessing";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { storagePaths } from "@/lib/supabase/storage-paths";
+import { PDFStoragePathsRetriever } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
 import { documentsRepository } from "@/features/documents/repositories/documents.repository";
 import { performance } from "node:perf_hooks";
@@ -106,11 +106,11 @@ export const processDocument = inngest.createFunction(
           start = performance.now();
           const uploadedPages = await Promise.all(
             pages.map(async (page) => {
-              const pageStoragePath = storagePaths.getDocumentFilePageSourceUrl(
+              const pageStoragePath = PDFStoragePathsRetriever.getDocumentFilePageSourceUrl(
                 userId,
                 documentId,
                 file.id as string,
-                file.filename || "file",
+
                 "webp",
                 page.pageNumber,
               );
@@ -177,7 +177,7 @@ export const processDocument = inngest.createFunction(
           data.push({
             id: generateUUIDv7(),
             fileId: file.id,
-            pageNo: page.pageNumber,
+            pageNo: page.pageNumber as number,
           });
         });
       });
