@@ -5,7 +5,7 @@ import { PDFStoragePathsRetriever } from "@/lib/supabase/storage-paths";
 import { DocumentWithFilesProjection } from "@/features/documents/dto/projections";
 import { JsonifyObject } from "inngest/types";
 
-import { documentsRepository } from "@/features/documents/repositories/documents.repository";
+import { documentRepository } from "@/features/documents/repositories/documents.repository";
 import {
   questionsRepository,
   type CreateQuestionItem,
@@ -48,7 +48,7 @@ export const extractQuestions = inngest.createFunction(
           "Extract questions workflow failed permanently. Marking document as failed.",
         );
         await step.run("mark-document-failed-on-error", async () => {
-          await documentsRepository.update(db, {
+          await documentRepository.commands.update(db, {
             documentId,
             userId: eventData.userId,
             status: "failed",
@@ -76,7 +76,7 @@ export const extractQuestions = inngest.createFunction(
 
     if (!docData || !docData.files || docData.files.length === 0) {
       await step.run("mark-document-failed-no-files", async () => {
-        await documentsRepository.update(db, {
+        await documentRepository.commands.update(db, {
           documentId,
           userId,
           status: "failed",
@@ -130,7 +130,7 @@ export const extractQuestions = inngest.createFunction(
 
     if (allDocPages.length === 0) {
       await step.run("mark-document-failed-no-pages", async () => {
-        await documentsRepository.update(db, {
+        await documentRepository.commands.update(db, {
           documentId,
           userId,
           status: "failed",
@@ -178,7 +178,7 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-documents-as-extracting-questions", async () => {
-        await documentsRepository.update(db, {
+        await documentRepository.commands.update(db, {
           documentId,
           userId,
           status: "extracting_questions",
@@ -254,7 +254,7 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-document-failed-incomplete-pages", async () => {
-        await documentsRepository.update(db, {
+        await documentRepository.commands.update(db, {
           documentId,
           userId,
           status: "failed",
@@ -270,7 +270,7 @@ export const extractQuestions = inngest.createFunction(
 
     // 5. All pages are successful! Ensure status is merging_questions and perform merging
     await step.run("mark-document-merging-questions", async () => {
-      await documentsRepository.update(db, {
+      await documentRepository.commands.update(db, {
         documentId,
         userId,
         status: "merging_questions",
@@ -341,7 +341,7 @@ export const extractQuestions = inngest.createFunction(
       );
 
       await step.run("mark-document-completed-zero-questions", async () => {
-        await documentsRepository.update(db, {
+        await documentRepository.commands.update(db, {
           documentId,
           userId,
           status: "completed",
@@ -467,7 +467,7 @@ export const extractQuestions = inngest.createFunction(
       // document_files.processing_status (already "completed" since
       // preprocessing) and never flips the DOCUMENT, leaving it stuck at
       // "merging_questions" on every refresh.
-      await documentsRepository.update(db, {
+      await documentRepository.commands.update(db, {
         documentId,
         userId,
         status: "completed",

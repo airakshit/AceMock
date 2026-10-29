@@ -5,7 +5,7 @@ import {
   structuredOutputExtractionPromptV2,
   structuredOutputExtractionPromptV3,
 } from "@/inngest/functions/v1/ocr-page/prompts";
-import { documentsRepository } from "@/features/documents/repositories/documents.repository";
+import { documentRepository } from "@/features/documents/repositories/documents.repository";
 import { db } from "@/db";
 import { OcrPageResult } from "./types";
 import {
@@ -56,7 +56,7 @@ export const ocrPage = inngest.createFunction(
 
     // 0. Update file page status to "running"
     await step.run("update-file-ocr-status", async () => {
-      await documentsRepository.updateFilePageStatusByPageId(
+      await documentRepository.commands.updateFilePageStatusByPageId(
         db,
         pageId,
         "running" as FilePageOCRStatus,
@@ -180,7 +180,7 @@ export const ocrPage = inngest.createFunction(
 
     // 3. Persist the cleaned (not parsed) OCR text & validation result to the database in a dedicated step
     await step.run("update-page-ocr-result", async () => {
-      await documentsRepository.updateFilePage(db, {
+      await documentRepository.commands.updateFilePage(db, {
         pageId,
         fileId,
         pageNo,

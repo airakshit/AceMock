@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { inngest } from "../../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { PDFStoragePathsRetriever } from "@/lib/supabase/storage-paths";
-import { documentsRepository } from "@/features/documents/repositories/documents.repository";
+import { documentRepository } from "@/features/documents/repositories/documents.repository";
 import { uploadSessionsRepository } from "@/features/documents/repositories/upload-sessions.repository";
 import type { FileUploadStatus } from "@/features/documents/types";
 
@@ -52,7 +52,7 @@ export const cleanupStaleUploads = inngest.createFunction(
 
     for (const session of expiredSessions) {
       await step.run(`abandon-session-${session.id}`, async () => {
-        const files = await documentsRepository.findFilesBySessionId(
+        const files = await documentRepository.queries.findFilesBySessionId(
           db,
           session.id,
         );
@@ -91,7 +91,7 @@ export const cleanupStaleUploads = inngest.createFunction(
               }
             }
 
-            await documentsRepository.updateFilesUploadStatus(db, {
+            await documentRepository.commands.updateFilesUploadStatus(db, {
               documentId: session.documentId,
               fileIds: [file.id],
               uploadStatus: "failed" as FileUploadStatus,

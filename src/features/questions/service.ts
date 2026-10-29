@@ -28,7 +28,7 @@ import { DocumentWithQuestionCountProjection } from "@/features/documents/dto/pr
 import { questionsRepository } from "./repositories/questions.repository";
 import { questionBookmarksRepository } from "./repositories/question-bookmarks.repository";
 import { questionReportsRepository } from "./repositories/question-reports.repository";
-import { documentsRepository } from "@/features/documents/repositories/documents.repository";
+import { documentRepository } from "@/features/documents/repositories/documents.repository";
 import { OptionKey } from "../shared/components/question-card";
 import {
   QUESTION_REPORT_OPTIONS,
@@ -79,18 +79,18 @@ class QuestionsService {
 
     const diagramStoragePath = diagramFile
       ? AdminQuestionStoragePathRetriever.getQuestionDiagramPath(
-          userId,
-          questionId,
-          diagramFile.name,
-        )
+        userId,
+        questionId,
+        diagramFile.name,
+      )
       : null;
 
     const solutionDiagramStoragePath = solutionDiagramFile
       ? AdminQuestionStoragePathRetriever.getQuestionDiagramPath(
-          userId,
-          questionId,
-          solutionDiagramFile.name,
-        )
+        userId,
+        questionId,
+        solutionDiagramFile.name,
+      )
       : null;
 
     await questionsRepository.create(db, {
@@ -170,7 +170,7 @@ class QuestionsService {
   async getRecentDocumentsForFilter(
     limit: number = 20,
   ): Promise<DocumentWithQuestionCountProjection[]> {
-    return documentsRepository.findDocumentsWithQuestionsCount(db);
+    return documentRepository.queries.findDocumentsWithQuestionsCount(db);
   }
 
   /**
@@ -402,9 +402,9 @@ class QuestionsService {
       nextCursor:
         hasMore && lastRow
           ? encodeBookmarkCursor({
-              bookmarkedAt: lastRow.bookmarkedAt,
-              bookmarkId: lastRow.bookmarkId,
-            })
+            bookmarkedAt: lastRow.bookmarkedAt,
+            bookmarkId: lastRow.bookmarkId,
+          })
           : null,
     };
   }
@@ -489,8 +489,8 @@ class QuestionsService {
     // the picked day is still in the window.
     const dateTo = payload.dateTo
       ? new Date(
-          this.parseDateStart(payload.dateTo, "dateTo").getTime() + MS_PER_DAY,
-        )
+        this.parseDateStart(payload.dateTo, "dateTo").getTime() + MS_PER_DAY,
+      )
       : null;
 
     if (dateFrom && dateTo && dateFrom.getTime() > dateTo.getTime()) {
@@ -559,9 +559,9 @@ class QuestionsService {
       nextCursor:
         hasMore && lastRow
           ? encodeReportedQuestionCursor({
-              latestReportAt: lastRow.latestReportAt,
-              questionId: lastRow.questionId,
-            })
+            latestReportAt: lastRow.latestReportAt,
+            questionId: lastRow.questionId,
+          })
           : null,
     };
   }

@@ -51,7 +51,7 @@ import {
   encodeMockTestCursor,
   isMockTestScope,
 } from "./utils";
-import { documentsRepository } from "../documents/repositories/documents.repository";
+import { documentRepository } from "../documents/repositories/documents.repository";
 import { questionsRepository } from "../questions/repositories/questions.repository";
 import { mockTestAttemptRepository } from "./repositories/mock-attempts.repository";
 import { curriculumRepository } from "../questions/repositories/curriculum.repository";
@@ -154,7 +154,7 @@ export class MockTestsService {
     // ownership set is computed from ids the caller provably owns, so a
     // foreign id is rejected without confirming whether it exists.
     if (options.requireOwnedDocuments) {
-      const ownedIds = await documentsRepository.findByIdsForUser(
+      const ownedIds = await documentRepository.queries.findByIdsForUser(
         db,
         userId,
         payload.documentIds,
@@ -510,10 +510,10 @@ export class MockTestsService {
       nextCursor:
         hasNextPage && lastItem
           ? encodeMockTestCursor({
-              scope: lastItem.scope,
-              createdAt: lastItem.createdAt,
-              id: lastItem.id,
-            })
+            scope: lastItem.scope,
+            createdAt: lastItem.createdAt,
+            id: lastItem.id,
+          })
           : null,
     };
   }

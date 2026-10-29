@@ -3,7 +3,7 @@ import { processFileBlob } from "./preprocessing";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { PDFStoragePathsRetriever } from "@/lib/supabase/storage-paths";
 import { db } from "@/db";
-import { documentsRepository } from "@/features/documents/repositories/documents.repository";
+import { documentRepository } from "@/features/documents/repositories/documents.repository";
 import { performance } from "node:perf_hooks";
 import {
   DocumentProcessingStatus,
@@ -32,7 +32,7 @@ export const processDocument = inngest.createFunction(
     let start = performance.now();
 
     await step.run(`mark-document-as-processing-files`, async () => {
-      await documentsRepository.update(db, {
+      await documentRepository.commands.update(db, {
         documentId: documentId,
         userId: userId,
         status: "processing_files",
@@ -40,7 +40,7 @@ export const processDocument = inngest.createFunction(
     });
 
     const docFiles = await step.run(`mark-files-as-running`, async () => {
-      const files = await documentsRepository.updateFileProcessingStatus(db, {
+      const files = await documentRepository.commands.updateFileProcessingStatus(db, {
         documentId,
         status: "running" as FileProcessingStatus,
       });
@@ -50,7 +50,7 @@ export const processDocument = inngest.createFunction(
 
     if (!docFiles || docFiles.length === 0) {
       await step.run(`mark-document-as-failed-no-files`, async () => {
-        await documentsRepository.update(db, {
+        await documentRepository.commands.update(db, {
           documentId: documentId,
           userId: userId,
           status: "failed",
@@ -160,7 +160,7 @@ export const processDocument = inngest.createFunction(
     );
 
     await step.run(`mark-files-as-completed`, async () => {
-      const files = await documentsRepository.updateFileProcessingStatus(db, {
+      const files = await documentRepository.commands.updateFileProcessingStatus(db, {
         documentId,
         status: "completed" as FileProcessingStatus,
       });
@@ -181,7 +181,7 @@ export const processDocument = inngest.createFunction(
           });
         });
       });
-      const createdPages = await documentsRepository.createManyFilePages(
+      const createdPages = await documentRepository.commands.createManyFilePages(
         db,
         data,
       );
@@ -199,7 +199,7 @@ export const processDocument = inngest.createFunction(
 
     if (pages.length === 0) {
       await step.run("mark-document-as-failed-no-pages", async () => {
-        await documentsRepository.update(db, {
+        await documentRepository.commands.update(db, {
           documentId,
           userId,
           status: "failed",
