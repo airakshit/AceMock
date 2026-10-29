@@ -1,0 +1,1 @@
+ALTER TABLE "file_pages" ADD COLUMN "fn_version" integer DEFAULT 1 NOT NULL;
