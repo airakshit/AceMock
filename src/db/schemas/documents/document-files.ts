@@ -9,7 +9,6 @@ import {
 import { documents } from "./documents";
 import { uploadSessions } from "./upload-sessions";
 
-
 export const fileUploadStatusEnum = pgEnum("file_upload_status_enum", [
   "pending",
   "uploading",
@@ -46,12 +45,7 @@ export const documentFiles = pgTable("document_files", {
 
   mimeType: text("mime_type").notNull(),
   storagePath: text("storage_path").notNull(),
-
-  /**
-   * Content fingerprint computed from the selected file (size prefix +
-   * first/last 256KiB). Lets a resuming client PROVE a re-selected file is
-   * the same one — filename/size matches alone are never trusted.
-   */
+  
   contentProbe: text("content_probe"),
 
   uploadStatus: fileUploadStatusEnum("upload_status")
@@ -62,24 +56,8 @@ export const documentFiles = pgTable("document_files", {
     .notNull()
     .default("pending"),
 
-  // ---------------------------------------------------------------------------
-  // TUS resource references (server is the single source of truth for
-  // resume decisions — Uppy fingerprints are NOT used).
-  // ---------------------------------------------------------------------------
-
-  /**
-   * TUS upload resource reference — the upload URL the TUS client created
-   * (persisted via saveUploadReference). Resuming "uploading" files
-   * continues THIS resource; a resuming client never looks at local
-   * fingerprints to decide where to continue.
-   */
   uploadRef: text("upload_ref"),
 
-  /**
-   * When the TUS resource was created. Providers expire TUS uploads after
-   * 24h; this lets the server judge (without a network probe) whether a
-   * stored reference could possibly still be resumable.
-   */
   uploadRefCreatedAt: timestamp("upload_ref_created_at", {
     withTimezone: true,
   }),

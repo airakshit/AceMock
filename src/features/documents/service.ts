@@ -1,33 +1,37 @@
 import { db } from "@/db";
 import {
   CreateDocumentActionPayload,
-  CreateDocumentActionResponse,
   SaveUploadReferenceActionPayload,
-  SaveUploadReferenceActionResponse,
   HeartbeatUploadSessionActionPayload,
+  ResumeDocumentUploadActionPayload,
+  CompleteDocumentFileUploadActionPayload,
+  CompleteUploadSessionActionPayload,
+  DocumentSearchQueryPayload,
+} from "./dto/payloads";
+import {
+  CreateDocumentActionResponse,
+  SaveUploadReferenceActionResponse,
   HeartbeatUploadSessionActionResponse,
   GetUploadSessionStatusActionResponse,
-  UploadSessionDTO,
-  ResumeDocumentUploadActionPayload,
   ResumeDocumentUploadActionResponse,
   DocumentFileRecoveryPlan,
-  CompleteDocumentFileUploadActionPayload,
   CompleteDocumentFileUploadActionResponse,
-  CompleteUploadSessionActionPayload,
   CompleteUploadSessionActionResponse,
-  DocumentFileDTO,
-  DocumentItemDTO,
-} from "./actions/types";
+  DocumentSearchQueryResponse,
+  GetUserDocumentActionResponse,
+  DeleteDocumentActionResponse,
+  GetDocumentsSummaryActionResponse,
+  ProcessDocumentActionResponse,
+  GetDocumentFileAccessUrlActionResponse,
+} from "./dto/results";
+import { UploadSessionDTO, DocumentWithFilesDTO } from "./dto/projections";
+
 import { documentRepository } from "./repositories/documents.repository";
 import {
   uploadSessionsRepository,
   type UploadSessionRow,
 } from "./repositories/upload-sessions.repository";
-import type {
-  DocumentWithQuestionCountProjection,
-  DocumentWithFilesProjection,
-} from "./dto/projections";
-import { documentQueries } from "./repositories/document-queries";
+import type { DocumentDTO } from "./dto/projections";
 import {
   PDFStoragePathsRetriever,
   ImageStoragePathsRetriever,
@@ -36,7 +40,6 @@ import { generateUUIDv7 } from "../shared/utils";
 import { supabaseStorageClient } from "../shared/storage-service";
 import { ServerActionError } from "../shared/actions/error";
 import { inngest } from "@/inngest/client";
-import { EXTRACT_QUESTIONS_EVENT } from "@/inngest/functions/v1/extract-questions/func";
 import { FileUploadStatus } from "./types";
 import { decideFileRecoveryAction } from "./uploads/recovery-decision";
 import { documentFiles } from "@/db/schemas";
@@ -46,56 +49,33 @@ import {
   UPLOAD_RECOVERY_WINDOW_MS,
   UPLOAD_TUS_RESOURCE_LIFETIME_MS,
 } from "./uploads/upload-session-constants";
+import { PROCESS_DOCUMENT_EVENT as PROCESS_DOCUMENT_EVENT_V2 } from "@/inngest/functions/v2/process-document";
+import { decodeSearchCursor, encodeSearchCursor } from "../shared/pagination";
+import { validateDocumentSearchCursor } from "./validators";
 
 class DocumentsService {
-  // =========================================================================
-  // Session lifecycle helpers
-  // =========================================================================
+  /** Default page size for the user documents search. */
+  private static readonly DOCUMENTS_PAGE_SIZE = 20;
+  /** Upper bound for `pageSize` — client-supplied values are clamped. */
+  private static readonly MAX_DOCUMENTS_PAGE_SIZE = 50;
 
   private toSessionDTO(session: UploadSessionRow): UploadSessionDTO {
     return {
-      id: session.id,
-      documentId: session.documentId,
+      sessionId: session.id,
       status: session.status,
       lastHeartbeatAt: session.lastHeartbeatAt,
       recoveryExpiresAt: session.recoveryExpiresAt,
-    };
-  }
-
-  private toFileDTO(
-    file: DocumentWithFilesProjection["files"][number],
-  ): DocumentFileDTO {
-    return {
-      id: file.id,
-      documentId: file.documentId,
-      filename: file.filename,
-      mimeType: file.mimeType,
-      fileSize: file.fileSize,
-      storagePath: file.storagePath,
-      uploadStatus: file.uploadStatus,
-      createdAt: file.createdAt,
+      progress: (session.progress as Record<string, number>) ?? {},
     };
   }
 
   /**
-   * The one document-related session surfaced to clients: the ACTIVE one
-   * when present, otherwise the most recent terminal session (for status).
-   * Terminal sessions are never surfaced as resumable.
+   * Returns the latest session for the document.
    */
   private async getRelevantSession(
     documentId: string,
     userId: string,
   ): Promise<UploadSessionDTO | null> {
-    const active = await uploadSessionsRepository.findActiveByDocumentIdForUser(
-      db,
-      documentId,
-      userId,
-    );
-
-    if (active) {
-      return this.toSessionDTO(active);
-    }
-
     const latest = await uploadSessionsRepository.findLatestByDocumentIdForUser(
       db,
       documentId,
@@ -127,46 +107,38 @@ class DocumentsService {
     const sessionId = generateUUIDv7();
     const recoveryExpiresAt = new Date(Date.now() + UPLOAD_RECOVERY_WINDOW_MS);
 
-    const allPayloadFiles = [...payload.pdfs, ...payload.images];
-
-    if (allPayloadFiles.length === 0) {
+    if (payload.files.length === 0) {
       throw new ServerActionError("BAD_REQUEST", "No files to upload.");
     }
 
-    const fileModels = allPayloadFiles.map((file) => {
+    const fileModels = payload.files.map((file) => {
       const documentFileId = generateUUIDv7();
       return {
         clientFileId: file.clientFileId,
         serverFileId: documentFileId,
         contentProbe: file.contentProbe,
         filename: file.name,
-        mimeType: file.type,
+        mimeType: file.mimeType,
         fileSize: file.size,
         storagePath:
-          file.type === "application/pdf"
+          file.mimeType === "application/pdf"
             ? PDFStoragePathsRetriever.getDocumentFileSourceUrl(
-              userId,
-              documentId,
-              documentFileId,
-              file.name,
-            )
+                userId,
+                documentId,
+                documentFileId,
+                file.name,
+              )
             : ImageStoragePathsRetriever.getDocumentFileSourceUrl(
-              userId,
-              documentId,
-              documentFileId,
-              file.name,
-            ),
+                userId,
+                documentId,
+                documentFileId,
+                file.name,
+              ),
       };
     });
 
-    /**
-     * One transaction = one attempt: document + files (bound to the session
-     * id and content probes) + the ACTIVE session row itself. The partial
-     * unique index `uq_active_upload_session_per_document` guarantees a
-     * racing attempt for the same document cannot create a second session.
-     */
-    await db.transaction(async (tx) => {
-      await documentRepository.commands.create(tx, {
+    const data = await db.transaction(async (tx) => {
+      const createdDoc = await documentRepository.commands.create(tx, {
         documentId: documentId,
         userId,
         title: payload.title,
@@ -174,7 +146,7 @@ class DocumentsService {
       });
 
       // Session is created first because, files require the id.
-      await uploadSessionsRepository.create(tx, {
+      const uploadSession = await uploadSessionsRepository.create(tx, {
         id: sessionId,
         userId,
         documentId,
@@ -194,11 +166,10 @@ class DocumentsService {
           storagePath: f.storagePath,
         })),
       );
+
+      return { document: createdDoc, session: uploadSession };
     });
 
-    // Tokens minted after commit. If this fails the session still exists,
-    // so the client recovers through resumeDocumentUpload (there is exactly
-    // one source of truth — the session, not local blobs/fingerprints).
     const signedUrls = await supabaseStorageClient.getUploadSignedUrls(
       fileModels.map((f) => ({
         clientFileId: f.clientFileId,
@@ -207,47 +178,19 @@ class DocumentsService {
       })),
     );
 
-    /**
-     * Re-read the just-created document through the SAME repository query
-     * and the SAME DTO mapper that getUserDocuments uses — the response's
-     * `document` is therefore exactly what the documents list renders
-     * (files + relevant session included), never a hand-built lookalike.
-     */
-    const createdDocument = await documentRepository.queries.findByIdForUserWithFiles(
-      db,
-      documentId,
-      userId,
-    );
-
-    if (!createdDocument) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "Document not found right after creation.",
-      );
-    }
-
     return {
-      documentId,
-      sessionId,
-      files: signedUrls,
-      document: await this.toDocumentItemDTO(
-        createdDocument.id,
-        userId,
-        createdDocument,
-      ),
+      documentId: data.document.documentId,
+      title: data.document.title,
+      description: data.document.description
+        ? data.document.description
+        : undefined,
+      createdAt: data.document.createdAt,
+      processingStatus: data.document.processingStatus,
+      sessionId: data.session.id,
+      signedFileUrls: signedUrls,
     };
   }
 
-  // =========================================================================
-  // saveUploadReference
-  // =========================================================================
-
-  /**
-   * The client's TUS session created an upload resource for a file — the
-   * server persists the reference so that ONLY the server (never a local
-   * fingerprint) decides resume eligibility later. Transitions the file
-   * `pending → uploading`.
-   */
   async saveUploadReference(
     userId: string,
     payload: SaveUploadReferenceActionPayload,
@@ -272,26 +215,7 @@ class DocumentsService {
       );
     }
 
-    const file = await db
-      .select()
-      .from(documentFiles)
-      .where(
-        and(
-          eq(documentFiles.id, payload.documentFileId),
-          eq(documentFiles.documentId, session.documentId),
-          eq(documentFiles.sessionId, session.id),
-        ),
-      )
-      .limit(1);
-
-    if (!file[0]) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "File not found in this upload session.",
-      );
-    }
-
-    const updated = await documentRepository.commands.saveUploadReference(db, {
+    const updated = await documentRepository.commands.updateFile(db, {
       fileId: payload.documentFileId,
       documentId: session.documentId,
       uploadRef: payload.uploadRef,
@@ -299,30 +223,18 @@ class DocumentsService {
 
     if (!updated) {
       throw new ServerActionError(
-        "CONFLICT",
-        "File is not in a transferable state (pending/uploading).",
+        "NOT_FOUND",
+        "File not found or access denied.",
       );
     }
 
     return {
-      documentFileId: updated.id,
+      fileId: updated.fileId,
+      sessionId: payload.sessionId,
       uploadStatus: updated.uploadStatus,
     };
   }
 
-  // =========================================================================
-  // heartbeatUploadSession
-  // =========================================================================
-
-  /**
-   * Client liveness heartbeat (every 25s while the coordinator runs).
-   *
-   * Accepts an optional per-file progress snapshot, which also doubles as
-   * the "dead pipeline" detection signal on the server (heartbeats cannot
-   * keep an abandoned session alive indefinitely: the recovery window is
-   * absolute; and the Inngest job reclaims sessions the client vanished
-   * from, since its heartbeats stop).
-   */
   async heartbeatUploadSession(
     userId: string,
     payload: HeartbeatUploadSessionActionPayload,
@@ -370,11 +282,11 @@ class DocumentsService {
     const progress =
       payload.files && payload.files.length > 0
         ? Object.fromEntries(
-          payload.files.map((f) => [
-            f.documentFileId,
-            { status: f.status, offsetBytes: f.offsetBytes ?? null },
-          ]),
-        )
+            payload.files.map((f) => [
+              f.documentFileId,
+              { status: f.status, offsetBytes: f.offsetBytes ?? null },
+            ]),
+          )
         : undefined;
 
     const updated = await uploadSessionsRepository.touchHeartbeat(db, {
@@ -389,10 +301,6 @@ class DocumentsService {
       accepted: true,
     };
   }
-
-  // =========================================================================
-  // getUploadSessionStatus
-  // =========================================================================
 
   async getUploadSessionStatus(
     userId: string,
@@ -781,13 +689,16 @@ class DocumentsService {
 
     // Flip only files that belong to this session and are mid-transfer;
     // a second call for the same file is an idempotent no-op.
-    const updated = await documentRepository.commands.updateFilesUploadStatus(db, {
-      documentId: session.documentId,
-      fileIds: [payload.documentFileId],
-      uploadStatus: "uploaded",
-    });
+    const updated = await documentRepository.commands.updateFilesUploadStatus(
+      db,
+      {
+        documentId: session.documentId,
+        fileIds: [payload.documentFileId],
+        uploadStatus: "uploaded",
+      },
+    );
 
-    if (!updated.some((f) => f.id === payload.documentFileId)) {
+    if (!updated.some((f) => f.fileId === payload.documentFileId)) {
       const [file] = await db
         .select({ uploadStatus: documentFiles.uploadStatus })
         .from(documentFiles)
@@ -819,51 +730,19 @@ class DocumentsService {
     };
   }
 
-  async getUserDocuments(userId: string): Promise<DocumentItemDTO[]> {
-    const docs = await documentRepository.queries.findByUserWithFiles(db, userId);
-
-    return Promise.all(
-      docs.map(async (doc) => this.toDocumentItemDTO(doc.id, userId, doc)),
-    );
-  }
-
-  /**
-   * Projection → client DTO conversion, always attaching the document's
-   * relevant upload session (active if one exists, else most recent).
-   */
-  private async toDocumentItemDTO(
-    _documentId: string,
-    userId: string,
-    doc: DocumentWithFilesProjection,
-  ): Promise<DocumentItemDTO> {
-    return {
-      id: doc.id,
-      userId: doc.userId,
-      title: doc.title,
-      description: doc.description,
-      processingStatus: doc.processingStatus,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
-      session: await this.getRelevantSession(doc.id, userId),
-      files: doc.files.map((f) => this.toFileDTO(f)),
-    };
-  }
-
-  /**
-   * Lightweight picker list: the user's own documents with how many questions
-   * each one has contributed. Shared by the admin and student mock-creation
-   * flows — the admin simply sees their own documents.
-   */
   async getDocumentsSummary(
     userId: string,
-  ): Promise<DocumentWithQuestionCountProjection[]> {
+  ): Promise<GetDocumentsSummaryActionResponse> {
     return documentRepository.queries.findDocumentsWithQuestionsCountForUser(
       db,
       userId,
     );
   }
 
-  async deleteDocument(userId: string, documentId: string) {
+  async deleteDocument(
+    userId: string,
+    documentId: string,
+  ): Promise<DeleteDocumentActionResponse> {
     const existingDocument = await documentRepository.queries.findByIdForUser(
       db,
       documentId,
@@ -903,124 +782,30 @@ class DocumentsService {
     }
 
     return {
-      documentId: deletedDocument.id,
-    };
-  }
-
-  async deleteDocumentFile(userId: string, documentId: string, fileId: string) {
-    const existingDocument = await documentRepository.queries.findByIdForUser(
-      db,
-      documentId,
-      userId,
-    );
-
-    if (!existingDocument) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "Document not found or access denied.",
-      );
-    }
-
-    const file = await db
-      .select()
-      .from(documentFiles)
-      .where(
-        and(
-          eq(documentFiles.id, fileId),
-          eq(documentFiles.documentId, documentId),
-        ),
-      )
-      .limit(1);
-
-    if (!file[0]) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "File not found or does not belong to this document.",
-      );
-    }
-
-    // 1. Delete storage folder for this file
-    const fileStorageFolder = PDFStoragePathsRetriever.getDocumentFilePath(
-      userId,
-      documentId,
-      fileId,
-    );
-    try {
-      await supabaseStorageClient.deleteFolder(fileStorageFolder);
-    } catch (storageError) {
-      console.error(
-        `Failed to delete storage folder for file ${fileId}:`,
-        storageError,
-      );
-    }
-
-    // Also ensure direct file storagePath is deleted if still present
-    if (file[0].storagePath) {
-      try {
-        await supabaseStorageClient.deleteFiles([file[0].storagePath]);
-      } catch (err) {
-        // Ignored if already cleaned by deleteFolder
-      }
-    }
-
-    // 2. Delete file record from DB.
-    await documentRepository.commands.deleteFile(db, {
-      fileId,
-      documentId,
-    });
-
-    return {
-      documentId,
-      fileId,
+      documentId: deletedDocument.documentId,
     };
   }
 
   async updateDocument(
     userId: string,
     documentId: string,
-    payload: { title: string; description?: string },
-  ) {
-    const existingDocument = await documentRepository.queries.findByIdForUser(
-      db,
-      documentId,
-      userId,
-    );
+    payload: { title?: string; description?: string },
+  ): Promise<DocumentDTO> {
+    const updatedDoc = await documentRepository.commands.update(db, {
+      documentId: documentId,
+      userId: userId,
+      title: payload.title,
+      description: payload.description,
+    });
 
-    if (!existingDocument) {
+    if (!updatedDoc) {
       throw new ServerActionError(
         "NOT_FOUND",
         "Document not found or access denied.",
       );
     }
 
-    const trimmedTitle = payload.title.trim();
-    if (!trimmedTitle) {
-      throw new ServerActionError(
-        "BAD_REQUEST",
-        "Document title cannot be empty.",
-      );
-    }
-
-    await documentRepository.commands.update(db, {
-      documentId,
-      userId,
-      title: trimmedTitle,
-      description: payload.description?.trim() || undefined,
-    });
-
-    const userDocs = await documentRepository.queries.findByUserWithFiles(db, userId);
-    const updatedDoc = userDocs.find((doc) => doc.id === documentId);
-
-    if (!updatedDoc) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "Document not found after update.",
-      );
-    }
-
-    return {
-      document: await this.toDocumentItemDTO(updatedDoc.id, userId, updatedDoc),
-    };
+    return updatedDoc;
   }
 
   async getDocumentFileAccessUrl(
@@ -1028,8 +813,8 @@ class DocumentsService {
     documentId: string,
     fileId: string,
     expiresIn = 3600,
-  ) {
-    const file = await documentRepository.queries.findFileById(db, fileId)
+  ): Promise<GetDocumentFileAccessUrlActionResponse> {
+    const file = await documentRepository.queries.findFileById(db, fileId);
 
     if (!file) {
       throw new ServerActionError(
@@ -1052,12 +837,15 @@ class DocumentsService {
     };
   }
 
-  async processDocument(userId: string, documentId: string) {
-    const document = await documentRepository.queries.findByIdForUser(
-      db,
-      documentId,
-      userId,
-    );
+  async processDocument(
+    userId: string,
+    documentId: string,
+  ): Promise<ProcessDocumentActionResponse> {
+    const document = await documentRepository.commands.update(db, {
+      documentId: documentId,
+      userId: userId,
+      status: "queued",
+    });
 
     if (!document) {
       throw new ServerActionError(
@@ -1066,70 +854,32 @@ class DocumentsService {
       );
     }
 
-    const docWithPages = await documentQueries.getDocumentWithPages(
-      db,
-      documentId,
-      userId,
-    );
-
-    if (
-      !docWithPages ||
-      !docWithPages.files ||
-      docWithPages.files.length === 0
-    ) {
-      throw new ServerActionError(
-        "BAD_REQUEST",
-        "Cannot process a document with no uploaded files.",
-      );
-    }
-
-    const totalPages = docWithPages.files.reduce(
-      (acc, f) => acc + (f.pages?.length || 0),
-      0,
-    );
-
-    if (totalPages === 0) {
-      await inngest.send({
-        name: "document/process",
-        data: {
-          userId,
-          documentId,
-        },
-      });
-    } else {
-      await inngest.send({
-        name: EXTRACT_QUESTIONS_EVENT,
-        data: {
-          userId,
-          documentId,
-        },
-      });
-    }
-
-    const updatedDoc = await documentRepository.queries.findByIdForUserWithFiles(
-      db,
-      documentId,
-      userId,
-    );
-
-    if (!updatedDoc) {
-      throw new ServerActionError(
-        "NOT_FOUND",
-        "Document not found after trigger.",
-      );
-    }
+    await inngest.send({
+      name: PROCESS_DOCUMENT_EVENT_V2,
+      data: {
+        userId,
+        documentId,
+      },
+    });
 
     return {
-      document: await this.toDocumentItemDTO(updatedDoc.id, userId, updatedDoc),
-      message: "Document processing triggered successfully.",
+      documentId: document.documentId,
+      processingStatus: document.processingStatus,
     };
   }
 
-  async getUserDocument(userId: string, documentId: string) {
-    const document = await documentRepository.queries.findByIdForUserWithFiles(
+  /**
+   * Single user document in the exact shape the documents list renders
+   * (`DocumentSearchData`), so the detail view can reuse the list mappers.
+   */
+  async getUserDocument(
+    userId: string,
+    documentId: string,
+  ): Promise<GetUserDocumentActionResponse> {
+    const document = await documentRepository.queries.getUserDocument(
       db,
-      documentId,
       userId,
+      documentId,
     );
 
     if (!document) {
@@ -1139,8 +889,68 @@ class DocumentsService {
       );
     }
 
+    return { document };
+  }
+
+  /**
+   * User documents with search keys, status filter and cursor pagination —
+   * all fields optional; called with an empty payload it is simply "all of
+   * this user's documents, newest first".
+   *
+   * Fetches `pageSize + 1` rows to decide `hasMore`, so pages never skip or
+   * duplicate a record: `cursor` holds the exact ORDER BY key of the last
+   * returned row and must be replayed with the same filters.
+   */
+  async searchUserDocuments(
+    userId: string,
+    searchQuery: DocumentSearchQueryPayload = {},
+  ): Promise<DocumentSearchQueryResponse> {
+    const pageSize = Math.min(
+      Math.max(
+        Math.round(
+          searchQuery.pagination?.pageSize ??
+            DocumentsService.DOCUMENTS_PAGE_SIZE,
+        ),
+        1,
+      ),
+      DocumentsService.MAX_DOCUMENTS_PAGE_SIZE,
+    );
+
+    const query = {
+      searchKey: searchQuery.searchKey ?? "",
+      processingStatus: searchQuery.processingStatus,
+      pagination: {
+        cursor: searchQuery.pagination?.cursor
+          ? decodeSearchCursor(
+              searchQuery.pagination.cursor,
+              validateDocumentSearchCursor,
+            )
+          : undefined,
+        pageSize,
+      },
+    };
+
+    const data = await documentRepository.queries.searchUserDocuments(
+      db,
+      userId,
+      query,
+    );
+
+    const hasMore = data.documents.length > query.pagination.pageSize;
+    const items = hasMore
+      ? data.documents.slice(0, query.pagination.pageSize)
+      : data.documents;
+    const lastItem = items[items.length - 1];
+
     return {
-      document: await this.toDocumentItemDTO(document.id, userId, document),
+      documents: items,
+      pagination: {
+        cursor: encodeSearchCursor({
+          createdAt: lastItem.createdAt,
+          id: lastItem.documentId,
+        }),
+        hasMore: hasMore,
+      },
     };
   }
 }

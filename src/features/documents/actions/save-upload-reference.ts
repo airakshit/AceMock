@@ -2,10 +2,8 @@
 
 import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
-import {
-  SaveUploadReferenceActionPayload,
-  SaveUploadReferenceActionResponse,
-} from "./types";
+import { SaveUploadReferenceActionPayload } from "../dto/payloads";
+import { SaveUploadReferenceActionResponse } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 

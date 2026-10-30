@@ -2,10 +2,8 @@
 
 import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
-import {
-  ProcessDocumentActionPayload,
-  ProcessDocumentActionResponse,
-} from "./types";
+import { ProcessDocumentActionPayload } from "../dto/payloads";
+import { ProcessDocumentActionResponse } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 
@@ -23,7 +21,7 @@ export async function processDocumentAction(
     return {
       success: true,
       data: data,
-      message: data.message,
+      message: "Document processing started.",
     };
   } catch (error) {
     return handleActionError(error);

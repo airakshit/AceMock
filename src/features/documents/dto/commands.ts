@@ -70,6 +70,7 @@ export interface UpdateDocumentFileCommand {
   mimeType?: string;
   fileSize?: number;
   storagePath?: string;
+  uploadRef?: string;
   uploadStatus?: "uploading" | "uploaded" | "failed";
 }
 

@@ -2,10 +2,8 @@
 
 import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
-import {
-  GetDocumentFileAccessUrlActionPayload,
-  GetDocumentFileAccessUrlActionResponse,
-} from "./types";
+import { GetDocumentFileAccessUrlActionPayload } from "../dto/payloads";
+import { GetDocumentFileAccessUrlActionResponse } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 

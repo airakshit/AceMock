@@ -37,7 +37,7 @@ export const OCR_FN_VERSION = 2;
 
 export const ocrPage = inngest.createFunction(
   {
-    id: "ocr-page",
+    id: "ocr-page-v2",
     triggers: { event: PAGE_OCR_EVENT },
     retries: TOTAL_RETRIES,
     concurrency: {

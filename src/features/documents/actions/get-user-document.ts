@@ -4,16 +4,13 @@ import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
 import {
   GetUserDocumentActionPayload,
+} from "../dto/payloads";
+import {
   GetUserDocumentActionResponse,
-} from "./types";
+} from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 
-/**
- * Single-document fetch — returns exactly the same DTO shape as
- * getUserDocumentsAction's items (DocumentItemDTO with files + relevant
- * session). Used for in-place refreshes of one document card.
- */
 export async function getUserDocumentAction(
   payload: GetUserDocumentActionPayload,
 ): Promise<ServerActionResult<GetUserDocumentActionResponse>> {

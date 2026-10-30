@@ -27,7 +27,7 @@ export const EXTRACT_QUESTIONS_EVENT = "v2/documents/extract" as const;
 
 export const extractQuestions = inngest.createFunction(
   {
-    id: "extract-questions-from-document",
+    id: "extract-questions-from-document-v2",
     triggers: { event: EXTRACT_QUESTIONS_EVENT },
     onFailure: async ({ event, step, logger }) => {
       const eventData = (event.data as any)?.event?.data as

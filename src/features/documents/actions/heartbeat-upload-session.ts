@@ -2,18 +2,11 @@
 
 import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
-import {
-  HeartbeatUploadSessionActionPayload,
-  HeartbeatUploadSessionActionResponse,
-} from "./types";
+import { HeartbeatUploadSessionActionPayload } from "../dto/payloads";
+import { HeartbeatUploadSessionActionResponse } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 
-/**
- * Client liveness ping (every 25s while the upload coordinator runs inside
- * its Web Lock). Keeps the session out of the stale/interrupted state and
- * carries an optional per-file progress snapshot for observability.
- */
 export async function heartbeatUploadSessionAction(
   payload: HeartbeatUploadSessionActionPayload,
 ): Promise<ServerActionResult<HeartbeatUploadSessionActionResponse>> {

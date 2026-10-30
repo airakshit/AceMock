@@ -5,7 +5,6 @@ import { StorageError } from "@supabase/storage-js";
 export interface SignedUrlResponseObject {
   serverFileId: string;
   clientFileId: string;
-  storagePath: string;
   token: string;
   signedUrl: string;
 }
@@ -85,7 +84,6 @@ class SupabaseStorageClient {
             serverFileId: element.serverFileId,
             clientFileId: element.clientFileId,
             signedUrl: element.signedUrl,
-            storagePath: element.path,
             token: element.token,
           });
         }

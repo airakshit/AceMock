@@ -1,19 +1,66 @@
-// Read models returned by repositories for queries
-// Accessed by: repositories and services
-
+import z from "zod";
+import {
+  DocumentSearchSchema,
+  DocumentFileSearchSchema,
+  DocumentUploadSessionSearchSchema,
+  DocumentSearchCursorSchema,
+} from "../schemas/pagination";
 import {
   DocumentProcessingStatus,
   FilePageOCRStatus,
   FileProcessingStatus,
   FileUploadStatus,
-  UploadSessionStatus,
 } from "../types";
 
+// Pagination read models
+export type DocumentSearchCursor = z.infer<typeof DocumentSearchCursorSchema>;
+export type DocumentFileSearchData = z.infer<typeof DocumentFileSearchSchema>;
+export type DocumentUploadSessionSearchData = z.infer<
+  typeof DocumentUploadSessionSearchSchema
+>;
+export type DocumentSearchData = z.infer<typeof DocumentSearchSchema>;
+
+export interface DocumentDTO {
+  documentId: string;
+  title: string;
+  description: string | null;
+  processingStatus: DocumentProcessingStatus;
+  createdAt: Date;
+}
+export type DocumentFileDTO = DocumentSearchData["files"][0];
+
+export type UploadSessionDTO = DocumentSearchData["session"];
+
+export interface DocumentWithFilesDTO {
+  documentId: string;
+  title: string;
+  description: string | null;
+  processingStatus: DocumentProcessingStatus;
+  createdAt: Date;
+  files: DocumentSearchData["files"];
+}
+
+export interface DocumentSearchProjection {
+  documents: DocumentSearchData[];
+}
+
+export type DocumentWithPagesDTO = Omit<DocumentWithFilesDTO, "files"> & {
+  files: Array<DocumentFileDTO & { pages: FilePageProjection[] }>;
+};
+
 /**
- * Per-file progress snapshot cached on the session row (jsonb).
- * Kept narrow (no `unknown`) so projections stay JSON-mappable downstream
- * (e.g. Inngest step serialization via JsonifyObject).
+ * Internal-only read model for the document-processing pipeline. Carries
+ * `storagePath`, deliberately excluded from the user-facing `DocumentFileDTO`
+ * (search results never expose storage paths).
  */
+export interface DocumentFileProcessingRow {
+  id: string;
+  filename: string;
+  mimeType: string;
+  storagePath: string;
+  processingStatus: FileProcessingStatus;
+}
+
 export interface UploadFileProgressSnapshot {
   status: FileUploadStatus;
   offsetBytes: number | null;
@@ -23,48 +70,6 @@ export type UploadSessionProgressSnapshot = Record<
   string,
   UploadFileProgressSnapshot
 >;
-
-/**
- * Read model projection for a document upload session.
- */
-export interface UploadSessionProjection {
-  id: string;
-  documentId: string;
-  userId: string;
-  status: UploadSessionStatus;
-  /** Last heartbeat accepted from the uploading client. */
-  lastHeartbeatAt: Date;
-  /** Absolute deadline after which the attempt can no longer be resumed. */
-  recoveryExpiresAt: Date;
-  /** Optional cached per-file progress (documentFileId → state). */
-  progress: UploadSessionProgressSnapshot | null;
-  createdAt: Date;
-  endedAt: Date | null;
-  endReason: string | null;
-}
-
-/**
- * Read model projection for a document file. Fields in the "upload
- * bookkeeping" group are needed by recovery/reconciliation logic, not by
- * the wider UI (DTOs are curated in ../actions/types).
- */
-export interface DocumentFileProjection {
-  id: string;
-  documentId: string;
-  filename: string;
-  mimeType: string;
-  fileSize: number;
-  storagePath: string;
-  uploadStatus: FileUploadStatus;
-  processingStatus: FileProcessingStatus;
-  createdAt: Date;
-
-  // ---- upload bookkeeping ----
-  sessionId: string | null;
-  contentProbe: string | null;
-  uploadRef: string | null;
-  uploadRefCreatedAt: Date | null;
-}
 
 /**
  * Read model projection for a file page.
@@ -81,42 +86,9 @@ export interface FilePageProjection {
   createdAt: Date;
 }
 
-
 export interface DocumentWithQuestionCountProjection {
   id: string;
   title: string;
   createdAt: Date;
   questionCount: number;
-}
-
-
-/**
- * Read model projection for a document with its files and pages.
- * `session` is the document's only relevant upload session (the active
- * one when one exists, otherwise the most recent terminal session for
- * status display; never both).
- */
-export interface DocumentWithFilesProjection {
-  id: string;
-  userId: string;
-  title: string;
-  description: string | null;
-  processingStatus: DocumentProcessingStatus;
-  createdAt: Date;
-  updatedAt: Date;
-  files: Array<DocumentFileProjection & { pages: FilePageProjection[] }>;
-  session: UploadSessionProjection | null;
-}
-
-/**
- * Read model projection for a document (basic, without files).
- */
-export interface DocumentProjection {
-  id: string;
-  userId: string;
-  title: string;
-  description: string | null;
-  processingStatus: DocumentProcessingStatus;
-  createdAt: Date;
-  updatedAt: Date;
 }

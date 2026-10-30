@@ -86,8 +86,6 @@ export class UploadSessionsRepository {
     return session || null;
   }
 
-  // ==================== QUERIES (reads) ====================
-
   async findByIdForUser(
     db: DbExecutor,
     sessionId: string,

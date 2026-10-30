@@ -1,11 +1,6 @@
 import { documents, documentFiles, filePages } from "@/db/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import {
-  DocumentProjection,
-  DocumentFileProjection,
-  FilePageProjection,
-} from "../dto/projections";
-import {
   CreateDocumentCommand,
   CreateDocumentFileCommand,
   UpdateDocumentCommand,
@@ -17,17 +12,65 @@ import {
   UpdateFilePageCommand,
   DeleteFilePageCommand,
   UpdateFilesUploadStatusCommand,
-  SaveUploadReferenceCommand,
   ReconcileVerifiedFilesCommand,
 } from "../dto/commands";
 import { DbExecutor } from "../../shared/types";
 import { FilePageOCRStatus } from "../types";
+import {
+  DocumentDTO,
+  DocumentFileDTO,
+  DocumentFileProcessingRow,
+  FilePageProjection,
+} from "../dto/projections";
+
+
+
+const documentDTOReturning = {
+  documentId: documents.id,
+  title: documents.title,
+  description: documents.description,
+  processingStatus: documents.processingStatus,
+  createdAt: documents.createdAt,
+};
+
+const documentFileDTOReturning = {
+  fileId: documentFiles.id,
+  filename: documentFiles.filename,
+  size: documentFiles.fileSize,
+  mimeType: documentFiles.mimeType,
+  uploadStatus: documentFiles.uploadStatus,
+  contentProbe: documentFiles.contentProbe,
+};
+
+const filePageProjectionReturning = {
+  id: filePages.id,
+  fileId: filePages.fileId,
+  pageNo: filePages.pageNo,
+  ocrText: filePages.ocrText,
+  ocrStatus: filePages.ocrStatus,
+  survivedValidation: filePages.survivedValidation,
+  ocrModel: filePages.ocrModel,
+  isRelevant: filePages.isRelevant,
+  createdAt: filePages.createdAt,
+};
+
+/**
+ * Internal selector for the processing pipeline — mirrors
+ * `DocumentFileProcessingRow` (keeps `id`/`storagePath`, not the public DTO).
+ */
+const documentFileProcessingRowReturning = {
+  id: documentFiles.id,
+  filename: documentFiles.filename,
+  mimeType: documentFiles.mimeType,
+  storagePath: documentFiles.storagePath,
+  processingStatus: documentFiles.processingStatus,
+};
 
 export class DocumentCommands {
   async create(
     db: DbExecutor,
     data: CreateDocumentCommand,
-  ): Promise<DocumentProjection> {
+  ): Promise<DocumentDTO> {
     const [document] = await db
       .insert(documents)
       .values({
@@ -36,7 +79,7 @@ export class DocumentCommands {
         title: data.title,
         description: data.description,
       })
-      .returning();
+      .returning(documentDTOReturning);
 
     return document;
   }
@@ -44,7 +87,7 @@ export class DocumentCommands {
   async createFile(
     db: DbExecutor,
     data: CreateDocumentFileCommand,
-  ): Promise<DocumentFileProjection> {
+  ): Promise<DocumentFileDTO> {
     const [file] = await db
       .insert(documentFiles)
       .values({
@@ -57,7 +100,7 @@ export class DocumentCommands {
         mimeType: data.mimeType,
         storagePath: data.storagePath,
       })
-      .returning();
+      .returning(documentFileDTOReturning);
 
     return file;
   }
@@ -65,10 +108,10 @@ export class DocumentCommands {
   async createManyFiles(
     db: DbExecutor,
     data: CreateDocumentFileCommand[],
-  ): Promise<DocumentFileProjection[]> {
+  ): Promise<DocumentFileDTO[]> {
     if (data.length === 0) return [];
 
-    const createdFiles = await db
+    return db
       .insert(documentFiles)
       .values(
         data.map((file) => ({
@@ -82,9 +125,7 @@ export class DocumentCommands {
           storagePath: file.storagePath,
         })),
       )
-      .returning();
-
-    return createdFiles;
+      .returning(documentFileDTOReturning);
   }
 
   async createFilePage(
@@ -98,7 +139,7 @@ export class DocumentCommands {
         fileId: data.fileId,
         pageNo: data.pageNo,
       })
-      .returning();
+      .returning(filePageProjectionReturning);
 
     return page;
   }
@@ -109,21 +150,22 @@ export class DocumentCommands {
   ): Promise<FilePageProjection[]> {
     if (data.length === 0) return [];
 
-    const values = data.map((page) => ({
-      id: page.id,
-      fileId: page.fileId,
-      pageNo: page.pageNo,
-    }));
-
-    const createdPages = await db.insert(filePages).values(values).returning();
-
-    return createdPages;
+    return db
+      .insert(filePages)
+      .values(
+        data.map((page) => ({
+          id: page.id,
+          fileId: page.fileId,
+          pageNo: page.pageNo,
+        })),
+      )
+      .returning(filePageProjectionReturning);
   }
 
   async update(
     db: DbExecutor,
     data: UpdateDocumentCommand,
-  ): Promise<DocumentProjection | null> {
+  ): Promise<DocumentDTO | null> {
     const { documentId, userId, title, description, status } = data;
 
     const [document] = await db
@@ -135,7 +177,7 @@ export class DocumentCommands {
         updatedAt: new Date(),
       })
       .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
-      .returning();
+      .returning(documentDTOReturning);
 
     return document || null;
   }
@@ -143,11 +185,22 @@ export class DocumentCommands {
   async updateFile(
     db: DbExecutor,
     data: UpdateDocumentFileCommand,
-  ): Promise<DocumentFileProjection | null> {
+  ): Promise<DocumentFileDTO | null> {
     const [file] = await db
       .update(documentFiles)
       .set({
-        ...data,
+        ...(data.filename !== undefined && { filename: data.filename }),
+        ...(data.mimeType !== undefined && { mimeType: data.mimeType }),
+        ...(data.fileSize !== undefined && { fileSize: data.fileSize }),
+        ...(data.storagePath !== undefined && { storagePath: data.storagePath }),
+        ...(data.uploadStatus !== undefined && {
+          uploadStatus: data.uploadStatus,
+        }),
+        ...(data.uploadRef !== undefined && { uploadRef: data.uploadRef }),
+        // Timestamp the reference whenever the ref itself is replaced.
+        ...(data.uploadRef !== undefined && {
+          uploadRefCreatedAt: new Date(),
+        }),
       })
       .where(
         and(
@@ -155,34 +208,7 @@ export class DocumentCommands {
           eq(documentFiles.documentId, data.documentId),
         ),
       )
-      .returning();
-
-    return file || null;
-  }
-
-  /**
-   * Persists the TUS resource reference created by the client, transitioning
-   * the file from `pending` to `uploading`. Idempotent for repeat saves.
-   */
-  async saveUploadReference(
-    db: DbExecutor,
-    data: SaveUploadReferenceCommand,
-  ): Promise<DocumentFileProjection | null> {
-    const [file] = await db
-      .update(documentFiles)
-      .set({
-        uploadRef: data.uploadRef,
-        uploadRefCreatedAt: new Date(),
-        uploadStatus: "uploading",
-      })
-      .where(
-        and(
-          eq(documentFiles.id, data.fileId),
-          eq(documentFiles.documentId, data.documentId),
-          inArray(documentFiles.uploadStatus, ["pending", "uploading"]),
-        ),
-      )
-      .returning();
+      .returning(documentFileDTOReturning);
 
     return file || null;
   }
@@ -193,10 +219,10 @@ export class DocumentCommands {
   async updateFilesUploadStatus(
     db: DbExecutor,
     data: UpdateFilesUploadStatusCommand,
-  ): Promise<DocumentFileProjection[]> {
+  ): Promise<DocumentFileDTO[]> {
     if (data.fileIds.length === 0) return [];
 
-    const files = await db
+    return db
       .update(documentFiles)
       .set({
         uploadStatus: data.uploadStatus,
@@ -207,9 +233,7 @@ export class DocumentCommands {
           inArray(documentFiles.id, data.fileIds),
         ),
       )
-      .returning();
-
-    return files;
+      .returning(documentFileDTOReturning);
   }
 
   /**
@@ -220,7 +244,7 @@ export class DocumentCommands {
   async reconcileVerifiedFiles(
     db: DbExecutor,
     data: ReconcileVerifiedFilesCommand,
-  ): Promise<DocumentFileProjection[]> {
+  ): Promise<DocumentFileDTO[]> {
     if (data.verifiedFileIds.length === 0 && data.failedFileIds.length === 0) {
       return [];
     }
@@ -237,7 +261,7 @@ export class DocumentCommands {
                 eq(documentFiles.uploadStatus, "uploaded"),
               ),
             )
-            .returning()
+            .returning(documentFileDTOReturning)
         : [];
 
     const failed =
@@ -252,7 +276,7 @@ export class DocumentCommands {
                 eq(documentFiles.uploadStatus, "uploaded"),
               ),
             )
-            .returning()
+            .returning(documentFileDTOReturning)
         : [];
 
     return [...verified, ...failed];
@@ -261,38 +285,38 @@ export class DocumentCommands {
   async updateFileProcessingStatus(
     db: DbExecutor,
     data: UpdateDocumentFileProcessingStatusCommand,
-  ): Promise<DocumentFileProjection[]> {
-    const files = await db
+  ): Promise<DocumentFileProcessingRow[]> {
+    return db
       .update(documentFiles)
       .set({
         processingStatus: data.status,
       })
       .where(eq(documentFiles.documentId, data.documentId))
-      .returning();
-
-    return files;
+      .returning(documentFileProcessingRowReturning);
   }
 
   async updateFilePage(
     db: DbExecutor,
     data: UpdateFilePageCommand,
   ): Promise<FilePageProjection | null> {
-    const { ocrModel, survivedValidation, ...rest } = data;
-
-    const updateData = {
-      ...rest,
-      updatedAt: new Date(),
-      ...(ocrModel !== undefined && { ocrModel }),
-      ...(survivedValidation !== undefined && { survivedValidation }),
-    };
-
     const [page] = await db
       .update(filePages)
-      .set(updateData)
+      .set({
+        pageNo: data.pageNo,
+        ...(data.ocrText !== undefined && { ocrText: data.ocrText }),
+        ...(data.ocrStatus !== undefined && { ocrStatus: data.ocrStatus }),
+        ...(data.isRelevant !== undefined && { isRelevant: data.isRelevant }),
+        ...(data.fnVersion !== undefined && { fnVersion: data.fnVersion }),
+        ...(data.ocrModel !== undefined && { ocrModel: data.ocrModel }),
+        ...(data.survivedValidation !== undefined && {
+          survivedValidation: data.survivedValidation,
+        }),
+        updatedAt: new Date(),
+      })
       .where(
         and(eq(filePages.id, data.pageId), eq(filePages.fileId, data.fileId)),
       )
-      .returning();
+      .returning(filePageProjectionReturning);
 
     return page || null;
   }
@@ -302,16 +326,14 @@ export class DocumentCommands {
     fileId: string,
     ocrStatus: FilePageOCRStatus,
   ): Promise<FilePageProjection[]> {
-    const pages = await db
+    return db
       .update(filePages)
       .set({
         ocrStatus,
         updatedAt: new Date(),
       })
       .where(eq(filePages.fileId, fileId))
-      .returning();
-
-    return pages;
+      .returning(filePageProjectionReturning);
   }
 
   async updateFilePageStatusByPageId(
@@ -323,7 +345,7 @@ export class DocumentCommands {
       .update(filePages)
       .set({ ocrStatus, updatedAt: new Date() })
       .where(eq(filePages.id, pageId))
-      .returning();
+      .returning(filePageProjectionReturning);
 
     return page || null;
   }
@@ -343,13 +365,13 @@ export class DocumentCommands {
         updatedAt: new Date(),
       })
       .where(and(eq(filePages.fileId, fileId), inArray(filePages.id, pageIds)))
-      .returning();
+      .returning(filePageProjectionReturning);
   }
 
   async delete(
     db: DbExecutor,
     data: DeleteDocumentCommand,
-  ): Promise<DocumentProjection | null> {
+  ): Promise<DocumentDTO | null> {
     const [document] = await db
       .delete(documents)
       .where(
@@ -358,7 +380,7 @@ export class DocumentCommands {
           eq(documents.userId, data.userId),
         ),
       )
-      .returning();
+      .returning(documentDTOReturning);
 
     return document || null;
   }
@@ -366,7 +388,7 @@ export class DocumentCommands {
   async deleteFile(
     db: DbExecutor,
     data: DeleteDocumentFileCommand,
-  ): Promise<DocumentFileProjection | null> {
+  ): Promise<DocumentFileDTO | null> {
     const [file] = await db
       .delete(documentFiles)
       .where(
@@ -375,7 +397,7 @@ export class DocumentCommands {
           eq(documentFiles.documentId, data.documentId),
         ),
       )
-      .returning();
+      .returning(documentFileDTOReturning);
 
     return file || null;
   }
@@ -389,11 +411,10 @@ export class DocumentCommands {
       .where(
         and(eq(filePages.id, data.pageId), eq(filePages.fileId, data.fileId)),
       )
-      .returning();
+      .returning(filePageProjectionReturning);
 
     return page || null;
   }
 }
 
 export const documentCommands = new DocumentCommands();
-

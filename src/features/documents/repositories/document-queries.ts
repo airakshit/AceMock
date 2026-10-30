@@ -1,37 +1,49 @@
-import { documentFiles, documents, filePages, questions } from "@/db/schemas";
-import { and, desc, eq, inArray, count } from "drizzle-orm";
+import {
+  documentFiles,
+  documents,
+  filePages,
+  questions,
+  uploadSessions,
+} from "@/db/schemas";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  count,
+  ilike,
+  or,
+  sql,
+  lt,
+  type SQL,
+} from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
 import {
-  DocumentProjection,
-  DocumentWithFilesProjection,
+  DocumentDTO,
+  DocumentFileDTO,
+  DocumentWithFilesDTO,
+  DocumentWithPagesDTO,
+  DocumentSearchCursor,
+  DocumentSearchData,
+  DocumentSearchProjection,
   DocumentWithQuestionCountProjection,
-  DocumentFileProjection,
-  FilePageProjection,
 } from "../dto/projections";
-
-export const documentFileColumns = {
-  id: documentFiles.id,
-  documentId: documentFiles.documentId,
-  sessionId: documentFiles.sessionId,
-  filename: documentFiles.filename,
-  mimeType: documentFiles.mimeType,
-  fileSize: documentFiles.fileSize,
-  storagePath: documentFiles.storagePath,
-  contentProbe: documentFiles.contentProbe,
-  uploadRef: documentFiles.uploadRef,
-  uploadRefCreatedAt: documentFiles.uploadRefCreatedAt,
-  uploadStatus: documentFiles.uploadStatus,
-  processingStatus: documentFiles.processingStatus,
-  createdAt: documentFiles.createdAt,
-};
+import { validateDocumentSearchRows } from "../validators";
+import { DocumentProcessingStatus } from "../types";
 
 export class DocumentQueries {
   async findById(
     db: DbExecutor,
     documentId: string,
-  ): Promise<DocumentProjection | null> {
+  ): Promise<DocumentDTO | null> {
     const [document] = await db
-      .select()
+      .select({
+        documentId: documents.id,
+        title: documents.title,
+        description: documents.description,
+        processingStatus: documents.processingStatus,
+        createdAt: documents.createdAt,
+      })
       .from(documents)
       .where(eq(documents.id, documentId))
       .limit(1);
@@ -40,15 +52,25 @@ export class DocumentQueries {
   }
 
   async findFileById(db: DbExecutor, fileId: string) {
-    const [file] = (await db.select().from(documentFiles).where(eq(documentFiles.id, fileId)).limit(1))
+    const [file] = await db
+      .select()
+      .from(documentFiles)
+      .where(eq(documentFiles.id, fileId))
+      .limit(1);
+
     return file || null;
   }
 
+  /**
+   * Full user document row or null — ownership enforced. Server flows use
+   * it where columns beyond the DTO projection are required (e.g. the
+   * resume decision tree reads `.id`, `.title`, `.description`, `.status`).
+   */
   async findByIdForUser(
     db: DbExecutor,
     documentId: string,
     userId: string,
-  ): Promise<DocumentProjection | null> {
+  ) {
     const [document] = await db
       .select()
       .from(documents)
@@ -58,154 +80,35 @@ export class DocumentQueries {
     return document || null;
   }
 
-  async findByIdForUserWithFiles(
-    db: DbExecutor,
-    documentId: string,
-    userId: string,
-  ): Promise<DocumentWithFilesProjection | null> {
-    const document = await this.findByIdForUser(db, documentId, userId);
-    if (!document) return null;
-
-    const files = await db
-      .select(documentFileColumns)
-      .from(documentFiles)
-      .where(eq(documentFiles.documentId, documentId))
-      .orderBy(desc(documentFiles.createdAt));
-
-    const filesWithPages = await Promise.all(
-      files.map(async (file) => {
-        const pages = await db
-          .select()
-          .from(filePages)
-          .where(eq(filePages.fileId, file.id))
-          .orderBy(desc(filePages.createdAt));
-
-        return {
-          ...file,
-          pages: pages as FilePageProjection[],
-        };
-      }),
-    );
-
-    return {
-      id: document.id,
-      userId: document.userId,
-      title: document.title,
-      description: document.description,
-      processingStatus: document.processingStatus,
-      createdAt: document.createdAt,
-      updatedAt: document.updatedAt,
-      // Attached by the service layer (getRelevantSession), not per-query.
-      session: null,
-      files: filesWithPages,
-    };
-  }
-
-  async findByUser(
-    db: DbExecutor,
-    userId: string,
-  ): Promise<DocumentProjection[]> {
-    return db
-      .select()
-      .from(documents)
-      .where(eq(documents.userId, userId))
-      .orderBy(desc(documents.createdAt));
-  }
-
-  async findByUserWithFiles(
-    db: DbExecutor,
-    userId: string,
-  ): Promise<DocumentWithFilesProjection[]> {
-    const userDocs = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.userId, userId))
-      .orderBy(desc(documents.createdAt));
-
-    if (userDocs.length === 0) return [];
-
-    const docIds = userDocs.map((d) => d.id);
-    const files = await db
-      .select(documentFileColumns)
-      .from(documentFiles)
-      .where(inArray(documentFiles.documentId, docIds))
-      .orderBy(desc(documentFiles.createdAt));
-
-    /**
-     * Group EVERY file under its document. The map is keyed by documentId
-     * and holds an ARRAY — a single-object map here silently overwrote
-     * entries per document, so each document surfaced only its last file
-     * (wrong counts, missing files) until a per-document refresh ran.
-     */
-    const filesByDocument = new Map<
-      string,
-      Array<(typeof files)[number] & { pages: FilePageProjection[] }>
-    >();
-    for (const docId of docIds) {
-      filesByDocument.set(docId, []);
-    }
-
-    const fileById = new Map<
-      string,
-      (typeof files)[number] & { pages: FilePageProjection[] }
-    >();
-    for (const file of files) {
-      const entry = { ...file, pages: [] as FilePageProjection[] };
-      filesByDocument.get(file.documentId)?.push(entry);
-      fileById.set(file.id, entry);
-    }
-
-    // Fetch pages for all files in one pass (skip when there are none —
-    // `inArray` with an empty list must not reach the DB).
-    if (files.length > 0) {
-      const fileIds = files.map((f) => f.id);
-      const allPages = await db
-        .select()
-        .from(filePages)
-        .where(inArray(filePages.fileId, fileIds))
-        .orderBy(desc(filePages.createdAt));
-
-      for (const page of allPages) {
-        fileById.get(page.fileId)?.pages.push(page as FilePageProjection);
-      }
-    }
-
-    return userDocs.map((doc) => ({
-      id: doc.id,
-      userId: doc.userId,
-      title: doc.title,
-      description: doc.description,
-      processingStatus: doc.processingStatus,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
-      // Attached by the service layer (getRelevantSession), not per-query.
-      session: null,
-      files: filesByDocument.get(doc.id) ?? [],
-    }));
-  }
-
   async findFilesByDocumentId(
     db: DbExecutor,
     documentId: string,
-  ): Promise<DocumentFileProjection[]> {
+  ): Promise<DocumentFileDTO[]> {
     const data = await db
-      .select(documentFileColumns)
-      .from(documents)
-      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
-      .where(eq(documents.id, documentId));
+      .select({
+        fileId: documentFiles.id,
+        filename: documentFiles.filename,
+        size: documentFiles.fileSize,
+        mimeType: documentFiles.mimeType,
+        storagePath: documentFiles.storagePath,
+        uploadStatus: documentFiles.uploadStatus,
+        contentProbe: documentFiles.contentProbe,
+      })
+      .from(documentFiles)
+      .where(eq(documentFiles.documentId, documentId));
 
-    return data as DocumentFileProjection[];
+    return data as DocumentFileDTO[];
   }
 
   /**
-   * Session-scoped file reads for the recovery algorithm.
+   * Session-scoped file reads for the recovery/verification flows. Returns
+   * the full row on purpose: resume decisions and storage verification need
+   * `uploadRef`, `uploadRefCreatedAt` and `fileSize`, columns deliberately
+   * excluded from the public file DTOs.
    */
-  async findFilesBySessionId(
-    db: DbExecutor,
-    sessionId: string,
-  ): Promise<DocumentFileProjection[]> {
+  async findFilesBySessionId(db: DbExecutor, sessionId: string) {
     return db
-      .select(documentFileColumns)
+      .select()
       .from(documentFiles)
       .where(eq(documentFiles.sessionId, sessionId))
       .orderBy(desc(documentFiles.createdAt));
@@ -288,124 +191,365 @@ export class DocumentQueries {
     return rows.map((r) => r.id);
   }
 
-  // Cross table queries
   async getDocumentWithFiles(
     db: DbExecutor,
     documentId: string,
     userId: string,
-  ): Promise<DocumentWithFilesProjection | null> {
-    const rows = await db
+  ): Promise<DocumentWithFilesDTO | null> {
+    const [record] = await db
       .select({
-        document: documents,
-        file: documentFiles,
+        documentId: documents.id,
+        title: documents.title,
+        description: documents.description,
+        processingStatus: documents.processingStatus,
+        createdAt: documents.createdAt,
+        files: sql<unknown>`
+          COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'fileId', ${documentFiles.id},
+                'filename', ${documentFiles.filename},
+                'size', ${documentFiles.fileSize},
+                'mimeType', ${documentFiles.mimeType},
+                'storagePath', ${documentFiles.storagePath},
+                'uploadStatus', ${documentFiles.uploadStatus},
+                'contentProbe', ${documentFiles.contentProbe}
+              )
+              ORDER BY ${documentFiles.createdAt} DESC
+            ) FILTER (
+              WHERE ${documentFiles.id} IS NOT NULL,
+            )
+            '[]'::jsonb
+          )
+        `.as("files"),
       })
       .from(documents)
       .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
-      .where(and(eq(documents.id, documentId), eq(documents.userId, userId)));
+      .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
+      .groupBy(
+        documents.id,
+        documents.title,
+        documents.description,
+        documents.processingStatus,
+        documents.createdAt,
+      );
 
-    if (rows.length === 0) return null;
+    if (!record) return null;
 
-    const document = rows[0].document;
-    const files = rows.filter((r) => r.file).map((r) => r.file!);
-
-    return {
-      id: document.id,
-      userId: document.userId,
-      title: document.title,
-      description: document.description,
-      processingStatus: document.processingStatus,
-      createdAt: document.createdAt,
-      updatedAt: document.updatedAt,
-      // Attached by the service layer (getRelevantSession), not per-query.
-      session: null,
-      files: files.map((f) => ({ ...f, pages: [] as FilePageProjection[] })),
-    };
+    return { ...record, files: record.files as DocumentFileDTO[] };
   }
 
   async getDocumentWithPages(
     db: DbExecutor,
     documentId: string,
     userId: string,
-  ): Promise<DocumentWithFilesProjection> {
+  ): Promise<DocumentWithPagesDTO | null> {
+    const doc = db.$with("doc").as(
+      db
+        .select({
+          documentId: documents.id,
+          title: documents.title,
+          description: documents.description,
+          processingStatus: documents.processingStatus,
+          createdAt: documents.createdAt,
+        })
+        .from(documents)
+        .where(and(eq(documents.id, documentId), eq(documents.userId, userId))),
+    );
+
+    // One row per file with its pages pre-aggregated ('[]' when it has none).
+    const docPages = db.$with("doc_pages").as(
+      db
+        .select({
+          fileId: documentFiles.id,
+          pages: sql<unknown>`
+            COALESCE(
+              jsonb_agg(
+                jsonb_build_object(
+                  'id', ${filePages.id},
+                  'fileId', ${filePages.fileId},
+                  'pageNo', ${filePages.pageNo},
+                  'ocrText', ${filePages.ocrText},
+                  'ocrStatus', ${filePages.ocrStatus},
+                  'survivedValidation', ${filePages.survivedValidation},
+                  'ocrModel', ${filePages.ocrModel},
+                  'isRelevant', ${filePages.isRelevant},
+                  'createdAt', ${filePages.createdAt}
+                )
+                ORDER BY ${filePages.pageNo} ASC
+              ) FILTER (
+                WHERE ${filePages.id} IS NOT NULL,
+              )
+              '[]'::jsonb
+            )
+          `.as("pages"),
+        })
+        .from(doc)
+        .innerJoin(documentFiles, eq(documentFiles.documentId, doc.documentId))
+        .leftJoin(filePages, eq(filePages.fileId, documentFiles.id))
+        .groupBy(documentFiles.id),
+    );
+
+    const [record] = await db
+      .select({
+        documentId: doc.documentId,
+        title: doc.title,
+        description: doc.description,
+        processingStatus: doc.processingStatus,
+        createdAt: doc.createdAt,
+        files: sql<unknown>`
+          COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'fileId', ${documentFiles.id},
+                'filename', ${documentFiles.filename},
+                'size', ${documentFiles.fileSize},
+                'mimeType', ${documentFiles.mimeType},
+                'storagePath', ${documentFiles.storagePath},
+                'uploadStatus', ${documentFiles.uploadStatus},
+                'contentProbe', ${documentFiles.contentProbe},
+                'pages', ${docPages.pages}
+              )
+              ORDER BY ${documentFiles.createdAt} DESC
+            ) FILTER (
+              WHERE ${documentFiles.id} IS NOT NULL,
+            )
+            '[]'::jsonb
+          )
+        `.as("files"),
+      })
+      .from(doc)
+      .leftJoin(documentFiles, eq(documentFiles.documentId, doc.documentId))
+      .leftJoin(docPages, eq(docPages.fileId, documentFiles.id))
+      .groupBy(
+        doc.documentId,
+        doc.title,
+        doc.description,
+        doc.processingStatus,
+        doc.createdAt,
+      );
+
+    if (!record) return null;
+
+    return {
+      documentId: record.documentId,
+      title: record.title,
+      description: record.description,
+      processingStatus: record.processingStatus,
+      createdAt: record.createdAt,
+      files: record.files as DocumentWithPagesDTO["files"],
+    };
+  }
+
+  async getUserDocument(
+    db: DbExecutor,
+    userId: string,
+    documentId: string,
+  ): Promise<DocumentSearchData | null> {
+    const docRows = db.$with("matching_docs").as(
+      db
+        .select({
+          documentId: documents.id,
+          title: documents.title,
+          description: documents.description,
+          processingStatus: documents.processingStatus,
+          createdAt: documents.createdAt,
+        })
+        .from(documents)
+        .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
+        .limit(1),
+    );
+
+    const docFiles = db.$with("document_files").as(
+      db
+        .select({
+          documentId: docRows.documentId,
+          files: sql<unknown>`
+            COALESCE(
+              jsonb_agg(
+                jsonb_build_object(
+                  'fileId', ${documentFiles.id},
+                  'filename', ${documentFiles.filename},
+                  'size', ${documentFiles.fileSize},
+                  'mimeType', ${documentFiles.mimeType},
+                  'storagePath', ${documentFiles.storagePath},
+                  'uploadStatus', ${documentFiles.uploadStatus},
+                  'contentProbe', ${documentFiles.contentProbe}
+                )
+                ORDER BY ${documentFiles.createdAt} DESC
+              ) FILTER (
+                WHERE ${documentFiles.id} IS NOT NULL,
+              )
+              '[]'::jsonb
+            )
+          `.as("files"),
+        })
+        .from(docRows)
+        .innerJoin(
+          documentFiles,
+          eq(documentFiles.documentId, docRows.documentId),
+        )
+        .groupBy(docRows.documentId),
+    );
+
+    const latestUploadSession = db
+      .select({
+        sessionId: uploadSessions.id,
+        status: uploadSessions.status,
+        lastHeartbeatAt: uploadSessions.lastHeartbeatAt,
+        recoveryExpiresAt: uploadSessions.recoveryExpiresAt,
+        progress: uploadSessions.progress,
+      })
+      .from(uploadSessions)
+      .where(eq(uploadSessions.documentId, docRows.documentId))
+      .orderBy(desc(uploadSessions.createdAt))
+      .limit(1)
+      .as("latest_session");
+
     const rows = await db
       .select({
-        documentId: documents.id,
-        processingStatus: documents.processingStatus,
-        fileId: documentFiles.id,
-        fileName: documentFiles.filename,
-        fileMimeType: documentFiles.mimeType,
-        fileSize: documentFiles.fileSize,
-        fileStoragePath: documentFiles.storagePath,
-        fileUploadStatus: documentFiles.uploadStatus,
-        fileProcessingStatus: documentFiles.processingStatus,
-        fileSessionId: documentFiles.sessionId,
-        fileContentProbe: documentFiles.contentProbe,
-        fileUploadRef: documentFiles.uploadRef,
-        fileUploadRefCreatedAt: documentFiles.uploadRefCreatedAt,
-        fileCreatedAt: documentFiles.createdAt,
-        page: filePages,
-        userId: documents.userId,
-        title: documents.title,
-        description: documents.description,
-        createdAt: documents.createdAt,
-        updatedAt: documents.updatedAt,
+        documentId: docRows.documentId,
+        title: docRows.title,
+        description: docRows.description,
+        processingStatus: docRows.processingStatus,
+        createdAt: docRows.createdAt,
+        session: {
+          sessionId: latestUploadSession.sessionId,
+          lastHeartbeatAt: latestUploadSession.lastHeartbeatAt,
+          recoveryExpiresAt: latestUploadSession.recoveryExpiresAt,
+          status: latestUploadSession.status,
+          progress: latestUploadSession.progress,
+        },
+        files: docFiles.files,
       })
-      .from(documents)
-      .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
-      .leftJoin(filePages, eq(documentFiles.id, filePages.fileId))
-      .where(and(eq(documents.id, documentId), eq(documents.userId, userId)));
+      .from(docRows)
+      .innerJoinLateral(latestUploadSession, sql`true`)
+      .innerJoin(docFiles, eq(docFiles.documentId, docRows.documentId));
 
-    const filesMap = new Map<
-      string,
-      DocumentFileProjection & { pages: FilePageProjection[] }
-    >();
+    return validateDocumentSearchRows(rows)[0] || null;
+  }
 
-    for (const row of rows) {
-      if (!row.fileId) continue;
-
-      let file = filesMap.get(row.fileId);
-
-      if (!file) {
-        file = {
-          id: row.fileId,
-          documentId: row.documentId,
-          filename: row.fileName as string,
-          mimeType: row.fileMimeType ?? "",
-          fileSize: row.fileSize ?? 0,
-          storagePath: row.fileStoragePath ?? "",
-          sessionId: row.fileSessionId ?? null,
-          contentProbe: row.fileContentProbe ?? null,
-          uploadRef: row.fileUploadRef ?? null,
-          uploadRefCreatedAt: row.fileUploadRefCreatedAt ?? null,
-          uploadStatus: row.fileUploadStatus ?? "uploading",
-          processingStatus: row.fileProcessingStatus ?? "pending",
-          createdAt: row.fileCreatedAt ?? new Date(),
-          pages: [],
-        };
-
-        filesMap.set(row.fileId, file);
-      }
-
-      if (row.page) {
-        file.pages.push(row.page as FilePageProjection);
-      }
+  async searchUserDocuments(
+    db: DbExecutor,
+    userId: string,
+    query: {
+      searchKey: string;
+      processingStatus?: DocumentProcessingStatus;
+      pagination: {
+        pageSize: number;
+        cursor?: DocumentSearchCursor;
+      };
+    },
+  ): Promise<DocumentSearchProjection> {
+    const conditions: SQL<unknown>[] = [eq(documents.userId, userId)];
+    if (query.processingStatus) {
+      conditions.push(eq(documents.processingStatus, query.processingStatus));
+    }
+    if (query.searchKey) {
+      const pattern = `%${query.searchKey}%`;
+      conditions.push(
+        or(
+          ilike(documents.title, pattern),
+          ilike(documents.description, pattern),
+        )!,
+      );
+    }
+    if (query.pagination.cursor) {
+      const date = query.pagination.cursor.createdAt;
+      conditions.push(
+        and(
+          lt(
+            documents.createdAt,
+            typeof date === "string" ? new Date(date) : date,
+          ),
+          lt(documents.id, query.pagination.cursor.id),
+        )!,
+      );
     }
 
-    const result: DocumentWithFilesProjection = {
-      id: documentId,
-      userId: rows[0]?.userId || "",
-      title: rows[0]?.title || "",
-      description: rows[0]?.description || null,
-      processingStatus: rows[0]?.processingStatus || "pending",
-      createdAt: rows[0]?.createdAt || new Date(),
-      updatedAt: rows[0]?.updatedAt || new Date(),
-      // Attached by the service layer (getRelevantSession), not per-query.
-      session: null,
-      files: [...filesMap.values()],
-    };
-    return result;
+    const matchingDocs = db.$with("matching_docs").as(
+      db
+        .select({
+          documentId: documents.id,
+          title: documents.title,
+          description: documents.description,
+          processingStatus: documents.processingStatus,
+          createdAt: documents.createdAt,
+        })
+        .from(documents)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(documents.createdAt), desc(documents.id))
+        .limit(query.pagination.pageSize + 1),
+    );
+
+    const docFiles = db.$with("document_files").as(
+      db
+        .select({
+          documentId: matchingDocs.documentId,
+          files: sql<unknown>`
+            COALESCE(
+              jsonb_agg(
+                jsonb_build_object(
+                  'fileId', ${documentFiles.id},
+                  'filename', ${documentFiles.filename},
+                  'size', ${documentFiles.fileSize},
+                  'mimeType', ${documentFiles.mimeType},
+                  'storagePath', ${documentFiles.storagePath},
+                  'uploadStatus', ${documentFiles.uploadStatus},
+                  'contentProbe', ${documentFiles.contentProbe}
+                )
+                ORDER BY ${documentFiles.createdAt} DESC
+              ) FILTER (
+                WHERE ${documentFiles.id} IS NOT NULL,
+              )
+              '[]'::jsonb
+            )
+          `.as("files"),
+        })
+        .from(matchingDocs)
+        .innerJoin(
+          documentFiles,
+          eq(documentFiles.documentId, matchingDocs.documentId),
+        )
+        .groupBy(matchingDocs.documentId),
+    );
+
+    const latestUploadSession = db
+      .select({
+        sessionId: uploadSessions.id,
+        status: uploadSessions.status,
+        lastHeartbeatAt: uploadSessions.lastHeartbeatAt,
+        recoveryExpiresAt: uploadSessions.recoveryExpiresAt,
+        progress: uploadSessions.progress,
+      })
+      .from(uploadSessions)
+      .where(eq(uploadSessions.documentId, matchingDocs.documentId))
+      .orderBy(desc(uploadSessions.createdAt))
+      .limit(1)
+      .as("latest_session");
+
+    const rows = await db
+      .select({
+        documentId: matchingDocs.documentId,
+        title: matchingDocs.title,
+        description: matchingDocs.description,
+        processingStatus: matchingDocs.processingStatus,
+        createdAt: matchingDocs.createdAt,
+        session: {
+          sessionId: latestUploadSession.sessionId,
+          lastHeartbeatAt: latestUploadSession.lastHeartbeatAt,
+          recoveryExpiresAt: latestUploadSession.recoveryExpiresAt,
+          status: latestUploadSession.status,
+          progress: latestUploadSession.progress,
+        },
+        files: docFiles.files,
+      })
+      .from(matchingDocs)
+      .innerJoinLateral(latestUploadSession, sql`true`)
+      .innerJoin(docFiles, eq(docFiles.documentId, matchingDocs.documentId));
+
+    return { documents: validateDocumentSearchRows(rows) };
   }
 }
 
 export const documentQueries = new DocumentQueries();
-

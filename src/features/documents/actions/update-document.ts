@@ -2,10 +2,8 @@
 
 import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
-import {
-  UpdateDocumentActionPayload,
-  UpdateDocumentActionResponse,
-} from "./types";
+import { UpdateDocumentActionPayload } from "../dto/payloads";
+import { UpdateDocumentActionResponse } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 
@@ -15,7 +13,7 @@ export async function updateDocumentAction(
   try {
     const session = await requireSession();
 
-    const data = await documentsService.updateDocument(
+    const updatedDoc = await documentsService.updateDocument(
       session.user.id,
       payload.documentId,
       {
@@ -26,7 +24,7 @@ export async function updateDocumentAction(
 
     return {
       success: true,
-      data: data,
+      data: { document: updatedDoc },
       message: "Document updated successfully.",
     };
   } catch (error) {

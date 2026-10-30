@@ -2,10 +2,8 @@
 
 import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
-import {
-  DeleteDocumentActionPayload,
-  DeleteDocumentActionResponse,
-} from "./types";
+import { DeleteDocumentActionPayload } from "../dto/payloads";
+import { DeleteDocumentActionResponse } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 

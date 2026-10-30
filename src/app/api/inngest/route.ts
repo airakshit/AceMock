@@ -8,6 +8,7 @@ import { extractFigures } from "@/inngest/functions/v1/extract-figures";
 import { cleanupStaleUploads } from "@/inngest/functions/v1/cleanup-stale-uploads";
 import { extractQuestions as extractQuestionsV2 } from "@/inngest/functions/v2/extract-questions";
 import { ocrPage as ocrPageV2 } from "@/inngest/functions/v2/ocr-page";
+import { processDocument as processDocumentV2 } from "@/inngest/functions/v2/process-document";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -22,5 +23,6 @@ export const { GET, POST, PUT } = serve({
     // V2 functions
     extractQuestionsV2,
     ocrPageV2,
+    processDocumentV2
   ],
 });

@@ -5,8 +5,10 @@ import { documentsService } from "../service";
 
 import {
   CreateDocumentActionPayload,
+} from "../dto/payloads";
+import {
   CreateDocumentActionResponse,
-} from "./types";
+} from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 

@@ -2,7 +2,7 @@
 
 import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
-import { GetDocumentsSummaryActionResponse } from "./types";
+import { GetDocumentsSummaryActionResponse } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
 

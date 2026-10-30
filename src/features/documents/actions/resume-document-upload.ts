@@ -4,10 +4,8 @@ import { requireSession } from "@/features/shared/actions/require-session";
 import { documentsService } from "../service";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { handleActionError } from "@/features/shared/actions/error";
-import {
-  ResumeDocumentUploadActionPayload,
-  ResumeDocumentUploadActionResponse,
-} from "./types";
+import { ResumeDocumentUploadActionPayload } from "../dto/payloads";
+import { ResumeDocumentUploadActionResponse } from "../dto/results";
 
 /**
  * THE server-side recovery decision point (plan §11).

@@ -5,7 +5,15 @@ export const documentsTable = "documents";
 
 export const documentProcessingStatusEnum = pgEnum(
   "document_processing_status_enum",
-  ["pending", "processing_files", "extracting_questions", "merging_questions", "completed", "failed"],
+  [
+    "pending",
+    "queued",
+    "processing_files",
+    "extracting_questions",
+    "merging_questions",
+    "completed",
+    "failed",
+  ],
 );
 
 export const documents = pgTable("documents", {
