@@ -36,7 +36,7 @@ import {
   SingleDocumentFileAndSessionProjection,
 } from "../dto/projections";
 import { validateDocumentSearchRows } from "../validators";
-import { DocumentProcessingStatus } from "../types";
+import { DocumentFilterProcessingStatus, DocumentProcessingStatus } from "../types";
 
 const documentFilesAggregate = sql<unknown>`
   COALESCE(
@@ -446,7 +446,7 @@ export class DocumentQueries {
     userId: string,
     query: {
       searchKey?: string;
-      processingStatus?: DocumentProcessingStatus;
+      processingStatus?: DocumentFilterProcessingStatus;
       pagination: {
         pageSize: number;
         cursor?: DocumentSearchCursor;
@@ -455,7 +455,17 @@ export class DocumentQueries {
   ): Promise<DocumentSearchProjection> {
     const conditions: SQL<unknown>[] = [eq(documents.userId, userId)];
     if (query.processingStatus) {
-      conditions.push(eq(documents.processingStatus, query.processingStatus));
+      if (query.processingStatus === "processing") {
+        conditions.push(
+          inArray(documents.processingStatus, [
+            "processing_files",
+            "extracting_questions",
+            "merging_questions",
+          ]),
+        );
+      } else {
+        conditions.push(eq(documents.processingStatus, query.processingStatus));
+      }
     }
     if (query.searchKey) {
       const pattern = `%${query.searchKey}%`;

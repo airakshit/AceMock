@@ -56,9 +56,7 @@ import { decodeSearchCursor, encodeSearchCursor } from "../shared/pagination";
 import { validateDocumentSearchCursor } from "./validators";
 
 class DocumentsService {
-  /** Default page size for the user documents search. */
   private static readonly DOCUMENTS_PAGE_SIZE = 20;
-  /** Upper bound for `pageSize` — client-supplied values are clamped. */
   private static readonly MAX_DOCUMENTS_PAGE_SIZE = 50;
 
   private toSessionDTO(session: UploadSessionRow): UploadSessionDTO {
@@ -71,12 +69,6 @@ class DocumentsService {
     };
   }
 
-  /**
-   * Creates the document, its files, AND its server-owned upload session —
-   * one attempt, one session. Tokens are minted after the transaction
-   * commits (a post-mint failure leaves a valid session; the client then
-   * recovers via resumeDocumentUpload instead of duplicating the attempt).
-   */
   async createDocument(
     userId: string,
     payload: CreateDocumentActionPayload,
@@ -324,7 +316,6 @@ class DocumentsService {
     return latest;
   }
 
-
   async resumeDocumentUpload(
     userId: string,
     payload: ResumeDocumentUploadActionPayload,
@@ -342,10 +333,8 @@ class DocumentsService {
         "Document session not found or access denied.",
       );
     }
-
   }
 
-  
   async completeUploadSession(
     userId: string,
     payload: CompleteUploadSessionActionPayload,

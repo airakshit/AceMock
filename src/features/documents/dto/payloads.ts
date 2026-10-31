@@ -1,4 +1,7 @@
-import { DocumentProcessingStatus, FileUploadStatus } from "../types";
+import {
+  DocumentFilterProcessingStatus,
+  FileUploadStatus,
+} from "../types";
 
 interface UploadFilePayload {
   clientFileId: string;
@@ -16,7 +19,7 @@ export interface CreateDocumentActionPayload {
 
 export interface DocumentSearchQueryPayload {
   searchKey?: string;
-  processingStatus?: DocumentProcessingStatus;
+  processingStatus?: DocumentFilterProcessingStatus;
   pagination?: {
     cursor?: string;
     pageSize?: number;

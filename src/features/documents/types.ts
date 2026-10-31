@@ -10,6 +10,10 @@ export type { FileRecoveryAction } from "./uploads/recovery-decision";
 export type DocumentProcessingStatus =
   (typeof documentProcessingStatusEnum.enumValues)[number];
 
+export type DocumentFilterProcessingStatus =
+  | DocumentProcessingStatus
+  | "processing";
+
 export type FileUploadStatus = (typeof fileUploadStatusEnum.enumValues)[number];
 
 export type FileProcessingStatus =

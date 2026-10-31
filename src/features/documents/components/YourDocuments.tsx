@@ -1,105 +1,132 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { FileStack, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/patterns/empty-state";
-import type { DocumentSearchData } from "../dto/projections";
-import { getUserDocumentsAction } from "../actions/get-user-documents";
-import { useDocumentUploaderContext } from "../uploads/document-uploader-provider";
+import { Skeleton } from "@/components/ui/skeleton";
+import { createDocumentAction } from "../actions/create-document";
 import { DocumentCard } from "./DocumentCard";
+import { DocumentForm } from "./DocumentForm";
+import { DocumentSearchBar } from "./DocumentSearchBar";
+import { useDocumentSearch } from "./use-document-search";
 
-interface YourDocumentsProps {
-  initialDocuments?: DocumentSearchData[];
+function DocumentsSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading documents"
+      className="space-y-3"
+    >
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex flex-col justify-between rounded-xl border border-border/80 bg-card p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <Skeleton className="h-5 w-48 rounded" />
+            <Skeleton className="h-5 w-24 rounded-full" />
+          </div>
+          <Skeleton className="h-4 w-3/4 rounded" />
+          <div className="flex items-center justify-between pt-2">
+            <Skeleton className="h-3 w-32 rounded" />
+            <Skeleton className="h-3 w-20 rounded" />
+          </div>
+        </div>
+      ))}
+      <span className="sr-only">Loading documents...</span>
+    </div>
+  );
 }
 
-/** Refetch signal (DocumentsNav refresh icon, coordinator completion). */
-const DOCUMENTS_REFRESH_EVENT = "documents:refresh";
+export function YourDocuments() {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-export function YourDocuments({ initialDocuments }: YourDocumentsProps) {
-  const { notifyKnownDocuments } = useDocumentUploaderContext();
-  /** True when the server page already supplied the first snapshot. */
-  const hasServerSnapshot = initialDocuments !== undefined;
-  const [documents, setDocuments] = useState<DocumentSearchData[]>(
-    initialDocuments ?? [],
+  const {
+    items,
+    searchQuery,
+    setSearchQuery,
+    debouncedSearchQuery,
+    processingStatus,
+    setProcessingStatus,
+    isLoading,
+    isLoadingMore,
+    isSearching,
+    isRefreshing,
+    hasMore,
+    loadMore,
+    refresh,
+    handleDocumentDeleted,
+    handleDocumentUpdated,
+  } = useDocumentSearch();
+
+  const hasActiveFilters = Boolean(
+    debouncedSearchQuery.trim() || processingStatus,
   );
-  const [isLoading, setIsLoading] = useState(!hasServerSnapshot);
 
-  const fetchDocuments = async () => {
-    try {
-      const result = await getUserDocumentsAction();
-      if (result.success && result.data) {
-        // getUserDocumentsAction now returns DocumentSearchQueryResponse { documents, pagination }
-        const docs = result.data.documents;
-        setDocuments(docs);
-        // Lets the uploader purge stale IndexedDB sessions for docs that
-        // no longer exist (deleted, or reclaimed by the stale-upload cron).
-        notifyKnownDocuments(docs.map((d) => d.documentId));
-      }
-    } catch (error) {
-      console.error("Failed to fetch user documents:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Setup infinite scroll observer on sentinel element
   useEffect(() => {
-    if (hasServerSnapshot) {
-      // First payload came with the server render — only purge stale local
-      // sessions here (no network round trip during hydration).
-      notifyKnownDocuments((initialDocuments ?? []).map((d) => d.documentId));
-    } else {
-      void fetchDocuments();
-    }
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
 
-    /**
-     * DocumentsNav's refresh icon re-runs the server pass AND signals the
-     * mounted list via this event (same pattern as the mocks refresh).
-     */
-    const handleRefresh = () => void fetchDocuments();
-
-    window.addEventListener(DOCUMENTS_REFRESH_EVENT, handleRefresh);
-    return () => {
-      window.removeEventListener(DOCUMENTS_REFRESH_EVENT, handleRefresh);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleDocumentDeleted = (deletedId: string) => {
-    setDocuments((prev) => prev.filter((d) => d.documentId !== deletedId));
-  };
-
-  const handleDocumentUpdated = (updatedDoc: DocumentSearchData) => {
-    setDocuments((prev) =>
-      prev.map((d) => (d.documentId === updatedDoc.documentId ? updatedDoc : d)),
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          void loadMore();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "250px",
+        threshold: 0,
+      },
     );
-  };
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
+      <DocumentSearchBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        processingStatus={processingStatus}
+        onProcessingStatusChange={setProcessingStatus}
+        onRefresh={refresh}
+        onCreateClick={() => setIsCreateOpen(true)}
+        isSearching={isSearching}
+        isRefreshing={isRefreshing}
+      />
+
+      <DocumentForm
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onSumbitAction={createDocumentAction}
+      />
+
       {isLoading ? (
-        <div
-          role="status"
-          aria-label="Loading documents"
-          className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-10 text-center space-y-3 bg-card/40"
-        >
-          <Loader2 className="size-6 animate-spin text-brand" />
-          <p className="text-xs text-muted-foreground">
-            Loading your study documents...
-          </p>
-        </div>
-      ) : documents.length === 0 ? (
+        <DocumentsSkeleton />
+      ) : !items || items.length === 0 ? (
         <EmptyState
           icon={FileStack}
-          title="No documents uploaded yet"
+          title={
+            hasActiveFilters
+              ? "No documents match your filters"
+              : "No documents uploaded yet"
+          }
+          description={
+            hasActiveFilters
+              ? "Try adjusting your search keywords or clearing the status filter."
+              : "Upload study documents, past questions, or reference sheets to generate mock tests."
+          }
           titleSize="md"
-          // Plain-background variant for this page: no dashed placeholder
-          // box. min-height + the component's own centering keeps the
-          // message vertically centered in the remaining page space.
           className="min-h-[45vh] rounded-none border-0 bg-transparent p-12"
         />
       ) : (
         <div className="space-y-3">
-          {documents.map((doc) => (
+          {items.map((doc) => (
             <div key={doc.documentId}>
               <DocumentCard
                 document={doc}
@@ -108,6 +135,27 @@ export function YourDocuments({ initialDocuments }: YourDocumentsProps) {
               />
             </div>
           ))}
+
+          {/* Sentinel for infinite scroll */}
+          {hasMore && (
+            <div
+              ref={sentinelRef}
+              className="h-6 w-full pointer-events-none"
+              aria-hidden="true"
+            />
+          )}
+
+          {/* Loading more spinner */}
+          {isLoadingMore && (
+            <div
+              role="status"
+              aria-label="Loading more documents"
+              className="flex items-center justify-center py-4"
+            >
+              <Loader2 className="size-5 animate-spin text-brand" />
+              <span className="sr-only">Loading more documents...</span>
+            </div>
+          )}
         </div>
       )}
     </section>
