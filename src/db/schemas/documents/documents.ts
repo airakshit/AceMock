@@ -32,6 +32,8 @@ export const documents = pgTable("documents", {
     .notNull()
     .defaultNow(),
 
+  deletedAt: timestamp("deleted_at", {withTimezone: true}),
+
   updatedAt: timestamp("updated_at", {
     withTimezone: true,
   })

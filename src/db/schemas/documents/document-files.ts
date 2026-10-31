@@ -45,7 +45,7 @@ export const documentFiles = pgTable("document_files", {
 
   mimeType: text("mime_type").notNull(),
   storagePath: text("storage_path").notNull(),
-  
+
   contentProbe: text("content_probe"),
 
   uploadStatus: fileUploadStatusEnum("upload_status")
@@ -63,6 +63,9 @@ export const documentFiles = pgTable("document_files", {
   }),
 
   uploadCompleteAt: timestamp("upload_complete_at", { withTimezone: true }),
+
+  // For soft delete feature.
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
