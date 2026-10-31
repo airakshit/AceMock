@@ -11,6 +11,12 @@ import {
   FileProcessingStatus,
   FileUploadStatus,
 } from "../types";
+import {
+  documents,
+  documentFiles,
+  filePages,
+  uploadSessions,
+} from "@/db/schemas";
 
 // Pagination read models
 export type DocumentSearchCursor = z.infer<typeof DocumentSearchCursorSchema>;
@@ -30,6 +36,16 @@ export interface DocumentDTO {
 export type DocumentFileDTO = DocumentSearchData["files"][0];
 
 export type UploadSessionDTO = DocumentSearchData["session"];
+
+export interface SingleDocumentFileAndSessionProjection {
+  documentId: string;
+  title: string;
+  description: string | null;
+  processingStatus: DocumentProcessingStatus;
+  createdAt: Date;
+  file: DocumentFileSearchData;
+  session: DocumentUploadSessionSearchData;
+}
 
 export interface DocumentWithFilesDTO {
   documentId: string;
@@ -92,3 +108,43 @@ export interface DocumentWithQuestionCountProjection {
   createdAt: Date;
   questionCount: number;
 }
+
+// Returning object that matches with the existing DTOs
+
+export const documentDTOReturning = {
+  documentId: documents.id,
+  title: documents.title,
+  description: documents.description,
+  processingStatus: documents.processingStatus,
+  createdAt: documents.createdAt,
+};
+
+export const documentFileDTOReturning = {
+  fileId: documentFiles.id,
+  filename: documentFiles.filename,
+  size: documentFiles.fileSize,
+  mimeType: documentFiles.mimeType,
+  uploadStatus: documentFiles.uploadStatus,
+  contentProbe: documentFiles.contentProbe,
+  storagePath: documentFiles.storagePath,
+};
+
+export const filePageProjectionReturning = {
+  id: filePages.id,
+  fileId: filePages.fileId,
+  pageNo: filePages.pageNo,
+  ocrText: filePages.ocrText,
+  ocrStatus: filePages.ocrStatus,
+  survivedValidation: filePages.survivedValidation,
+  ocrModel: filePages.ocrModel,
+  isRelevant: filePages.isRelevant,
+  createdAt: filePages.createdAt,
+};
+
+export const uploadSessionDTOReturning = {
+  sessionId: uploadSessions.id,
+  status: uploadSessions.status,
+  lastHeartbeatAt: uploadSessions.lastHeartbeatAt,
+  recoveryExpiresAt: uploadSessions.recoveryExpiresAt,
+  progress: uploadSessions.progress,
+};

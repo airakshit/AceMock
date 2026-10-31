@@ -6,23 +6,14 @@ import {
 } from "../dto/commands";
 import { DbExecutor } from "../../shared/types";
 import { UploadSessionStatus } from "../types";
+import {
+  UploadSessionDTO,
+  uploadSessionDTOReturning,
+} from "../dto/projections";
 
 export type UploadSessionRow = typeof uploadSessions.$inferSelect;
 
-/**
- * Commands + queries for the server-owned upload sessions.
- *
- * All read/write methods take a `DbExecutor` so sessions can be created
- * inside the same transaction as their document (atomic attempt creation).
- */
 export class UploadSessionsRepository {
-  // ==================== COMMANDS (writes) ====================
-
-  /**
-   * Creates an ACTIVE session. The partial unique index
-   * `uq_active_upload_session_per_document` makes a concurrent second
-   * active session for the same document impossible at the database level.
-   */
   async create(
     db: DbExecutor,
     data: {
@@ -31,7 +22,7 @@ export class UploadSessionsRepository {
       documentId: string;
       recoveryExpiresAt: Date;
     },
-  ): Promise<UploadSessionRow> {
+  ): Promise<UploadSessionDTO> {
     const [session] = await db
       .insert(uploadSessions)
       .values({
@@ -41,9 +32,9 @@ export class UploadSessionsRepository {
         recoveryExpiresAt: data.recoveryExpiresAt,
         status: "active" as UploadSessionStatus,
       })
-      .returning();
+      .returning(uploadSessionDTOReturning);
 
-    return session;
+    return session || null;
   }
 
   /**

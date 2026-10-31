@@ -20,9 +20,11 @@ import {
   DocumentSearchQueryResponse,
   GetUserDocumentActionResponse,
   DeleteDocumentActionResponse,
+  DeleteDocumentFileActionResponse,
   GetDocumentsSummaryActionResponse,
   ProcessDocumentActionResponse,
   GetDocumentFileAccessUrlActionResponse,
+  DocumentFileWithSignedUrls,
 } from "./dto/results";
 import { UploadSessionDTO, DocumentWithFilesDTO } from "./dto/projections";
 
@@ -85,14 +87,6 @@ class DocumentsService {
     return latest ? this.toSessionDTO(latest) : null;
   }
 
-  private requireVerifiedDocument(userId: string, documentId: string) {
-    return documentRepository.queries.findByIdForUser(db, documentId, userId);
-  }
-
-  // =========================================================================
-  // createDocument
-  // =========================================================================
-
   /**
    * Creates the document, its files, AND its server-owned upload session —
    * one attempt, one session. Tokens are minted after the transaction
@@ -153,7 +147,7 @@ class DocumentsService {
         recoveryExpiresAt,
       });
 
-      await documentRepository.commands.createManyFiles(
+      const files = await documentRepository.commands.createManyFiles(
         tx,
         fileModels.map((f) => ({
           id: f.serverFileId,
@@ -167,7 +161,7 @@ class DocumentsService {
         })),
       );
 
-      return { document: createdDoc, session: uploadSession };
+      return { document: createdDoc, session: uploadSession, files: files };
     });
 
     const signedUrls = await supabaseStorageClient.getUploadSignedUrls(
@@ -178,16 +172,33 @@ class DocumentsService {
       })),
     );
 
+    const filesData: DocumentFileWithSignedUrls[] = data.files.flatMap(
+      (file) => {
+        const signedFile = signedUrls.find(
+          (value) => value.fileId === file.fileId,
+        );
+        if (signedFile) {
+          return {
+            clientFileId: signedFile.clientFileId,
+            fileId: file.fileId,
+            filename: file.filename,
+            size: file.size,
+            mimeType: file.mimeType,
+            storagePath: file.storagePath,
+            uploadStatus: file.uploadStatus,
+            contentProbe: file.contentProbe,
+            token: signedFile.token,
+            signedUrl: signedFile.signedUrl,
+          };
+        }
+        return [];
+      },
+    );
+
     return {
-      documentId: data.document.documentId,
-      title: data.document.title,
-      description: data.document.description
-        ? data.document.description
-        : undefined,
-      createdAt: data.document.createdAt,
-      processingStatus: data.document.processingStatus,
-      sessionId: data.session.id,
-      signedFileUrls: signedUrls,
+      ...data.document,
+      session: data.session,
+      files: filesData,
     };
   }
 
@@ -441,7 +452,7 @@ class DocumentsService {
     );
 
     const tokensByFileId = new Map(
-      signedUrls.map((s) => [s.serverFileId, s.token]),
+      signedUrls.map((s) => [s.fileId, s.token]),
     );
     const tusResourceExpiryCutoff =
       Date.now() - UPLOAD_TUS_RESOURCE_LIFETIME_MS;
@@ -786,6 +797,61 @@ class DocumentsService {
     };
   }
 
+  async deleteDocumentFile(
+    userId: string,
+    documentId: string,
+    fileId: string,
+  ): Promise<DeleteDocumentFileActionResponse> {
+    const documentWithSession =
+      await documentRepository.queries.getSingleDocumentFileAndSession(
+        db,
+        userId,
+        documentId,
+        fileId,
+      );
+
+    if (!documentWithSession) {
+      throw new ServerActionError("NOT_FOUND", "Document not found for file.");
+    }
+    if (!documentWithSession.file) {
+      throw new ServerActionError(
+        "NOT_FOUND",
+        "File not found or accessed denied.",
+      );
+    }
+    if (documentWithSession.session.status === "active") {
+      throw new ServerActionError(
+        "FORBIDDEN",
+        "Cannot delete file during active upload session.",
+      );
+    }
+    if (documentWithSession.processingStatus !== "pending") {
+      throw new ServerActionError(
+        "FORBIDDEN",
+        "Cannot delete file from processing/processed document.",
+      );
+    }
+
+    // We do soft delete.
+    const deletedFile = await documentRepository.commands.updateFile(db, {
+      documentId,
+      fileId,
+      delete: true,
+    });
+
+    if (!deletedFile) {
+      throw new ServerActionError(
+        "FAILED",
+        "Delete could not be succesful. Try again.",
+      );
+    }
+
+    return {
+      documentId,
+      fileId: deletedFile?.fileId,
+    };
+  }
+
   async updateDocument(
     userId: string,
     documentId: string,
@@ -945,10 +1011,12 @@ class DocumentsService {
     return {
       documents: items,
       pagination: {
-        cursor: encodeSearchCursor({
-          createdAt: lastItem.createdAt,
-          id: lastItem.documentId,
-        }),
+        cursor: lastItem
+          ? encodeSearchCursor({
+              createdAt: lastItem.createdAt,
+              id: lastItem.documentId,
+            })
+          : "",
         hasMore: hasMore,
       },
     };

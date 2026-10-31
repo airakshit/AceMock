@@ -30,7 +30,7 @@ import { Switch } from "@/components/ui/switch";
 import { SearchInput } from "@/components/patterns/search-input";
 import { HierarchyFilterChips } from "@/components/patterns/hierarchy-filter-chips";
 import type { CurriculumOptionsProjection } from "@/features/questions/dto/projections";
-import type { DocumentOptionForMockProjection } from "@/features/documents/dto/projections";
+import type { DocumentWithQuestionCountProjection } from "@/features/documents/dto/projections";
 import { MockTestScope } from "../../dto/projections";
 import { getDocumentsSummaryAction } from "@/features/documents/actions/get-documents-summary";
 import { createMockTestFromDocumentsAction } from "../../actions/create-mock-test-from-documents";
@@ -102,7 +102,7 @@ export function CreateMockTestModal({
   onTestCreated,
 }: CreateMockTestModalProps) {
   // Data loading state
-  const [documents, setDocuments] = useState<DocumentOptionForMockProjection[]>(
+  const [documents, setDocuments] = useState<DocumentWithQuestionCountProjection[]>(
     [],
   );
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);

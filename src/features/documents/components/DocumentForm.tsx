@@ -25,22 +25,14 @@ import { layout } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 import { documentFormSchema, type DocumentFormData } from "../schemas";
 import { FileDropzone } from "./FileDropzone";
-import {
-  CreateDocumentActionPayload,
-  CreateDocumentActionResponse,
-} from "../actions/types";
+import { CreateDocumentActionPayload } from "../dto/payloads";
+import { CreateDocumentActionResponse } from "../dto/results";
 import { ServerActionResult } from "@/features/shared/actions/types";
 import { useDocumentUploaderContext } from "../uploads/document-uploader-provider";
 import { computeContentProbe } from "../uploads/upload-probe";
 
 /** Window event that makes the documents list refetch (see YourDocuments). */
 const DOCUMENTS_REFRESH_EVENT = "documents:refresh";
-/**
- * Window event carrying the freshly created document's FULL DTO (the
- * exact data get-user-documents returns) so the list can insert the new
- * card instantly — no refetch wait — and play its entrance animation.
- */
-const DOCUMENTS_CREATED_EVENT = "documents:created";
 
 interface DocumentFormProps {
   /**
@@ -120,33 +112,20 @@ export function DocumentForm({
         fileHandles.set(item.clientFileId, item.fileHandle ?? null);
       }
 
-      // One mixed list in the UI; the server payload still keeps the two
-      // payload groups separate.
-      const pdfPayloads = data.files
-        .filter((item) => item.file.type === "application/pdf")
-        .map((item) => ({
-          clientFileId: item.clientFileId,
-          name: item.file.name,
-          size: item.file.size,
-          type: item.file.type || "application/pdf",
-          contentProbe: probes.get(item.clientFileId) ?? "",
-        }));
-
-      const imagePayloads = data.files
-        .filter((item) => item.file.type !== "application/pdf")
-        .map((item) => ({
-          clientFileId: item.clientFileId,
-          name: item.file.name,
-          size: item.file.size,
-          type: item.file.type || "image/jpeg",
-          contentProbe: probes.get(item.clientFileId) ?? "",
-        }));
+      // One mixed list in the UI and one flat server payload — the server
+      // derives each file's role from its MIME type.
+      const filePayloads = data.files.map((item) => ({
+        clientFileId: item.clientFileId,
+        name: item.file.name,
+        size: item.file.size,
+        mimeType: item.file.type || "application/pdf",
+        contentProbe: probes.get(item.clientFileId) ?? "",
+      }));
 
       const result = await onSumbitAction({
         title: data.title,
         description: data.description,
-        pdfs: pdfPayloads,
-        images: imagePayloads,
+        files: filePayloads,
       });
 
       if (!result.success) {
@@ -164,18 +143,12 @@ export function DocumentForm({
       setShowDescription(false);
 
       /**
-       * 2. The document enters the list INSTANTLY — straight from the create
-       * response (same DTO the list renders), before the upload bootstrap
-       * even starts. This ordering is what makes "create then immediately
-       * close the popup" safe: the event has already fired, and everything
-       * below keeps running in this closure regardless of dialog state —
-       * the upload itself is owned by the provider, never by the form.
+       * 2. Refresh the list so the newly created document (and its
+       * server-owned upload session) appears immediately. The create
+       * response no longer carries the full document DTO, so the card is
+       * read back through the same query the list uses.
        */
-      window.dispatchEvent(
-        new CustomEvent(DOCUMENTS_CREATED_EVENT, {
-          detail: { document: result.data.document },
-        }),
-      );
+      window.dispatchEvent(new Event(DOCUMENTS_REFRESH_EVENT));
 
       /**
        * 3. From here on the SERVER owns the attempt (upload session id, tokens,
@@ -187,7 +160,7 @@ export function DocumentForm({
        */
       void beginUploadSession({
         documentId: result.data.documentId,
-        sessionId: result.data.sessionId,
+        sessionId: result.data.session.sessionId,
         title: data.title,
         description: data.description ?? null,
         files: data.files,

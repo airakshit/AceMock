@@ -26,7 +26,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { DocumentFileDTO, DocumentItemDTO } from "../actions/types";
+import type { DocumentFileDTO, DocumentSearchData } from "../dto/projections";
+import type { DocumentProcessingStatus } from "../types";
 import { deleteDocumentAction } from "../actions/delete-document";
 import { deleteDocumentFileAction } from "../actions/delete-document-file";
 import { updateDocumentAction } from "../actions/update-document";
@@ -49,9 +50,9 @@ import {
 import { DocumentFilesList } from "./DocumentFilesList";
 
 interface DocumentCardProps {
-  document: DocumentItemDTO;
+  document: DocumentSearchData;
   onDocumentDeleted?: (documentId: string) => void;
-  onDocumentUpdated?: (updatedDoc: DocumentItemDTO) => void;
+  onDocumentUpdated?: (updatedDoc: DocumentSearchData) => void;
 }
 
 /**
@@ -120,9 +121,10 @@ export function DocumentCard({
   const [description, setDescription] = useState(document.description || "");
 
   // Processing & Files state
-  const [processingStatus, setProcessingStatus] = useState(
-    document.processingStatus || "pending",
-  );
+  const [processingStatus, setProcessingStatus] =
+    useState<DocumentProcessingStatus>(
+      document.processingStatus as DocumentProcessingStatus,
+    );
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
   const [files, setFiles] = useState<DocumentFileDTO[]>(document.files);
@@ -132,7 +134,9 @@ export function DocumentCard({
     setTitle(document.title);
     setDescription(document.description || "");
     setFiles(document.files);
-    setProcessingStatus(document.processingStatus || "pending");
+    setProcessingStatus(
+      document.processingStatus as DocumentProcessingStatus,
+    );
   }, [document]);
 
   // Loading & dialog states
@@ -155,10 +159,10 @@ export function DocumentCard({
   // the component can be read against one explicit `mode`).
   // -----------------------------------------------------------------------
   const mode = resolveDocumentCardMode({
-    documentId: document.id,
+    documentId: document.documentId,
     activeDocumentId,
     isResumingThisDocument:
-      isStartingResume || resumeTarget?.documentId === document.id,
+      isStartingResume || resumeTarget?.documentId === document.documentId,
   });
 
   const isLiveMode = mode !== "display";
@@ -214,7 +218,7 @@ export function DocumentCard({
   const handleRefreshStatus = async () => {
     try {
       setIsRefreshingStatus(true);
-      const res = await getUserDocumentAction({ documentId: document.id });
+      const res = await getUserDocumentAction({ documentId: document.documentId });
 
       if (!res.success) {
         toast.error(res.error.message || "Failed to refresh document status");
@@ -236,7 +240,7 @@ export function DocumentCard({
   const handleTriggerProcess = async () => {
     try {
       setIsProcessing(true);
-      const res = await processDocumentAction({ documentId: document.id });
+      const res = await processDocumentAction({ documentId: document.documentId });
 
       if (!res.success) {
         toast.error(
@@ -246,8 +250,11 @@ export function DocumentCard({
       }
 
       toast.success("Question extraction started in background!");
-      setProcessingStatus(res.data.document.processingStatus);
-      onDocumentUpdated?.(res.data.document);
+      setProcessingStatus(res.data.processingStatus);
+      onDocumentUpdated?.({
+        ...document,
+        processingStatus: res.data.processingStatus,
+      });
     } catch (err) {
       toast.error("An unexpected error occurred while starting processing");
       console.error(err);
@@ -272,7 +279,7 @@ export function DocumentCard({
   const handleResumeUpload = async () => {
     try {
       setIsStartingResume(true);
-      await startResume(document.id);
+      await startResume(document.documentId);
     } catch (error) {
       toast.error("Failed to start the upload resume");
       console.error(error);
@@ -299,7 +306,7 @@ export function DocumentCard({
     try {
       setIsSaving(true);
       const res = await updateDocumentAction({
-        documentId: document.id,
+        documentId: document.documentId,
         title: trimmedTitle,
         description: description.trim() || undefined,
       });
@@ -311,7 +318,14 @@ export function DocumentCard({
 
       toast.success("Document updated successfully");
       setIsEditing(false);
-      onDocumentUpdated?.(res.data.document);
+      // The update response carries only the document columns; keep the
+      // files/session already held by the list item.
+      onDocumentUpdated?.({
+        ...document,
+        ...res.data.document,
+        files: document.files,
+        session: document.session,
+      });
     } catch (err) {
       toast.error("An unexpected error occurred while updating document");
       console.error(err);
@@ -323,7 +337,7 @@ export function DocumentCard({
   const handleDeleteDocument = async () => {
     try {
       setIsDeletingDoc(true);
-      const res = await deleteDocumentAction({ documentId: document.id });
+      const res = await deleteDocumentAction({ documentId: document.documentId });
 
       if (!res.success) {
         toast.error(res.error.message || "Failed to delete document");
@@ -332,7 +346,7 @@ export function DocumentCard({
 
       toast.success("Document and its files deleted successfully");
       setShowDeleteDocDialog(false);
-      onDocumentDeleted?.(document.id);
+      onDocumentDeleted?.(document.documentId);
     } catch (err) {
       toast.error("An unexpected error occurred while deleting document");
       console.error(err);
@@ -347,8 +361,8 @@ export function DocumentCard({
     try {
       setIsDeletingFile(true);
       const res = await deleteDocumentFileAction({
-        documentId: document.id,
-        fileId: fileToDelete.id,
+        documentId: document.documentId,
+        fileId: fileToDelete.fileId,
       });
 
       if (!res.success) {
@@ -357,7 +371,9 @@ export function DocumentCard({
       }
 
       toast.success(`"${fileToDelete.filename}" deleted successfully`);
-      const updatedFiles = files.filter((f) => f.id !== fileToDelete.id);
+      const updatedFiles = files.filter(
+        (f) => f.fileId !== fileToDelete.fileId,
+      );
       setFiles(updatedFiles);
       setFileToDelete(null);
 
@@ -383,8 +399,8 @@ export function DocumentCard({
 
     try {
       const res = await getDocumentFileAccessUrlAction({
-        documentId: document.id,
-        fileId: file.id,
+        documentId: document.documentId,
+        fileId: file.fileId,
       });
 
       if (!res.success) {
@@ -456,13 +472,13 @@ export function DocumentCard({
               <div className="space-y-2 pt-1">
                 <div>
                   <label
-                    htmlFor={`title-${document.id}`}
+                    htmlFor={`title-${document.documentId}`}
                     className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1"
                   >
                     Document Title
                   </label>
                   <Input
-                    id={`title-${document.id}`}
+                    id={`title-${document.documentId}`}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Enter document title"
@@ -473,13 +489,13 @@ export function DocumentCard({
                 </div>
                 <div>
                   <label
-                    htmlFor={`desc-${document.id}`}
+                    htmlFor={`desc-${document.documentId}`}
                     className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1"
                   >
                     Description (optional)
                   </label>
                   <Textarea
-                    id={`desc-${document.id}`}
+                    id={`desc-${document.documentId}`}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Provide additional details or context"
@@ -749,7 +765,7 @@ export function DocumentCard({
         {(isFilesOpen || isLiveMode) && files.length > 0 && (
           <div className="border-t border-border/50 bg-muted/20 p-4">
             <DocumentFilesList
-              documentId={document.id}
+              documentId={document.documentId}
               files={files}
               isEditing={isEditing}
               mode={mode}
@@ -809,7 +825,7 @@ export function DocumentCard({
           onOpenChange={setIsPreviewOpen}
           filename={previewFile.filename}
           mimeType={previewFile.mimeType}
-          fileSize={previewFile.fileSize}
+          fileSize={previewFile.size}
           url={previewUrl}
           isLoading={isLoadingPreview}
           error={previewError}

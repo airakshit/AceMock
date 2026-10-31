@@ -9,19 +9,22 @@ import type {
   DocumentSearchData,
   DocumentWithQuestionCountProjection,
   DocumentDTO,
+  DocumentFileSearchData,
 } from "../dto/projections";
 import { FileRecoveryAction } from "../types";
+
+export interface DocumentFileWithSignedUrls
+  extends SignedUrlResponseObject, DocumentFileSearchData {}
 
 export interface CreateDocumentActionResponse {
   documentId: string;
   title: string;
-  description?: string;
+  description: string | null;
   processingStatus: string;
   createdAt: Date;
 
-  // Session and file urls data.
-  sessionId: string;
-  signedFileUrls: SignedUrlResponseObject[];
+  session: DocumentUploadSessionSearchData;
+  files: DocumentFileWithSignedUrls[];
 }
 
 export interface DocumentSearchQueryResponse {

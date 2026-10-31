@@ -71,6 +71,7 @@ export interface UpdateDocumentFileCommand {
   fileSize?: number;
   storagePath?: string;
   uploadRef?: string;
+  delete?: boolean;
   uploadStatus?: "uploading" | "uploaded" | "failed";
 }
 

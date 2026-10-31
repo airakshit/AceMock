@@ -3,10 +3,11 @@ import { env } from "@/config/env/server";
 import { StorageError } from "@supabase/storage-js";
 
 export interface SignedUrlResponseObject {
-  serverFileId: string;
+  fileId: string;
   clientFileId: string;
   token: string;
   signedUrl: string;
+  storagePath: string;
 }
 
 export interface DownloadedObject {
@@ -81,10 +82,11 @@ class SupabaseStorageClient {
 
         for (const element of batchResult) {
           signedUrls.push({
-            serverFileId: element.serverFileId,
+            fileId: element.serverFileId,
             clientFileId: element.clientFileId,
             signedUrl: element.signedUrl,
             token: element.token,
+            storagePath: element.path,
           });
         }
       }

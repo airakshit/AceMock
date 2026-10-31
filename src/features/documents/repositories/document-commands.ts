@@ -21,38 +21,11 @@ import {
   DocumentFileDTO,
   DocumentFileProcessingRow,
   FilePageProjection,
+  filePageProjectionReturning,
+  documentDTOReturning,
+  documentFileDTOReturning,
+  uploadSessionDTOReturning,
 } from "../dto/projections";
-
-
-
-const documentDTOReturning = {
-  documentId: documents.id,
-  title: documents.title,
-  description: documents.description,
-  processingStatus: documents.processingStatus,
-  createdAt: documents.createdAt,
-};
-
-const documentFileDTOReturning = {
-  fileId: documentFiles.id,
-  filename: documentFiles.filename,
-  size: documentFiles.fileSize,
-  mimeType: documentFiles.mimeType,
-  uploadStatus: documentFiles.uploadStatus,
-  contentProbe: documentFiles.contentProbe,
-};
-
-const filePageProjectionReturning = {
-  id: filePages.id,
-  fileId: filePages.fileId,
-  pageNo: filePages.pageNo,
-  ocrText: filePages.ocrText,
-  ocrStatus: filePages.ocrStatus,
-  survivedValidation: filePages.survivedValidation,
-  ocrModel: filePages.ocrModel,
-  isRelevant: filePages.isRelevant,
-  createdAt: filePages.createdAt,
-};
 
 /**
  * Internal selector for the processing pipeline — mirrors
@@ -192,7 +165,9 @@ export class DocumentCommands {
         ...(data.filename !== undefined && { filename: data.filename }),
         ...(data.mimeType !== undefined && { mimeType: data.mimeType }),
         ...(data.fileSize !== undefined && { fileSize: data.fileSize }),
-        ...(data.storagePath !== undefined && { storagePath: data.storagePath }),
+        ...(data.storagePath !== undefined && {
+          storagePath: data.storagePath,
+        }),
         ...(data.uploadStatus !== undefined && {
           uploadStatus: data.uploadStatus,
         }),
@@ -200,6 +175,11 @@ export class DocumentCommands {
         // Timestamp the reference whenever the ref itself is replaced.
         ...(data.uploadRef !== undefined && {
           uploadRefCreatedAt: new Date(),
+        }),
+
+        // Soft deleting the file.
+        ...(data.delete === true && {
+          deletedAt: new Date(),
         }),
       })
       .where(

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { colors } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
-import type { DocumentFileDTO } from "../actions/types";
+import type { DocumentFileDTO } from "../dto/projections";
 import { formatBytes } from "../utils";
 import type { FileProgressState } from "../uploads/upload.types";
 import type {
@@ -203,10 +203,10 @@ export function DocumentFilesList({
       <div className="grid gap-2 sm:grid-cols-2">
         {files.map((file) => (
           <FileRow
-            key={file.id}
+            key={file.fileId}
             file={file}
             isEditing={isEditing}
-            liveState={isLive && live ? live.statesByServerFileId[file.id] : undefined}
+            liveState={isLive && live ? live.statesByServerFileId[file.fileId] : undefined}
             onViewFile={onViewFile}
             onDeleteFile={onDeleteFile}
             onPauseFile={live?.onPauseFile}
@@ -374,7 +374,7 @@ function FileRow({
               </TooltipContent>
             </Tooltip>
             <p className="text-[10px] text-muted-foreground font-mono">
-              {formatBytes(file.fileSize)}
+              {formatBytes(file.size)}
             </p>
           </div>
         </div>

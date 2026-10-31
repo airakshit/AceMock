@@ -21,7 +21,7 @@ export const DocumentUploadSessionSearchSchema = z.object({
   status: z.enum(uploadSessionStatusEnum.enumValues),
   lastHeartbeatAt: z.date(),
   recoveryExpiresAt: z.date(),
-  progress: z.record(z.string(), z.number()),
+  progress: z.record(z.string(), z.union([z.number(), z.unknown()])).nullable(),
 });
 
 export const DocumentSearchSchema = z.object({
@@ -31,5 +31,5 @@ export const DocumentSearchSchema = z.object({
   processingStatus: z.string(),
   createdAt: z.date(),
   files: z.array(DocumentFileSearchSchema),
-  session: DocumentUploadSessionSearchSchema,
+  session: DocumentUploadSessionSearchSchema.nullable(),
 });

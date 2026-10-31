@@ -27,10 +27,8 @@ import {
 } from "./upload-session-storage";
 import { UploadSessionCoordinator } from "./upload-coordinator";
 import { resumeDocumentUploadAction } from "../actions/resume-document-upload";
-import type {
-  DocumentFileRecoveryPlan,
-  FileRecoveryAction,
-} from "../actions/types";
+import type { DocumentFileRecoveryPlan } from "../dto/results";
+import type { FileRecoveryAction } from "../types";
 import type { SignedUrlResponseObject } from "@/features/shared/storage-service";
 import type { DocumentFileItem } from "../schemas";
 
@@ -141,7 +139,7 @@ function toCredential(
   clientFileId: string,
 ): SignedUrlResponseObject {
   return {
-    serverFileId: plan.serverFileId,
+    fileId: plan.serverFileId,
     clientFileId,
     storagePath: plan.storagePath,
     token: plan.token,
@@ -340,7 +338,7 @@ export function DocumentUploaderProvider({
           documentFileId:
             params.credentials.find(
               (c) => c.clientFileId === item.clientFileId,
-            )?.serverFileId ?? "",
+            )?.fileId ?? "",
           clientFileId: item.clientFileId,
           filename: item.file.name,
           mimeType: item.file.type || "application/octet-stream",

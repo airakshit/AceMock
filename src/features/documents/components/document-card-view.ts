@@ -12,9 +12,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type {
   DocumentFileDTO,
-  DocumentItemDTO,
-  UploadSessionDTO,
-} from "../actions/types";
+  DocumentUploadSessionSearchData,
+} from "../dto/projections";
 import type {
   DocumentProcessingStatus,
   FileUploadStatus,
@@ -104,7 +103,7 @@ export function summarizeFiles(files: DocumentFileDTO[]): DocumentFilesSummary {
       (!f.mimeType.includes("pdf") &&
         !f.filename.toLowerCase().endsWith(".pdf")),
   ).length;
-  const totalSize = files.reduce((acc, f) => acc + (f.fileSize || 0), 0);
+  const totalSize = files.reduce((acc, f) => acc + (f.size || 0), 0);
 
   return { pdfCount, imageCount, totalSize };
 }
@@ -136,12 +135,12 @@ export const LIVE_RESUME_STATUS_VIEW: DocumentStatusView = {
   icon: Loader2,
   className: "border-info/30 bg-info/10 text-info",
   spin: true,
-};
+}
 
 export interface DocumentStatusInput {
   processingStatus: DocumentProcessingStatus;
   files: DocumentFileDTO[];
-  session: UploadSessionDTO | null;
+  session: DocumentUploadSessionSearchData | null;
   /**
    * Staleness clock snapshot (0 = not yet ticking — treated as "fresh",
    * since Date.now() is not callable during render).
@@ -343,16 +342,3 @@ export const LIVE_FILE_BADGE: Record<
     className: "bg-danger/10 text-danger border-danger/25",
   },
 };
-
-// ---------------------------------------------------------------------------
-// Misc helpers
-// ---------------------------------------------------------------------------
-
-export function isDocumentItem(value: unknown): value is DocumentItemDTO {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as DocumentItemDTO).id === "string" &&
-    Array.isArray((value as DocumentItemDTO).files)
-  );
-}
