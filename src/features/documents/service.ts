@@ -72,22 +72,6 @@ class DocumentsService {
   }
 
   /**
-   * Returns the latest session for the document.
-   */
-  private async getRelevantSession(
-    documentId: string,
-    userId: string,
-  ): Promise<UploadSessionDTO | null> {
-    const latest = await uploadSessionsRepository.findLatestByDocumentIdForUser(
-      db,
-      documentId,
-      userId,
-    );
-
-    return latest ? this.toSessionDTO(latest) : null;
-  }
-
-  /**
    * Creates the document, its files, AND its server-owned upload session —
    * one attempt, one session. Tokens are minted after the transaction
    * commits (a post-mint failure leaves a valid session; the client then
@@ -146,6 +130,13 @@ class DocumentsService {
         documentId,
         recoveryExpiresAt,
       });
+
+      if (uploadSession === null) {
+        throw new ServerActionError(
+          "FAILED",
+          "Failed to create upload session for document.",
+        );
+      }
 
       const files = await documentRepository.commands.createManyFiles(
         tx,
@@ -316,232 +307,45 @@ class DocumentsService {
   async getUploadSessionStatus(
     userId: string,
     documentId: string,
-  ): Promise<GetUploadSessionStatusActionResponse> {
-    const existingDocument = await this.requireVerifiedDocument(
-      userId,
+  ): Promise<GetUploadSessionStatusActionResponse | null> {
+    const latest = await uploadSessionsRepository.findLatestByDocumentIdForUser(
+      db,
       documentId,
+      userId,
     );
 
-    if (!existingDocument) {
+    if (latest === null) {
       throw new ServerActionError(
         "NOT_FOUND",
-        "Document not found or access denied.",
+        "Document session not found or access denied.",
       );
     }
 
-    return {
-      session: await this.getRelevantSession(documentId, userId),
-    };
+    return latest;
   }
 
-  // =========================================================================
-  // resumeDocumentUpload — the server-side recovery algorithm
-  // =========================================================================
 
-  /**
-   * THE recovery decision point. The client NEVER decides resume by itself
-   * (no Uppy fingerprints are trusted): before returning a single byte of
-   * instructions, this server action runs the recovery decision table —
-   * including live HEAD probes of stored TUS resources — and returns a
-   * per-file plan the client executes mechanically.
-   */
   async resumeDocumentUpload(
     userId: string,
     payload: ResumeDocumentUploadActionPayload,
   ): Promise<ResumeDocumentUploadActionResponse> {
-    const existingDocument = await this.requireVerifiedDocument(
-      userId,
-      payload.documentId,
-    );
+    const docLatestSession =
+      await uploadSessionsRepository.findLatestByDocumentIdForUser(
+        db,
+        userId,
+        payload.documentId,
+      );
 
-    if (!existingDocument) {
+    if (!docLatestSession) {
       throw new ServerActionError(
         "NOT_FOUND",
-        "Document not found or access denied.",
+        "Document session not found or access denied.",
       );
     }
 
-    const session =
-      await uploadSessionsRepository.findActiveByDocumentIdForUser(
-        db,
-        payload.documentId,
-        userId,
-      );
-
-    // No session at all → nothing to resume; the caller starts a new attempt.
-    if (!session) {
-      const latest =
-        await uploadSessionsRepository.findLatestByDocumentIdForUser(
-          db,
-          payload.documentId,
-          userId,
-        );
-
-      return {
-        document: {
-          documentId: existingDocument.id,
-          title: existingDocument.title,
-          description: existingDocument.description,
-        },
-        sessionId: latest?.id ?? "",
-        sessionStatus: latest?.status ?? "abandoned",
-        recoveryExpiresAt: latest?.recoveryExpiresAt ?? new Date(0),
-        canResume: false,
-        reason: latest
-          ? ("session-terminal" as const)
-          : ("no-session" as const),
-        files: [],
-      };
-    }
-
-    if (session.status !== "active") {
-      return {
-        document: {
-          documentId: existingDocument.id,
-          title: existingDocument.title,
-          description: existingDocument.description,
-        },
-        sessionId: session.id,
-        sessionStatus: session.status,
-        recoveryExpiresAt: session.recoveryExpiresAt,
-        canResume: false,
-        reason: "session-terminal",
-        files: [],
-      };
-    }
-
-    // Lazy expiry for ACTIVE sessions outside the recovery window.
-    if (Date.now() > session.recoveryExpiresAt.getTime()) {
-      await uploadSessionsRepository.updateStatus(db, {
-        sessionId: session.id,
-        status: "abandoned",
-        endReason: "recovery-window-elapsed",
-      });
-
-      return {
-        document: {
-          documentId: existingDocument.id,
-          title: existingDocument.title,
-          description: existingDocument.description,
-        },
-        sessionId: session.id,
-        sessionStatus: "abandoned",
-        recoveryExpiresAt: session.recoveryExpiresAt,
-        canResume: false,
-        reason: "session-expired",
-        files: [],
-      };
-    }
-
-    const files = await documentRepository.queries.findFilesBySessionId(
-      db,
-      session.id,
-    );
-
-    // Only files with bytes still to move need re-authorized credentials.
-    const transferTargets = files.filter(
-      (f) => f.uploadStatus === "pending" || f.uploadStatus === "uploading",
-    );
-
-    const signedUrls = await supabaseStorageClient.getUploadSignedUrls(
-      transferTargets.map((value) => ({
-        clientFileId: value.id,
-        serverFileId: value.id,
-        storagePath: value.storagePath,
-      })),
-    );
-
-    const tokensByFileId = new Map(
-      signedUrls.map((s) => [s.fileId, s.token]),
-    );
-    const tusResourceExpiryCutoff =
-      Date.now() - UPLOAD_TUS_RESOURCE_LIFETIME_MS;
-
-    /**
-     * Downloadable resources are validated with a live HEAD probe: the
-     * stored reference is authoritative only if the provider still accepts
-     * it. This is the "resource validity unknown → perform a supported
-     * resource check" row of the recovery decision table.
-     */
-    const probes = await Promise.all(
-      transferTargets.map(async (f) => {
-        const hasFreshReference =
-          f.uploadRef !== null &&
-          f.uploadRef !== undefined &&
-          (f.uploadRefCreatedAt?.getTime() ?? 0) > tusResourceExpiryCutoff;
-
-        if (f.uploadStatus === "uploading" && hasFreshReference) {
-          const token = tokensByFileId.get(f.id) ?? "";
-          return {
-            fileId: f.id,
-            probe: await probeTusResource(f.uploadRef as string, token),
-          };
-        }
-
-        return { fileId: f.id, probe: null };
-      }),
-    );
-
-    const probeByFileId = new Map(probes.map((p) => [p.fileId, p.probe]));
-
-    const plans: DocumentFileRecoveryPlan[] = files.map((f) => {
-      const token = tokensByFileId.get(f.id) ?? null;
-      const probe = probeByFileId.get(f.id);
-
-      const action = decideFileRecoveryAction(
-        {
-          uploadStatus: f.uploadStatus,
-          uploadRef: f.uploadRef,
-          isReferenceWithinProviderLifetime:
-            (f.uploadRefCreatedAt?.getTime() ?? 0) > tusResourceExpiryCutoff,
-        },
-        probe ?? null,
-      );
-
-      return {
-        serverFileId: f.id,
-        filename: f.filename,
-        mimeType: f.mimeType,
-        fileSize: f.fileSize,
-        storagePath: f.storagePath,
-        contentProbe: f.contentProbe ?? null,
-        uploadStatus: f.uploadStatus,
-        action,
-        token: action === "skip" ? null : token,
-        uploadRef: action === "resume" ? (f.uploadRef ?? null) : null,
-        offsetBytes:
-          action === "resume" && probe?.ok ? probe.offsetBytes : null,
-      };
-    });
-
-    // A resume is a liveness signal in itself — don't let the recovery
-    // window expire while the client is actively picking up instructions.
-    await uploadSessionsRepository.touchHeartbeat(db, {
-      sessionId: session.id,
-    });
-
-    return {
-      document: {
-        documentId: existingDocument.id,
-        title: existingDocument.title,
-        description: existingDocument.description,
-      },
-      sessionId: session.id,
-      sessionStatus: session.status,
-      recoveryExpiresAt: session.recoveryExpiresAt,
-      canResume: true,
-      reason: null,
-      files: plans,
-    };
   }
 
-  /**
-   * Commits a session ONLY after every file of the session is out of
-   * transfer. Storage verification runs first: each `uploaded` file must
-   * actually exist in the bucket (clients may claim completion without
-   * the bytes being durable). Unverifiable files are demoted to `failed`
-   * and reported back — the session stays open for recovery.
-   */
+  
   async completeUploadSession(
     userId: string,
     payload: CompleteUploadSessionActionPayload,

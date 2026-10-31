@@ -121,16 +121,14 @@ export class UploadSessionsRepository {
     return session || null;
   }
 
-  /**
-   * The most recent session of any status — status displays and audit.
-   */
+
   async findLatestByDocumentIdForUser(
     db: DbExecutor,
     documentId: string,
     userId: string,
-  ): Promise<UploadSessionRow | null> {
+  ): Promise<UploadSessionDTO | null> {
     const [session] = await db
-      .select()
+      .select(uploadSessionDTOReturning)
       .from(uploadSessions)
       .where(
         and(

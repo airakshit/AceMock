@@ -54,9 +54,8 @@ export interface HeartbeatUploadSessionActionResponse {
   accepted: boolean;
 }
 
-export interface GetUploadSessionStatusActionResponse {
-  session: DocumentUploadSessionSearchData | null;
-}
+export type GetUploadSessionStatusActionResponse =
+  DocumentUploadSessionSearchData | null;
 
 export interface DocumentFileRecoveryPlan {
   serverFileId: string;
