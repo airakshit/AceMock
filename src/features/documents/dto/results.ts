@@ -57,37 +57,24 @@ export interface HeartbeatUploadSessionActionResponse {
 export type GetUploadSessionStatusActionResponse =
   DocumentUploadSessionSearchData | null;
 
-export interface DocumentFileRecoveryPlan {
-  serverFileId: string;
+export interface ToUploadFilesResponse {
+  fileId: string;
   filename: string;
-  mimeType: string;
   fileSize: number;
-  storagePath: string;
-  /** Server-side expectation for content verification of re-selected files. */
+  mimeType: string;
   contentProbe: string | null;
+  storagePath: string;
+  uploadRef: string;
+  token: string; // The signed token for upload from supabase
   uploadStatus: FileUploadStatus;
-  action: FileRecoveryAction;
-  /** Present for `resume`/`reupload` — a fresh, short-lived signed token. */
-  token: string | null;
-  /** Present for `resume` — the existing TUS resource URL to continue. */
-  uploadRef: string | null;
-  /** Present for `resume` — server-confirmed byte offset of the resource. */
-  offsetBytes: number | null;
 }
 
 export interface ResumeDocumentUploadActionResponse {
-  document: {
-    documentId: string;
-    title: string;
-    description: string | null;
-  };
+  documentId: string;
   sessionId: string;
   sessionStatus: UploadSessionStatus;
   recoveryExpiresAt: Date;
-  canResume: boolean;
-  /** Populated when canResume=false — why. */
-  reason: "no-session" | "session-terminal" | "session-expired" | null;
-  files: DocumentFileRecoveryPlan[];
+  toUploadFiles: ToUploadFilesResponse;
 }
 
 export interface CompleteDocumentFileUploadActionResponse {

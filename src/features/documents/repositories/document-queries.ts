@@ -16,7 +16,6 @@ import {
   sql,
   lt,
   type SQL,
-  isNotNull,
   isNull,
 } from "drizzle-orm";
 import { DbExecutor } from "../../shared/types";
@@ -36,7 +35,11 @@ import {
   SingleDocumentFileAndSessionProjection,
 } from "../dto/projections";
 import { validateDocumentSearchRows } from "../validators";
-import { DocumentFilterProcessingStatus, DocumentProcessingStatus } from "../types";
+import {
+  DocumentFilterProcessingStatus,
+  DocumentProcessingStatus,
+} from "../types";
+import { PgTable } from "drizzle-orm/pg-core";
 
 const documentFilesAggregate = sql<unknown>`
   COALESCE(
@@ -59,9 +62,17 @@ const documentFilesAggregate = sql<unknown>`
 `.as("files");
 
 export class DocumentQueries {
+  private readonly applyDeletedAtIsNullForDocument = isNull(
+    documents.createdAt,
+  );
+  private readonly applyDeletedAtIsNullForDocumentFile = isNull(
+    documentFiles.createdAt,
+  );
+
   async findById(
     db: DbExecutor,
     documentId: string,
+    excludeDeleted: boolean = true,
   ): Promise<DocumentDTO | null> {
     const [document] = await db
       .select({
@@ -72,17 +83,31 @@ export class DocumentQueries {
         createdAt: documents.createdAt,
       })
       .from(documents)
-      .where(eq(documents.id, documentId))
+      .where(
+        and(
+          eq(documents.id, documentId),
+          excludeDeleted ? this.applyDeletedAtIsNullForDocument : undefined,
+        ),
+      )
       .limit(1);
 
     return document || null;
   }
 
-  async findFileById(db: DbExecutor, fileId: string) {
+  async findFileById(
+    db: DbExecutor,
+    fileId: string,
+    excludeDeleted: boolean = true,
+  ) {
     const [file] = await db
       .select()
       .from(documentFiles)
-      .where(eq(documentFiles.id, fileId))
+      .where(
+        and(
+          eq(documentFiles.id, fileId),
+          excludeDeleted ? this.applyDeletedAtIsNullForDocument : undefined,
+        ),
+      )
       .limit(1);
 
     return file || null;
@@ -93,11 +118,22 @@ export class DocumentQueries {
    * it where columns beyond the DTO projection are required (e.g. the
    * resume decision tree reads `.id`, `.title`, `.description`, `.status`).
    */
-  async findByIdForUser(db: DbExecutor, documentId: string, userId: string) {
+  async findByIdForUser(
+    db: DbExecutor,
+    documentId: string,
+    userId: string,
+    excludeDeleted: boolean = true,
+  ) {
     const [document] = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
+      .where(
+        and(
+          eq(documents.id, documentId),
+          eq(documents.userId, userId),
+          excludeDeleted ? this.applyDeletedAtIsNullForDocument : undefined,
+        ),
+      )
       .limit(1);
 
     return document || null;
@@ -106,6 +142,7 @@ export class DocumentQueries {
   async findFilesByDocumentId(
     db: DbExecutor,
     documentId: string,
+    excludeDeleted: boolean = true,
   ): Promise<DocumentFileDTO[]> {
     const data = await db
       .select({
@@ -118,7 +155,12 @@ export class DocumentQueries {
         contentProbe: documentFiles.contentProbe,
       })
       .from(documentFiles)
-      .where(eq(documentFiles.documentId, documentId));
+      .where(
+        and(
+          eq(documentFiles.documentId, documentId),
+          excludeDeleted ? this.applyDeletedAtIsNullForDocument : undefined,
+        ),
+      );
 
     return data as DocumentFileDTO[];
   }
@@ -129,16 +171,26 @@ export class DocumentQueries {
    * `uploadRef`, `uploadRefCreatedAt` and `fileSize`, columns deliberately
    * excluded from the public file DTOs.
    */
-  async findFilesBySessionId(db: DbExecutor, sessionId: string) {
+  async findFilesBySessionId(
+    db: DbExecutor,
+    sessionId: string,
+    excludeDeleted: boolean = true,
+  ) {
     return db
       .select()
       .from(documentFiles)
-      .where(eq(documentFiles.sessionId, sessionId))
+      .where(
+        and(
+          eq(documentFiles.sessionId, sessionId),
+          excludeDeleted ? this.applyDeletedAtIsNullForDocument : undefined,
+        ),
+      )
       .orderBy(desc(documentFiles.createdAt));
   }
 
   async findDocumentsWithQuestionsCount(
     db: DbExecutor,
+    excludeDeleted: boolean = true,
   ): Promise<DocumentWithQuestionCountProjection[]> {
     const records = await db
       .select({
@@ -151,7 +203,8 @@ export class DocumentQueries {
       .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
       .leftJoin(questions, eq(questions.fileId, documentFiles.id))
       .groupBy(documents.id, documents.title, documents.createdAt)
-      .orderBy(desc(documents.createdAt));
+      .orderBy(desc(documents.createdAt))
+      .where(excludeDeleted ? this.applyDeletedAtIsNullForDocument : undefined);
 
     return records.map((r) => ({
       id: r.id,
@@ -169,6 +222,7 @@ export class DocumentQueries {
   async findDocumentsWithQuestionsCountForUser(
     db: DbExecutor,
     userId: string,
+    excludeDeleted: boolean = true,
   ): Promise<DocumentWithQuestionCountProjection[]> {
     const records = await db
       .select({
@@ -180,7 +234,12 @@ export class DocumentQueries {
       .from(documents)
       .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
       .leftJoin(questions, eq(questions.fileId, documentFiles.id))
-      .where(eq(documents.userId, userId))
+      .where(
+        and(
+          eq(documents.userId, userId),
+          excludeDeleted ? this.applyDeletedAtIsNullForDocument : undefined,
+        ),
+      )
       .groupBy(documents.id, documents.title, documents.createdAt)
       .orderBy(desc(documents.createdAt));
 
@@ -201,6 +260,7 @@ export class DocumentQueries {
     db: DbExecutor,
     userId: string,
     documentIds: string[],
+    excludeDeleted: boolean = true,
   ): Promise<string[]> {
     if (documentIds.length === 0) return [];
 
@@ -208,7 +268,11 @@ export class DocumentQueries {
       .select({ id: documents.id })
       .from(documents)
       .where(
-        and(eq(documents.userId, userId), inArray(documents.id, documentIds)),
+        and(
+          eq(documents.userId, userId),
+          inArray(documents.id, documentIds),
+          excludeDeleted ? this.applyDeletedAtIsNullForDocument : undefined,
+        ),
       );
 
     return rows.map((r) => r.id);
@@ -230,7 +294,7 @@ export class DocumentQueries {
         and(
           eq(documentFiles.documentId, documentId),
           eq(documentFiles.id, fileId),
-          isNull(documentFiles.deletedAt),
+          this.applyDeletedAtIsNullForDocumentFile,
         ),
       )
       .limit(1)
@@ -295,7 +359,13 @@ export class DocumentQueries {
       })
       .from(documents)
       .leftJoin(documentFiles, eq(documentFiles.documentId, documents.id))
-      .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
+      .where(
+        and(
+          eq(documents.id, documentId),
+          eq(documents.userId, userId),
+          this.applyDeletedAtIsNullForDocument,
+        ),
+      )
       .groupBy(
         documents.id,
         documents.title,
@@ -318,7 +388,13 @@ export class DocumentQueries {
       db
         .select(documentDTOReturning)
         .from(documents)
-        .where(and(eq(documents.id, documentId), eq(documents.userId, userId))),
+        .where(
+          and(
+            eq(documents.id, documentId),
+            eq(documents.userId, userId),
+            this.applyDeletedAtIsNullForDocument,
+          ),
+        ),
     );
 
     // One row per file with its pages pre-aggregated ('[]' when it has none).
@@ -435,7 +511,13 @@ export class DocumentQueries {
       .from(documents)
       .leftJoinLateral(latestUploadSession, sql`true`)
       .leftJoin(docFiles, eq(docFiles.documentId, documents.id))
-      .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
+      .where(
+        and(
+          eq(documents.id, documentId),
+          eq(documents.userId, userId),
+          isNull(documents.deletedAt),
+        ),
+      )
       .limit(1);
 
     return validateDocumentSearchRows(rows)[0] || null;
@@ -533,7 +615,11 @@ export class DocumentQueries {
       .from(documents)
       .leftJoinLateral(latestUploadSession, sql`true`)
       .leftJoin(docFiles, eq(docFiles.documentId, documents.id))
-      .where(conditions.length ? and(...conditions) : undefined)
+      .where(
+        conditions.length
+          ? and(...conditions, isNull(documents.deletedAt))
+          : undefined,
+      )
       .orderBy(desc(documents.createdAt), desc(documents.id))
       .limit(query.pagination.pageSize + 1);
 

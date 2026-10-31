@@ -16,6 +16,7 @@ export async function deleteDocumentAction(
     const data = await documentsService.deleteDocument(
       session.user.id,
       payload.documentId,
+      false,
     );
 
     return {

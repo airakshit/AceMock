@@ -44,7 +44,7 @@ import { ServerActionError } from "../shared/actions/error";
 import { inngest } from "@/inngest/client";
 import { FileUploadStatus } from "./types";
 import { decideFileRecoveryAction } from "./uploads/recovery-decision";
-import { documentFiles } from "@/db/schemas";
+import { documentFiles, user } from "@/db/schemas";
 import { and, eq } from "drizzle-orm";
 import { probeTusResource } from "@/lib/supabase/tus-probe";
 import {
@@ -54,6 +54,7 @@ import {
 import { PROCESS_DOCUMENT_EVENT as PROCESS_DOCUMENT_EVENT_V2 } from "@/inngest/functions/v2/process-document";
 import { decodeSearchCursor, encodeSearchCursor } from "../shared/pagination";
 import { validateDocumentSearchCursor } from "./validators";
+import { generateRandomString } from "better-auth/crypto";
 
 class DocumentsService {
   private static readonly DOCUMENTS_PAGE_SIZE = 20;
@@ -319,7 +320,7 @@ class DocumentsService {
   async resumeDocumentUpload(
     userId: string,
     payload: ResumeDocumentUploadActionPayload,
-  ): Promise<ResumeDocumentUploadActionResponse> {
+  ): Promise<ResumeDocumentUploadActionPayload> {
     const docLatestSession =
       await uploadSessionsRepository.findLatestByDocumentIdForUser(
         db,
@@ -327,11 +328,44 @@ class DocumentsService {
         payload.documentId,
       );
 
-    if (!docLatestSession) {
+    if (docLatestSession && docLatestSession.status === "completed") {
       throw new ServerActionError(
-        "NOT_FOUND",
-        "Document session not found or access denied.",
+        "FORBIDDEN",
+        "Upload already completed. Refresh it.",
       );
+    }
+
+    const isRecoverable =
+      docLatestSession !== null &&
+      Date.now() <
+        docLatestSession.recoveryExpiresAt.getTime() -
+          UPLOAD_RECOVERY_WINDOW_MS +
+          UPLOAD_TUS_RESOURCE_LIFETIME_MS;
+
+    const requiresNewSession =
+      docLatestSession === null ||
+      !isRecoverable ||
+      docLatestSession.status === "abandoned" ||
+      docLatestSession.status === "cancelled";
+
+    if (isRecoverable) {
+      const sessionFiles =
+        await documentRepository.queries.findFilesBySessionId(
+          db,
+          docLatestSession.sessionId,
+        );
+      const toBeUploadedFiles = sessionFiles.filter(
+        (file) => file.uploadStatus !== "uploaded",
+      );
+      const tokens = await supabaseStorageClient.getUploadSignedUrls(
+        toBeUploadedFiles.map((file) => ({
+          // Generating random string as no client is involved.
+          clientFileId: generateRandomString(5),
+          serverFileId: file.id,
+          storagePath: file.storagePath,
+        })),
+      );
+    } else if (requiresNewSession) {
     }
   }
 
@@ -543,50 +577,62 @@ class DocumentsService {
     );
   }
 
+  private async permanentlyDeleteDocument(userId: string, documentId: string) {
+    const data = await db.transaction(async (tx) => {
+      const deletedDocument = await documentRepository.commands.delete(tx, {
+        userId,
+        documentId,
+      });
+
+      if (deletedDocument === null) {
+        throw new ServerActionError(
+          "NOT_FOUND",
+          "Document not found or access denied.",
+        );
+      }
+
+      const documentStorageFolder = `user/${userId}/documents/${documentId}`;
+      try {
+        await supabaseStorageClient.deleteFolder(documentStorageFolder);
+      } catch (storageError) {
+        console.error(
+          `Failed to delete storage objects for document ${documentId}:`,
+          storageError,
+        );
+      }
+
+      return {
+        documentId: deletedDocument.documentId,
+      };
+    });
+
+    return data;
+  }
+
   async deleteDocument(
     userId: string,
     documentId: string,
+    softDelete: boolean = true,
   ): Promise<DeleteDocumentActionResponse> {
-    const existingDocument = await documentRepository.queries.findByIdForUser(
-      db,
-      documentId,
-      userId,
-    );
+    if (!softDelete) {
+      return await this.permanentlyDeleteDocument(userId, documentId);
+    }
 
-    if (!existingDocument) {
+    const document = await documentRepository.commands.update(db, {
+      documentId: documentId,
+      userId: userId,
+      delete: true,
+    });
+
+    if (!document) {
       throw new ServerActionError(
         "NOT_FOUND",
         "Document not found or access denied.",
       );
     }
 
-    // 1. Delete all Supabase storage objects under the document folder
-    const documentStorageFolder = `user/${userId}/documents/${documentId}`;
-    try {
-      await supabaseStorageClient.deleteFolder(documentStorageFolder);
-    } catch (storageError) {
-      console.error(
-        `Failed to delete storage objects for document ${documentId}:`,
-        storageError,
-      );
-    }
-
-    // 2. Delete database record of document.
-    // Foreign key cascade (onDelete: "cascade") automatically deletes associated document_files and file_pages.
-    const deletedDocument = await documentRepository.commands.delete(db, {
-      documentId,
-      userId,
-    });
-
-    if (!deletedDocument) {
-      throw new ServerActionError(
-        "INTERNAL_ERROR",
-        "Failed to delete document.",
-      );
-    }
-
     return {
-      documentId: deletedDocument.documentId,
+      documentId: document.documentId,
     };
   }
 

@@ -61,6 +61,7 @@ export interface UpdateDocumentCommand {
   title?: string;
   description?: string;
   status?: DocumentProcessingStatus;
+  delete?: boolean;
 }
 
 export interface UpdateDocumentFileCommand {

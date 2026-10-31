@@ -147,6 +147,7 @@ export class DocumentCommands {
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description }),
         ...(status !== undefined && { processingStatus: status }),
+        ...(data.delete === true && { deletedAt: new Date() }),
         updatedAt: new Date(),
       })
       .where(and(eq(documents.id, documentId), eq(documents.userId, userId)))
