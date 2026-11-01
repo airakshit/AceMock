@@ -84,6 +84,7 @@ export function QuestionCard({
   selectedAnswer,
   pendingAnswer,
   onAnswerChange,
+  showActions = true,
   isBookmarked = false,
   solutionControls,
   className,
@@ -145,7 +146,9 @@ export function QuestionCard({
             <div className="h-4 w-px bg-border" aria-hidden="true" />
           )}
 
-          <QuestionCardActions questionId={id} isBookmarked={isBookmarked} />
+          {showActions && (
+            <QuestionCardActions questionId={id} isBookmarked={isBookmarked} />
+          )}
         </div>
       </header>
 

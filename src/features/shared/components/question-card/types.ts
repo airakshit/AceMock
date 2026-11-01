@@ -69,6 +69,8 @@ export type QuestionCardProps = {
   onAnswerChange: (key: OptionKey) => void;
   /** Extra classes merged onto the card root (e.g. shadow overrides). */
   className?: string;
+  /** Hide bookmark/report controls when rendering untrusted preview data. */
+  showActions?: boolean;
   /**
    * Whether the question is already bookmarked. Controls the bookmark
    * button's initial visual state (amber, filled icon) and acts as a

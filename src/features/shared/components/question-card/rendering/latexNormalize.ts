@@ -48,6 +48,14 @@
  */
 export const BRACE_MATH_COMMANDS = [
   "dfrac",
+  "overrightarrow",
+  "overleftarrow",
+  "overline",
+  "underline",
+  "overset",
+  "underset",
+  "text",
+  "ce",
   "tfrac",
   "cfrac",
   "frac",
@@ -279,6 +287,193 @@ export function cleanDisplayMathBlocks(
   });
 }
 
+/**
+ * Gives recognized matrix environments display-math delimiters.
+ *
+ * This intentionally does not rewrite matrix cells, row breaks, or column
+ * separators: those are content, and guessing at their intended structure
+ * can silently change the math. A paired matrix environment is the evidence
+ * that this repair applies.
+ */
+export function normalizeMatrixMath(
+  text: string,
+  shouldRepairRowsAndColumns = false,
+): string {
+  // Match only paired, known matrix environments; ordinary text and
+  // unrelated LaTeX environments are returned without modification.
+  const matrixPattern =
+    /\\begin\{(matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|smallmatrix|array)\}(?:\s*\{[^{}]*\})?[\s\S]*?\\end\{\1\}/g;
+  const matrices = [...text.matchAll(matrixPattern)].map((matrix) => {
+    let matrixText = matrix[0];
+    if (shouldRepairRowsAndColumns) {
+      // Turn a lone backslash followed by whitespace into a row break, but
+      // leave existing double-backslash row breaks and LaTeX commands intact.
+      matrixText = matrixText.replace(
+        /(^|[^\\])\\(?=[ \t]+\S|[ \t]*\r?\n)/gm,
+        "$1\\\\",
+      );
+
+      // Collapse each run of unescaped column separators to one ampersand;
+      // escaped ampersands remain literal math content.
+      matrixText = matrixText.replace(
+        /&{2,}/g,
+        (ampersands, offset: number, source: string) => {
+          let precedingBackslashes = 0;
+          for (
+            let index = offset - 1;
+            index >= 0 && source[index] === "\\";
+            index--
+          ) {
+            precedingBackslashes++;
+          }
+          return precedingBackslashes % 2 === 0 ? "&" : ampersands;
+        },
+      );
+    }
+
+    return {
+      text: matrixText,
+      originalText: matrix[0],
+      index: matrix.index,
+    };
+  });
+  if (matrices.length === 0) return text;
+
+  // Ignore escaped dollar signs when locating math delimiters.
+  const findDollarRuns = (source: string) => {
+    const runs: Array<{ start: number; end: number }> = [];
+    for (let index = 0; index < source.length; ) {
+      if (source[index] !== "$") {
+        index++;
+        continue;
+      }
+
+      // Count preceding backslashes so a literal "\$" is not treated as a delimiter.
+      let backslashCount = 0;
+      for (
+        let previous = index - 1;
+        previous >= 0 && source[previous] === "\\";
+        previous--
+      ) {
+        backslashCount++;
+      }
+      if (backslashCount % 2 === 1) {
+        // Skip the rest of an escaped dollar run so later dollars are not misread as delimiters.
+        while (source[index] === "$") index++;
+        continue;
+      }
+
+      // Consume a contiguous run so "$$" is treated as one display delimiter.
+      const start = index;
+      while (source[index] === "$") index++;
+      runs.push({ start, end: index });
+    }
+    return runs;
+  };
+
+  // Process from right to left so earlier match positions remain valid.
+  let normalized = text;
+  for (const matrix of matrices.reverse()) {
+    const matrixText = matrix.text;
+    const matrixStart = matrix.index;
+    if (matrixStart === undefined) continue;
+
+    // Apply separator repairs even when this matrix already has display delimiters.
+    if (matrixText !== matrix.originalText) {
+      normalized =
+        normalized.slice(0, matrixStart) +
+        matrixText +
+        normalized.slice(matrixStart + matrix.originalText.length);
+    }
+
+    const matrixEnd = matrixStart + matrixText.length;
+
+    // Locate the nearest unescaped dollar runs on either side of this environment.
+    const dollarRuns = findDollarRuns(normalized);
+    const leftRun = dollarRuns.filter((run) => run.end <= matrixStart).at(-1);
+    const rightRun = dollarRuns.find((run) => run.start >= matrixEnd);
+    // Alternate matching delimiter runs between opening and closing positions.
+    const isOpeningRun = (run: { start: number; end: number }) =>
+      dollarRuns.filter(
+        (candidate) =>
+          candidate.end <= run.start &&
+          candidate.end - candidate.start === run.end - run.start,
+      ).length %
+        2 ===
+      0;
+    const leftOpensMath = leftRun ? isOpeningRun(leftRun) : false;
+    const rightClosesMath = rightRun
+      ? !leftRun || !isOpeningRun(rightRun)
+      : false;
+    const delimitersAreAdjacent =
+      leftRun !== undefined &&
+      rightRun !== undefined &&
+      normalized.slice(leftRun.end, matrixStart).trim() === "" &&
+      normalized.slice(matrixEnd, rightRun.start).trim() === "";
+
+    // Leave a matrix inside an existing display-math block unchanged.
+    if (
+      leftRun &&
+      rightRun &&
+      leftOpensMath &&
+      rightClosesMath &&
+      leftRun.end - leftRun.start >= 2 &&
+      rightRun.end - rightRun.start >= 2
+    ) {
+      continue;
+    }
+
+    // Promote an enclosing inline-math span, or repair mismatched delimiters directly around the matrix.
+    if (
+      leftRun &&
+      rightRun &&
+      ((leftOpensMath && rightClosesMath) || delimitersAreAdjacent)
+    ) {
+      const start = leftRun.start;
+      const end = rightRun.end;
+      normalized =
+        normalized.slice(0, start) +
+        "$$" +
+        normalized.slice(leftRun.end, rightRun.start) +
+        "$$" +
+        normalized.slice(end);
+      continue;
+    }
+
+    // If an opening delimiter exists without a matching close, normalize it and close after the matrix.
+    if (leftRun && leftOpensMath) {
+      normalized =
+        normalized.slice(0, leftRun.start) +
+        "$$" +
+        normalized.slice(leftRun.end, matrixEnd) +
+        "$$" +
+        normalized.slice(matrixEnd);
+      continue;
+    }
+
+    // If a closing delimiter exists without a matching open, add the missing open before the matrix.
+    if (rightRun && rightClosesMath) {
+      normalized =
+        normalized.slice(0, matrixStart) +
+        "$$" +
+        normalized.slice(matrixStart, rightRun.start) +
+        "$$" +
+        normalized.slice(rightRun.end);
+      continue;
+    }
+
+    // With no surrounding math delimiters, wrap just the recognized matrix environment.
+    normalized =
+      normalized.slice(0, matrixStart) +
+      "$$" +
+      matrixText +
+      "$$" +
+      normalized.slice(matrixEnd);
+  }
+
+  return normalized;
+}
+
 interface NormalizeContext {
   nonce: string;
   mathBlocks: string[];
@@ -505,6 +700,9 @@ export interface NormalizeOptions {
    * real environment and left alone. Override explicitly if that heuristic
    * ever guesses wrong for your content. */
   escapeAmpersand?: boolean;
+  /** Repair likely OCR row/column separator corruption inside matrices.
+   * Opt in because repeated separators and control-space can be intentional. */
+  shouldRepairRowsAndColumns?: boolean;
   /** Logs the text after every stage that actually changed it. Useful when
    * a specific piece of OCR content isn't rendering as expected. */
   debug?: boolean;
@@ -530,6 +728,8 @@ export function normalizeMathAndChemistry(
   const opts = {
     upgradeFracToDfrac: options.upgradeFracToDfrac ?? true,
     escapeAmpersand: options.escapeAmpersand ?? !/\\begin\{/.test(text),
+    shouldRepairRowsAndColumns:
+      options.shouldRepairRowsAndColumns ?? false,
     debug: options.debug ?? false,
   };
 
@@ -538,6 +738,10 @@ export function normalizeMathAndChemistry(
   const stages: Stage[] = [
     ["repairEscapeCorruption", repairEscapeCorruption],
     ["restoreLiteralNewlines", (t) => restoreLiteralNewlines(t, ctx.nonce)],
+    [
+      "normalizeMatrixMath",
+      (t) => normalizeMatrixMath(t, opts.shouldRepairRowsAndColumns),
+    ],
     ["fixBareCaretBrace", fixBareCaretBrace],
     ["normalizeCeOpenBrace", normalizeCeOpenBrace],
     ["fixCeGluedFormula", fixCeGluedFormula],
