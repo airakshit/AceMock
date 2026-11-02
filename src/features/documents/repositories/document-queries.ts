@@ -39,7 +39,7 @@ import {
   DocumentFilterProcessingStatus,
   DocumentProcessingStatus,
 } from "../types";
-import { PgTable } from "drizzle-orm/pg-core";
+
 
 const documentFilesAggregate = sql<unknown>`
   COALESCE(
@@ -63,10 +63,10 @@ const documentFilesAggregate = sql<unknown>`
 
 export class DocumentQueries {
   private readonly applyDeletedAtIsNullForDocument = isNull(
-    documents.createdAt,
+    documents.deletedAt,
   );
   private readonly applyDeletedAtIsNullForDocumentFile = isNull(
-    documentFiles.createdAt,
+    documentFiles.deletedAt,
   );
 
   async findById(
@@ -381,8 +381,8 @@ export class DocumentQueries {
 
   async getDocumentWithPages(
     db: DbExecutor,
-    documentId: string,
     userId: string,
+    documentId: string,
   ): Promise<DocumentWithPagesDTO | null> {
     const doc = db.$with("doc").as(
       db
@@ -418,8 +418,8 @@ export class DocumentQueries {
                 )
                 ORDER BY ${filePages.pageNo} ASC
               ) FILTER (
-                WHERE ${filePages.id} IS NOT NULL,
-              )
+                WHERE ${filePages.id} IS NOT NULL
+              ),
               '[]'::jsonb
             )
           `.as("pages"),
@@ -431,13 +431,33 @@ export class DocumentQueries {
     );
 
     const [record] = await db
+      .with(doc, docPages)
       .select({
         documentId: doc.documentId,
         title: doc.title,
         description: doc.description,
         processingStatus: doc.processingStatus,
         createdAt: doc.createdAt,
-        files: documentFilesAggregate,
+        files: sql<unknown>`
+          COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'fileId', ${documentFiles.id},
+                'filename', ${documentFiles.filename},
+                'size', ${documentFiles.fileSize},
+                'mimeType', ${documentFiles.mimeType},
+                'storagePath', ${documentFiles.storagePath},
+                'uploadStatus', ${documentFiles.uploadStatus},
+                'contentProbe', ${documentFiles.contentProbe},
+                'pages', ${docPages.pages}
+              )
+              ORDER BY ${documentFiles.createdAt} DESC
+            ) FILTER (
+              WHERE ${documentFiles.id} IS NOT NULL AND ${documentFiles.deletedAt} IS NULL
+            ),
+            '[]'::jsonb
+          )
+        `.as("files"),
       })
       .from(doc)
       .leftJoin(documentFiles, eq(documentFiles.documentId, doc.documentId))
