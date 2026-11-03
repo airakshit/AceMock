@@ -1,19 +1,35 @@
 import { inngest } from "../../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { structuredOutputExtractionPromptV2 } from "./prompts";
+import {
+  buildStage2BoundingBoxPrompt,
+  structuredTextExtractionPromptV2,
+} from "./prompts";
 import { documentRepository } from "@/features/documents/repositories/documents.repository";
 import { db } from "@/db";
 import { OcrPageResult } from "./types";
 import { GeminiLLMService, GeminiModels } from "@/services/llm/gemini.service";
-import { parseAndValidateStructuredOCR } from "./utils";
-import { OcrValidationError, OcrEmptyResponseError } from "./errors";
+import {
+  collectFiguresToExtract,
+  mergeStage1AndStage2,
+  parsePartialStructuredOCR,
+  parseStage2BoundingBoxes,
+} from "./utils";
+import {
+  OcrValidationError,
+  OcrEmptyResponseError,
+  OcrMergeError,
+} from "./errors";
 import {
   type StructuredSchemaParseResult,
-  structuredOCRJsonSchema,
 } from "./structured-question-schema";
+import {
+  partialOCRJsonSchema,
+  stage2BoundingBoxRootJsonSchema,
+  type PartialSchemaParseResult,
+} from "./partial-schema";
 import { env } from "@/config/env/server";
 import { RateLimitError } from "@/services/llm/errors";
-import { RetryAfterError } from "inngest";
+import { NonRetriableError, RetryAfterError } from "inngest";
 import { FilePageOCRStatus } from "@/features/documents/types";
 import {
   extractFiguresFromPage,
@@ -81,28 +97,27 @@ export const ocrPage = inngest.createFunction(
       env.GEMINI_API_KEY,
       GeminiModels.GEMINI_3_5_FLASH_LITE,
     );
-    // const llmService = new OpenRouterLLMService(
-    //   env.OPENROUTER_API_KEY!,
-    //   OpenRouterModels.DOTS_3_NOTE_PREVIEW,
-    // );
-    const extraction = await step.run(
-      "llm-ocr-extraction",
+
+    // ---------------------------------------------------------------------
+    // STAGE 1 — text / LaTeX extraction + hasFigure detection.
+    // ---------------------------------------------------------------------
+    const stage1 = await step.run(
+      "llm-ocr-stage-1-text",
       async (): Promise<{
         rawText: string | null;
-        ocrStatus: "completed" | "failed";
         survivedValidation: boolean;
         isRelevant: boolean;
-        parsedData?: StructuredSchemaParseResult;
+        data?: PartialSchemaParseResult;
       }> => {
         let rawText: string | null = null;
         try {
           rawText = await llmService.call(
-            structuredOutputExtractionPromptV2,
+            structuredTextExtractionPromptV2,
             undefined,
             [signedUrl],
-            structuredOCRJsonSchema,
+            partialOCRJsonSchema,
           );
-          logger.debug("Output is : ", {
+          logger.debug("Stage-1 output:", {
             output: rawText,
             model: llmService.model,
           });
@@ -121,7 +136,7 @@ export const ocrPage = inngest.createFunction(
 
         if (!rawText && attempt < TOTAL_RETRIES) {
           throw new OcrEmptyResponseError(
-            `No response returned by LLM on page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}).`,
+            `No response returned by LLM on page ${pageNo} stage 1 (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}).`,
           );
         }
 
@@ -130,62 +145,135 @@ export const ocrPage = inngest.createFunction(
           survivedValidation,
           validationErrors,
           parsedStructuredData,
-        } = parseAndValidateStructuredOCR(rawText);
+        } = parsePartialStructuredOCR(rawText);
 
         if (!cleanedText && attempt < TOTAL_RETRIES) {
           throw new OcrEmptyResponseError(
-            `No valid response text could be extracted from LLM on page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}).`,
+            `No valid stage-1 response text could be extracted on page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}).`,
           );
         }
 
-        // Retry on validation failure if retries are not exhausted
         if (!survivedValidation && attempt < TOTAL_RETRIES) {
           logger.warn(
-            {
-              pageNo,
-              pageId,
-              attempt,
-              validationErrors,
-            },
-            `Structured OCR validation failed for page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}). Retrying page OCR...`,
+            { pageNo, pageId, attempt, validationErrors },
+            `Stage-1 OCR validation failed for page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}). Retrying...`,
           );
           throw new OcrValidationError(
-            `Structured OCR validation failed for page ${pageNo}: ${validationErrors?.join("; ") || "Schema validation failed"}`,
+            `Stage-1 structured OCR validation failed for page ${pageNo}: ${validationErrors?.join("; ") || "Schema validation failed"}`,
             { validationErrors, pageNo, attempt },
           );
         }
 
         if (!survivedValidation && validationErrors) {
           logger.warn(
-            {
-              pageNo,
-              pageId,
-              attempt,
-              validationErrors,
-            },
-            `Structured OCR validation failed on final attempt for page ${pageNo}. Proceeding with best-effort text.`,
+            { pageNo, pageId, attempt, validationErrors },
+            `Stage-1 OCR validation failed on final attempt for page ${pageNo}. Proceeding with best-effort text.`,
           );
         }
 
-        const ocrStatus: "completed" | "failed" = cleanedText
-          ? "completed"
-          : "failed";
-
-        let isRelevant: boolean = true;
-
-        if (!(parsedStructuredData?.isRelevant === undefined)) {
+        let isRelevant = true;
+        if (parsedStructuredData?.isRelevant !== undefined) {
           isRelevant = parsedStructuredData.isRelevant;
         }
 
         return {
           rawText: cleanedText,
-          isRelevant: isRelevant,
-          ocrStatus,
           survivedValidation,
-          parsedData: parsedStructuredData,
+          isRelevant,
+          data: parsedStructuredData,
         };
       },
     );
+
+    // ---------------------------------------------------------------------
+    // STAGE 2 — bounding-box extraction, only for items with hasFigure=true.
+    // ---------------------------------------------------------------------
+    let mergedData: StructuredSchemaParseResult | undefined;
+
+    if (stage1.survivedValidation && stage1.data) {
+      const figuresToExtract = collectFiguresToExtract(stage1.data);
+
+      if (figuresToExtract.length === 0) {
+        // No figures on this page — merge with an empty stage-2 result.
+        mergedData = mergeStage1AndStage2(stage1.data, { items: [] });
+      } else {
+        const stage2Raw = await step.run("llm-ocr-stage-2-bbox", async () => {
+          const stage2Prompt = buildStage2BoundingBoxPrompt(
+            pageNo,
+            figuresToExtract,
+          );
+          try {
+            return await llmService.call(
+              stage2Prompt,
+              undefined,
+              [signedUrl],
+              stage2BoundingBoxRootJsonSchema,
+            );
+          } catch (error) {
+            if (error instanceof RateLimitError) {
+              logger.error("Rate limit error in stage 2", {
+                message: error.message,
+                model: error.model,
+                provider: error.llmProvider,
+              });
+              throw new RetryAfterError(error.message, error.retryAfterMs);
+            }
+            throw error;
+          }
+        });
+
+        logger.debug("Stage-2 output:", {
+          output: stage2Raw,
+          figuresRequested: figuresToExtract.length,
+        });
+
+        const stage2Parsed = parseStage2BoundingBoxes(stage2Raw);
+
+        if (!stage2Parsed.survivedValidation) {
+          const detail =
+            stage2Parsed.validationErrors?.join("; ") ||
+            "Stage-2 bounding box schema validation failed";
+          if (attempt < TOTAL_RETRIES) {
+            throw new OcrValidationError(
+              `Stage-2 bounding box extraction failed for page ${pageNo} (attempt ${attempt + 1}/${TOTAL_RETRIES + 1}): ${detail}`,
+              { validationErrors: stage2Parsed.validationErrors, pageNo, attempt },
+            );
+          }
+          // Final attempt failed — non-retriable, cannot produce merged output.
+          throw new NonRetriableError(
+            `Stage-2 bounding box extraction failed on final attempt for page ${pageNo}: ${detail}`,
+          );
+        }
+
+        // Strict merge — serial mismatches are non-retriable.
+        try {
+          mergedData = mergeStage1AndStage2(
+            stage1.data,
+            stage2Parsed.parsedStructuredData!,
+          );
+        } catch (error) {
+          if (error instanceof OcrMergeError) {
+            logger.error("Stage-1 / stage-2 merge failed", {
+              pageNo,
+              pageId,
+              message: error.message,
+            });
+            throw new NonRetriableError(error.message);
+          }
+          throw error;
+        }
+      }
+    }
+
+    const extraction = {
+      rawText: stage1.rawText,
+      ocrStatus: (stage1.rawText ? "completed" : "failed") as
+        | "completed"
+        | "failed",
+      survivedValidation: stage1.survivedValidation && !!mergedData,
+      isRelevant: stage1.isRelevant,
+      parsedData: mergedData,
+    };
 
     // 3. Persist the cleaned (not parsed) OCR text & validation result to the database in a dedicated step
     await step.run("update-page-ocr-result", async () => {

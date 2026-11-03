@@ -44,3 +44,17 @@ export class OcrPageFailedError extends OcrError {
     this.pageNo = pageNo;
   }
 }
+
+/**
+ * Thrown when stage-1 and stage-2 outputs cannot be merged due to serial
+ * number mismatches or missing figure data. Non-retriable by design.
+ */
+export class OcrMergeError extends OcrError {
+  public readonly pageNo?: number;
+
+  constructor(message: string, pageNo?: number) {
+    super(message);
+    this.name = "OcrMergeError";
+    this.pageNo = pageNo;
+  }
+}
