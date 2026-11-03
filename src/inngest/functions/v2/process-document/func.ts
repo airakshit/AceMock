@@ -19,12 +19,16 @@ export interface ProcessDocumentEventData {
   documentId: string;
 }
 
-export const PROCESS_DOCUMENT_EVENT = "v2/document/process"
+export const PROCESS_DOCUMENT_EVENT = "v2/document/process";
 
 export const processDocument = inngest.createFunction(
   {
     id: "process-document-v2",
     triggers: { event: PROCESS_DOCUMENT_EVENT },
+    concurrency: {
+      limit: 3,
+      key: "event.data.documentId",
+    },
   },
 
   async ({ event, step, logger }) => {
@@ -42,10 +46,11 @@ export const processDocument = inngest.createFunction(
     });
 
     const docFiles = await step.run(`mark-files-as-running`, async () => {
-      const files = await documentRepository.commands.updateFileProcessingStatus(db, {
-        documentId,
-        status: "running" as FileProcessingStatus,
-      });
+      const files =
+        await documentRepository.commands.updateFileProcessingStatus(db, {
+          documentId,
+          status: "running" as FileProcessingStatus,
+        });
 
       return files;
     });
@@ -108,14 +113,15 @@ export const processDocument = inngest.createFunction(
           start = performance.now();
           const uploadedPages = await Promise.all(
             pages.map(async (page) => {
-              const pageStoragePath = PDFStoragePathsRetriever.getDocumentFilePageSourceUrl(
-                userId,
-                documentId,
-                file.id as string,
+              const pageStoragePath =
+                PDFStoragePathsRetriever.getDocumentFilePageSourceUrl(
+                  userId,
+                  documentId,
+                  file.id as string,
 
-                "webp",
-                page.pageNumber,
-              );
+                  "webp",
+                  page.pageNumber,
+                );
 
               start = performance.now();
               await supabaseStorageClient.upload(pageStoragePath, page.buffer, {
@@ -162,10 +168,11 @@ export const processDocument = inngest.createFunction(
     );
 
     await step.run(`mark-files-as-completed`, async () => {
-      const files = await documentRepository.commands.updateFileProcessingStatus(db, {
-        documentId,
-        status: "completed" as FileProcessingStatus,
-      });
+      const files =
+        await documentRepository.commands.updateFileProcessingStatus(db, {
+          documentId,
+          status: "completed" as FileProcessingStatus,
+        });
 
       return files;
     });
@@ -183,10 +190,8 @@ export const processDocument = inngest.createFunction(
           });
         });
       });
-      const createdPages = await documentRepository.commands.createManyFilePages(
-        db,
-        data,
-      );
+      const createdPages =
+        await documentRepository.commands.createManyFilePages(db, data);
       return createdPages;
     });
 

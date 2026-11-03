@@ -66,7 +66,7 @@ export function QuestionRenderingPlayground() {
   return (
     <div className="space-y-5">
       <div className="grid gap-5 xl:grid-cols-[minmax(20rem,0.9fr)_minmax(0,1.1fr)]">
-        <section className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <section className="flex min-h-128 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
             <div className="flex items-center gap-2">
               <Braces className="size-4 text-primary" />
@@ -101,7 +101,7 @@ export function QuestionRenderingPlayground() {
               onChange={(event) => setInput(event.target.value)}
               placeholder={`Paste question JSON or plain text…\n\n{"questionText":"...","options":["...","..."]}`}
               spellCheck={false}
-              className="min-h-[24rem] flex-1 resize-y font-mono text-xs leading-relaxed"
+              className="min-h-96 flex-1 resize-y font-mono text-xs leading-relaxed"
             />
             <p className="text-xs leading-relaxed text-muted-foreground">
               Paste plain text, one question object, an array, or a response
@@ -150,7 +150,7 @@ export function QuestionRenderingPlayground() {
               <p className="text-sm font-semibold text-destructive">
                 Invalid JSON
               </p>
-              <p className="mt-1 break-words font-mono text-xs text-muted-foreground">
+              <p className="mt-1 wrap-break-word font-mono text-xs text-muted-foreground">
                 {result.error}
               </p>
             </div>

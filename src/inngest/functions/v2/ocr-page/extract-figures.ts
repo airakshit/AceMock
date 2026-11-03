@@ -1,6 +1,7 @@
 import { supabaseStorageClient } from "@/features/shared/storage-service";
 import { PDFStoragePathsRetriever, ImageStoragePathsRetriever } from "@/lib/supabase/storage-paths";
 import type { StructuredSchemaParseResult, BoundingBox } from "./structured-question-schema";
+import { computeCropRegion } from "./crop-region";
 import sharp from "sharp";
 
 export interface ExtractedFigure {
@@ -26,6 +27,8 @@ export interface ExtractedFigure {
 export type FigureRetriever =
   | typeof PDFStoragePathsRetriever
   | typeof ImageStoragePathsRetriever;
+
+export { computeCropRegion, type CropRegion } from "./crop-region";
 
 export function getStorageRetriever(fileName: string): FigureRetriever {
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
@@ -70,6 +73,10 @@ export function buildFigureStoragePath(
 
 /**
  * Generates a unique figure filename based on the figure context.
+ *
+ * A short random suffix guards against same-name overwrites (uploads use
+ * upsert) when the model reports multiple items sharing one serialNo —
+ * each such item's figures restart at index 0.
  */
 export function generateFigureName(input: {
   serialNo: number;
@@ -80,12 +87,18 @@ export function generateFigureName(input: {
   const typePrefix = input.figureType === "question" ? "q"
     : input.figureType === "solution" ? "s"
     : `opt-${input.optionKey}`;
-  return `serial-${input.serialNo}-${typePrefix}-${input.index}`;
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `serial-${input.serialNo}-${typePrefix}-${input.index}-${suffix}`;
 }
 
 /**
  * Downloads an image from a signed URL, crops it to the bounding box,
  * and uploads the cropped figure to Supabase storage.
+ *
+ * Coordinates are defensively clamped into [0, 1] and padded slightly:
+ * models occasionally emit values just outside the page (e.g. -0.02 or
+ * 1.005 despite schema bounds), and tight/edge boxes would otherwise make
+ * `sharp.extract()` throw or clip the drawing's strokes.
  *
  * @param signedUrl - Signed URL to the full page image
  * @param bbox - Normalized bounding box (0-1, origin top-left)
@@ -114,13 +127,8 @@ export async function cropAndUploadFigure(
     throw new Error("Could not determine image dimensions");
   }
 
-  // Convert normalized coordinates to pixel coordinates
-  const left = Math.round(bbox.xMin * width);
-  const top = Math.round(bbox.yMin * height);
-  const right = Math.round(bbox.xMax * width);
-  const bottom = Math.round(bbox.yMax * height);
-  const cropWidth = right - left;
-  const cropHeight = bottom - top;
+  const { left, top, width: cropWidth, height: cropHeight } =
+    computeCropRegion(bbox, width, height);
 
   // Validate crop dimensions
   if (cropWidth <= 0 || cropHeight <= 0) {
@@ -176,9 +184,9 @@ export async function extractFiguresFromPage(
     if (!serialNo) continue;
 
     // Extract question stem figures
-    if (item.questionFigures?.length) {
-      for (let i = 0; i < item.questionFigures.length; i++) {
-        const bbox = item.questionFigures[i];
+    if (item.question?.figures?.length) {
+      for (let i = 0; i < item.question.figures.length; i++) {
+        const bbox = item.question.figures[i];
         const figName = generateFigureName({ serialNo, figureType: "question", index: i });
         const storagePath = buildFigureStoragePath(
           retriever,
@@ -203,9 +211,9 @@ export async function extractFiguresFromPage(
     }
 
     // Extract solution figures
-    if (item.solutionFigures?.length) {
-      for (let i = 0; i < item.solutionFigures.length; i++) {
-        const bbox = item.solutionFigures[i];
+    if (item.solution?.figures?.length) {
+      for (let i = 0; i < item.solution.figures.length; i++) {
+        const bbox = item.solution.figures[i];
         const figName = generateFigureName({ serialNo, figureType: "solution", index: i });
         const storagePath = buildFigureStoragePath(
           retriever,
@@ -230,9 +238,9 @@ export async function extractFiguresFromPage(
     }
 
     // Extract option figures
-    if (item.optionFigures) {
+    if (item.options) {
       for (const optionKey of ["A", "B", "C", "D"] as const) {
-        const bbox = item.optionFigures[optionKey];
+        const bbox = item.options[optionKey]?.figure;
         if (!bbox) continue;
 
         const figName = generateFigureName({ serialNo, figureType: "option", optionKey, index: 0 });

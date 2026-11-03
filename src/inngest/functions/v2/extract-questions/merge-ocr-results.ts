@@ -25,8 +25,7 @@ interface MergedQuestionRecord {
     D?: BoundingBox;
   };
   passageContent?: string | null;
-  incomplete: boolean;
-  optionIncomplete: boolean;
+  isContinuation: boolean;
 }
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
@@ -114,7 +113,7 @@ export function hasPassageQuestionKeywords(text?: string | null): boolean {
  * Determines whether an entity represents a Reading Comprehension question.
  */
 export function isComprehensionQuestion(
-  item: { subject?: string | null; question?: string | null },
+  item: { subject?: string | null; question?: { text?: string | null } | null },
   existingRecord?: MergedQuestionRecord | null,
   sectionLabel?: string | null,
   activePassage?: ActivePassageState | null,
@@ -137,7 +136,7 @@ export function isComprehensionQuestion(
   }
 
   // 2. STEM indicators in question text (e.g. math equations) indicate non-comprehension
-  const qText = item.question || existingRecord?.questionText || "";
+  const qText = item.question?.text || existingRecord?.questionText || "";
   if (containsSTEMIndicators(qText)) {
     return false;
   }
@@ -281,12 +280,12 @@ export function mergeOcrResults(
         sectionStart,
         sectionEnd,
         eachMarks,
-        paragraph,
+        englishParagraph,
         data: items,
-      } = structuredData;
+      } = structuredData as StructuredSchemaParseResult;
 
       // Check if this page introduces or modifies a reading passage
-      const pageParagraph = paragraph?.trim();
+      const pageParagraph = englishParagraph?.trim();
       if (pageParagraph && pageParagraph.length > 20) {
         if (
           activePassage &&
@@ -412,52 +411,48 @@ export function mergeOcrResults(
           const optionsMap: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
           if (item.options) {
             for (const key of OPTION_KEYS) {
-              if (
-                item.options[key] !== undefined &&
-                item.options[key] !== null
-              ) {
-                optionsMap[key] = cleanOptionText(item.options[key]!);
+              const optionText = item.options[key]?.text;
+              if (optionText !== undefined && optionText !== null) {
+                optionsMap[key] = cleanOptionText(optionText);
               }
             }
           }
 
           // Extract bounding boxes from the v2 OCR schema
-          const questionFigures: BoundingBox[] = item.questionFigures ?? [];
-          const solutionFigures: BoundingBox[] = item.solutionFigures ?? [];
+          const questionFigures: BoundingBox[] = item.question?.figures ?? [];
+          const solutionFigures: BoundingBox[] = item.solution?.figures ?? [];
           const optionFigures: MergedQuestionRecord["optionFigures"] = {};
-          if (item.optionFigures) {
-            if (item.optionFigures.A) optionFigures.A = item.optionFigures.A;
-            if (item.optionFigures.B) optionFigures.B = item.optionFigures.B;
-            if (item.optionFigures.C) optionFigures.C = item.optionFigures.C;
-            if (item.optionFigures.D) optionFigures.D = item.optionFigures.D;
+          if (item.options) {
+            for (const key of OPTION_KEYS) {
+              const figure = item.options[key]?.figure;
+              if (figure) optionFigures[key] = figure;
+            }
           }
 
           mergedMap.set(serialNo, {
             serialNo,
             fileId: page.fileId,
             pageNos: [page.pageNo],
-            questionText: item.question?.trim() ?? "",
+            questionText: item.question?.text?.trim() ?? "",
             optionsMap,
             answerKey: item.answerKey?.trim() ?? "",
             subject: item.subject?.trim(),
             marks: item.marks ?? eachMarks ?? 1,
-            solution: item.solution?.trim(),
+            solution: item.solution?.text?.trim(),
             questionFigures,
             solutionFigures,
             optionFigures,
             passageContent: itemPassageContent,
-            incomplete: Boolean(item.incomplete),
-            optionIncomplete: Boolean(item.optionIncomplete),
+            isContinuation: Boolean(item.isContinuation),
           });
         } else {
           // Merge with previously encountered record for this serialNo
           existing.pageNos.push(page.pageNo);
 
           // Merge Question Text
-          if (item.question?.trim()) {
-            const nextText = item.question.trim();
+          if (item.question?.text?.trim()) {
+            const nextText = item.question.text.trim();
             if (
-              existing.incomplete ||
               item.isContinuation ||
               !existing.questionText
             ) {
@@ -473,13 +468,10 @@ export function mergeOcrResults(
           // Merge Options
           if (item.options) {
             for (const key of OPTION_KEYS) {
-              const optText = item.options[key]?.trim();
+              const optText = item.options[key]?.text?.trim();
               if (optText) {
                 const cleanedOpt = cleanOptionText(optText);
-                if (existing.optionIncomplete && existing.optionsMap[key]) {
-                  existing.optionsMap[key] =
-                    `${existing.optionsMap[key]} ${cleanedOpt}`.trim();
-                } else if (!existing.optionsMap[key]) {
+                if (!existing.optionsMap[key]) {
                   existing.optionsMap[key] = cleanedOpt;
                 }
               }
@@ -492,8 +484,8 @@ export function mergeOcrResults(
           }
 
           // Merge Solution
-          if (item.solution?.trim()) {
-            const nextSolution = item.solution.trim();
+          if (item.solution?.text?.trim()) {
+            const nextSolution = item.solution.text.trim();
             if (existing.solution) {
               if (!existing.solution.includes(nextSolution)) {
                 existing.solution = `${existing.solution}\n${nextSolution}`;
@@ -514,27 +506,23 @@ export function mergeOcrResults(
           }
 
           // Merge bounding boxes from the v2 OCR schema
-          if (item.questionFigures?.length) {
-            existing.questionFigures.push(...item.questionFigures);
+          if (item.question?.figures?.length) {
+            existing.questionFigures.push(...item.question.figures);
           }
-          if (item.solutionFigures?.length) {
-            existing.solutionFigures.push(...item.solutionFigures);
+          if (item.solution?.figures?.length) {
+            existing.solutionFigures.push(...item.solution.figures);
           }
-          if (item.optionFigures) {
-            if (item.optionFigures.A) existing.optionFigures.A = item.optionFigures.A;
-            if (item.optionFigures.B) existing.optionFigures.B = item.optionFigures.B;
-            if (item.optionFigures.C) existing.optionFigures.C = item.optionFigures.C;
-            if (item.optionFigures.D) existing.optionFigures.D = item.optionFigures.D;
+          if (item.options) {
+            for (const key of OPTION_KEYS) {
+              const figure = item.options[key]?.figure;
+              if (figure) existing.optionFigures[key] = figure;
+            }
           }
 
           // Assign Passage if existing does not have one and this item has one
           if (!existing.passageContent && itemPassageContent) {
             existing.passageContent = itemPassageContent;
           }
-
-          // Update continuation flags
-          existing.incomplete = Boolean(item.incomplete);
-          existing.optionIncomplete = Boolean(item.optionIncomplete);
         }
       }
     }

@@ -8,7 +8,8 @@ export const GeminiModels = {
   GEMMA_4_26B: "gemma-4-26b-a4b-it",
   GEMMA_4_31B: "gemma-4-31b-it",
   GEMINI_3_5_FLASH_LITE: "gemini-3.5-flash-lite",
-  GEMINI_3_6_FLASH: "gemini-3.6-flash"
+  GEMINI_3_1_FLASH_LITE: "gemini-3.1-flash-lite",
+  GEMINI_3_6_FLASH: "gemini-3.6-flash",
 } as const;
 
 export type GeminiModel = (typeof GeminiModels)[keyof typeof GeminiModels];

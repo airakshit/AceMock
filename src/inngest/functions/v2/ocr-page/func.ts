@@ -1,13 +1,9 @@
 import { inngest } from "../../../client";
 import { supabaseStorageClient } from "@/features/shared/storage-service";
-import { structuredOutputExtractionPrompt } from "./prompts";
+import { structuredOutputExtractionPromptV2 } from "./prompts";
 import { documentRepository } from "@/features/documents/repositories/documents.repository";
 import { db } from "@/db";
 import { OcrPageResult } from "./types";
-import {
-  OpenRouterLLMService,
-  OpenRouterModels,
-} from "@/services/llm/openrouter.service";
 import { GeminiLLMService, GeminiModels } from "@/services/llm/gemini.service";
 import { parseAndValidateStructuredOCR } from "./utils";
 import { OcrValidationError, OcrEmptyResponseError } from "./errors";
@@ -19,7 +15,10 @@ import { env } from "@/config/env/server";
 import { RateLimitError } from "@/services/llm/errors";
 import { RetryAfterError } from "inngest";
 import { FilePageOCRStatus } from "@/features/documents/types";
-import { extractFiguresFromPage, type ExtractedFigure } from "./extract-figures";
+import {
+  extractFiguresFromPage,
+  type ExtractedFigure,
+} from "./extract-figures";
 
 export interface OcrPageEventData {
   userId: string;
@@ -45,9 +44,22 @@ export const ocrPage = inngest.createFunction(
     },
   },
 
-  async ({ event, step, logger, attempt }): Promise<OcrPageResult & { extractedFigures?: ExtractedFigure[] }> => {
+  async ({
+    event,
+    step,
+    logger,
+    attempt,
+  }): Promise<OcrPageResult & { extractedFigures?: ExtractedFigure[] }> => {
     const data = event.data as OcrPageEventData;
-    const { fileId, pageId, pageNo, storagePath, userId, documentId, fileName } = data;
+    const {
+      fileId,
+      pageId,
+      pageNo,
+      storagePath,
+      userId,
+      documentId,
+      fileName,
+    } = data;
 
     // 0. Update file page status to "running"
     await step.run("update-file-ocr-status", async () => {
@@ -63,6 +75,8 @@ export const ocrPage = inngest.createFunction(
       return await supabaseStorageClient.getPageAccessUrl(storagePath);
     });
 
+    // OpenRouter kept out of v2 OCR by decision — Gemini only.
+    // The client implementation itself remains in src/services/llm/.
     const llmService = new GeminiLLMService(
       env.GEMINI_API_KEY,
       GeminiModels.GEMINI_3_5_FLASH_LITE,
@@ -83,7 +97,7 @@ export const ocrPage = inngest.createFunction(
         let rawText: string | null = null;
         try {
           rawText = await llmService.call(
-            structuredOutputExtractionPrompt,
+            structuredOutputExtractionPromptV2,
             undefined,
             [signedUrl],
             structuredOCRJsonSchema,
@@ -191,21 +205,29 @@ export const ocrPage = inngest.createFunction(
     // 4. Extract figures if validation survived and we have structured data with bounding boxes
     let extractedFigures: ExtractedFigure[] = [];
     if (extraction.survivedValidation && extraction.parsedData) {
-      extractedFigures = await step.run("extract-figures-from-page", async () => {
-        return await extractFiguresFromPage(
-          extraction.parsedData,
-          signedUrl,
-          pageNo,
-          fileId,
-          userId,
-          documentId,
-          fileName,
-        );
-      });
+      extractedFigures = await step.run(
+        "extract-figures-from-page",
+        async () => {
+          return await extractFiguresFromPage(
+            extraction.parsedData,
+            signedUrl,
+            pageNo,
+            fileId,
+            userId,
+            documentId,
+            fileName,
+          );
+        },
+      );
 
       if (extractedFigures.length > 0) {
         logger.info(
-          { documentId, fileId, pageNo, figuresExtracted: extractedFigures.length },
+          {
+            documentId,
+            fileId,
+            pageNo,
+            figuresExtracted: extractedFigures.length,
+          },
           "Figure extraction complete for page.",
         );
       }

@@ -47,6 +47,7 @@
  * patterns show up.
  */
 export const BRACE_MATH_COMMANDS = [
+  "infty",
   "dfrac",
   "overrightarrow",
   "overleftarrow",
@@ -88,7 +89,7 @@ const BRACE_MATH_COMMAND_SOURCE = BRACE_MATH_COMMANDS.join("|");
 /** Macros that legitimately start with "\n" and must survive the literal
  * "\n" -> newline conversion untouched (\neq, \nabla, ...). */
 const LATEX_N_MACRO_EXCEPTIONS =
-  "eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim";
+  "|eq|e|abla|atural|eg|i|otin|ot|u|exists|rightarrow|leftarrow|Rightarrow|Leftarrow|mid|parallel|subset|subseteq|supset|supseteq|cong|sim";
 
 /**
  * Brace-matching helper: given str[openIdx] === '{', returns the index of

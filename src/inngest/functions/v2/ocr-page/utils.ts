@@ -50,9 +50,10 @@ export function tryParseJson(
 /**
  * Recursively converts `null` values to `undefined` so downstream code
  * using optional chaining (`?.`) works seamlessly with structured output
- * responses (which use nullable fields instead of optional).
+ * responses (whose schema expresses optionality with nullable types).
+ * Exported for the debug harness, which uses it on its own parse path.
  */
-function nullsToUndefined<T>(obj: T): T {
+export function nullsToUndefined<T>(obj: T): T {
   if (obj === null) return undefined as unknown as T;
   if (Array.isArray(obj)) return obj.map(nullsToUndefined) as unknown as T;
   if (typeof obj === "object") {
@@ -61,7 +62,7 @@ function nullsToUndefined<T>(obj: T): T {
       if (value !== null) {
         result[key] = nullsToUndefined(value);
       }
-      // null values are simply omitted → become undefined on access
+      // null values are simply omitted -> become undefined on access
     }
     return result as T;
   }
@@ -69,15 +70,8 @@ function nullsToUndefined<T>(obj: T): T {
 }
 
 /**
- * Normalizes common LLM structural mistakes:
- * 1. Hoists page-level fields (`paragraph`, `sectionLabel`, `sectionStart`, `sectionEnd`, `eachMarks`)
- *    from items inside `data` to root if root doesn't already have them.
- * 2. Deletes page-level fields from `data` items so item validation succeeds.
- * 3. Normalizes root aliases (e.g. `sectionEnds` -> `sectionEnd`, root `marks` -> `eachMarks`).
- */
-/**
  * Recursively repairs LaTeX strings where single backslashes in JSON output
- * were parsed as JSON escape sequences (e.g. \t -> tab, \f -> form feed, \b -> backspace).
+ * were parsed as JSON escape sequences (e.g. tab, form feed, backspace).
  */
 function sanitizeLatexString(val: unknown): unknown {
   if (typeof val !== "string") return val;
@@ -93,6 +87,305 @@ function sanitizeLatexString(val: unknown): unknown {
     .replace(/(^|[^\\])\bext\{/g, "$1\\text{");
 }
 
+/**
+ * Coerces raw figure-ish values (object | array) into an array of bounding boxes.
+ */
+function asFigureArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") return [value];
+  return [];
+}
+
+/**
+ * Normalizes a question/solution content value into { text, figures }:
+ * - legacy (v1) plain-string content becomes { text }
+ * - a `figure` (singular) value merges into the `figures` array
+ * - legacy flat figure arrays (questionFigures / solutionFigures) merge in
+ */
+function normalizeContentShape(raw: unknown, legacyFigures: unknown): unknown {
+  if (typeof raw === "string") {
+    return {
+      text: sanitizeLatexString(raw),
+      figures: asFigureArray(legacyFigures),
+    };
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+
+  const content: Record<string, unknown> = {
+    ...(raw as Record<string, unknown>),
+  };
+  const extra = asFigureArray(legacyFigures);
+
+  if (content.figure !== undefined) {
+    content.figures = [...asFigureArray(content.figure), ...extra];
+    delete content.figure;
+  } else {
+    content.figures = [...asFigureArray(content.figures), ...extra];
+  }
+
+  if (typeof content.text === "string") {
+    content.text = sanitizeLatexString(content.text);
+  }
+  return content;
+}
+
+/**
+ * Normalizes the options object:
+ * - legacy (v1) plain-string options become { text }
+ * - a plural `figures` value collapses to its first box as singular `figure`
+ * - the legacy `optionFigures` map fills missing per-option boxes
+ */
+function normalizeOptionsShape(
+  raw: unknown,
+  legacyOptionFigures: unknown,
+): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+
+  const legacyMap =
+    legacyOptionFigures &&
+    typeof legacyOptionFigures === "object" &&
+    !Array.isArray(legacyOptionFigures)
+      ? (legacyOptionFigures as Record<string, unknown>)
+      : {};
+
+  const result: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof val === "string") {
+      result[key] = { text: sanitizeLatexString(val) };
+      continue;
+    }
+    if (!val || typeof val !== "object" || Array.isArray(val)) {
+      result[key] = val;
+      continue;
+    }
+
+    const content: Record<string, unknown> = {
+      ...(val as Record<string, unknown>),
+    };
+    if (content.figures !== undefined) {
+      if (content.figure === undefined) {
+        content.figure = asFigureArray(content.figures)[0];
+      }
+      delete content.figures;
+    }
+    if (Array.isArray(content.figure)) {
+      content.figure = content.figure[0];
+    }
+    if (typeof content.text === "string") {
+      content.text = sanitizeLatexString(content.text);
+    }
+    result[key] = content;
+  }
+
+  for (const [key, box] of Object.entries(legacyMap)) {
+    const existing = result[key];
+    if (existing && typeof existing === "object" && !Array.isArray(existing)) {
+      const option = existing as Record<string, unknown>;
+      if (option.figure === undefined) option.figure = box;
+    } else if (existing === null || existing === undefined) {
+      result[key] = { figure: box };
+    }
+  }
+
+  return result;
+}
+
+const BOX_COORD_KEYS = ["xMin", "xMax", "yMin", "yMax"] as const;
+
+/** Parses a coordinate value (number or numeric string), or null when malformed. */
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/** Returns the box's four coordinates as numbers, or null when not a well-formed box. */
+function readBoxCoords(box: unknown): number[] | null {
+  if (!box || typeof box !== "object") return null;
+  const coords: number[] = [];
+  for (const key of BOX_COORD_KEYS) {
+    const parsed = toFiniteNumber((box as Record<string, unknown>)[key]);
+    if (parsed === null) return null;
+    coords.push(parsed);
+  }
+  return coords;
+}
+
+/**
+ * Repairs bounding boxes emitted on a non-normalized coordinate scale.
+ *
+ * The schema and prompt request 0-1 fractions, but models habitually fall
+ * back to other conventions — the 0-1000 integer grounding scale that
+ * Gemini-family models are trained on, or 0-100 percent coordinates —
+ * typically when provider-side schema enforcement is missing or ignored.
+ * Left unrepaired, such values clamp to page edges and produce blank or
+ * wildly misplaced crops.
+ *
+ * Detection is per item: if any single coordinate exceeds 100 the item is
+ * treated as 0-1000 scaled (all its boxes rescaled), otherwise any
+ * coordinate above 1.5 marks the 0-100 percent scale. Boxes already on the
+ * 0-1 scale are left untouched.
+ */
+function repairFigureCoordinateScales(cleanItem: Record<string, unknown>): void {
+  // Collect every bounding box attached to this item.
+  const boxes: Record<string, unknown>[] = [];
+  const collectFromContent = (content: unknown) => {
+    if (!content || typeof content !== "object") return;
+    const figures = (content as Record<string, unknown>).figures;
+    if (Array.isArray(figures)) {
+      for (const figure of figures) {
+        if (figure && typeof figure === "object") {
+          boxes.push(figure as Record<string, unknown>);
+        }
+      }
+    }
+  };
+  collectFromContent(cleanItem.question);
+  collectFromContent(cleanItem.solution);
+  if (cleanItem.options && typeof cleanItem.options === "object") {
+    for (const option of Object.values(cleanItem.options as Record<string, unknown>)) {
+      if (!option || typeof option !== "object") continue;
+      const figure = (option as Record<string, unknown>).figure;
+      if (figure && typeof figure === "object") {
+        boxes.push(figure as Record<string, unknown>);
+      }
+    }
+  }
+
+  if (boxes.length === 0) return;
+
+  let maxCoord = 0;
+  for (const box of boxes) {
+    const coords = readBoxCoords(box);
+    if (!coords) continue;
+    for (const value of coords) maxCoord = Math.max(maxCoord, value);
+  }
+
+  let divideBy: number;
+  if (maxCoord > 100) {
+    divideBy = 1000;
+  } else if (maxCoord > 1.5) {
+    divideBy = 100;
+  } else {
+    return; // Already on the 0-1 scale.
+  }
+
+  let rescaled = 0;
+  for (const box of boxes) {
+    const coords = readBoxCoords(box);
+    if (!coords) continue;
+    for (const key of BOX_COORD_KEYS) {
+      const value = toFiniteNumber(box[key]);
+      if (value !== null) {
+        // Round to avoid float noise from the division (e.g. 8.2/100).
+        box[key] = Number((value / divideBy).toFixed(6));
+      }
+    }
+    rescaled++;
+  }
+  console.warn(
+    `[normalizeStructuredOCR] Bounding-box coordinates for serial ${String(cleanItem.serialNo ?? "?")} ` +
+      `look like a 0-${divideBy === 1000 ? "1000" : "100"} scale; rescaled by 1/${divideBy}. ` +
+      `Box sample: ${JSON.stringify(boxes[0])}`,
+  );
+}
+
+/**
+ * Native Gemini grounding mode: the provider schema requests integer
+ * bounding-box coordinates in the 0-1000 range. When EVERY box on the page
+ * holds integers within [0, 1000] (with at least one value above 1), the
+ * response is confidently on the native scale — rescale everything to 0-1
+ * fractions deterministically. Resolving scale PAGE-WIDE (not per box) is
+ * what disambiguates small boxes sitting in the top-left corner, which a
+ * per-box max-value heuristic cannot classify. Responses that are not
+ * clearly native (fractional 0-1 fallbacks, percent output) fall through to
+ * repairFigureCoordinateScales instead.
+ */
+function rescaleNativeGroundingBoxes(root: Record<string, unknown>): void {
+  const data = root.data;
+  if (!Array.isArray(data)) return;
+  const items = data as unknown[];
+
+  const boxes: Record<string, unknown>[] = [];
+  const collectFigures = (content: unknown) => {
+    if (!content || typeof content !== "object") return;
+    const figures = (content as Record<string, unknown>).figures;
+    if (Array.isArray(figures)) {
+      for (const figure of figures) {
+        if (figure && typeof figure === "object") {
+          boxes.push(figure as Record<string, unknown>);
+        }
+      }
+    }
+  };
+  for (const item of items) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const cleanItem = item as Record<string, unknown>;
+    collectFigures(cleanItem.question);
+    collectFigures(cleanItem.solution);
+    if (cleanItem.options && typeof cleanItem.options === "object") {
+      for (const option of Object.values(
+        cleanItem.options as Record<string, unknown>,
+      )) {
+        if (!option || typeof option !== "object") continue;
+        const figure = (option as Record<string, unknown>).figure;
+        if (figure && typeof figure === "object") {
+          boxes.push(figure as Record<string, unknown>);
+        }
+      }
+    }
+  }
+  if (boxes.length === 0) return;
+
+  let allNative = true;
+  let anyAboveOne = false;
+  outer: for (const box of boxes) {
+    for (const key of BOX_COORD_KEYS) {
+      const value = toFiniteNumber(box[key]);
+      if (
+        value === null ||
+        value < 0 ||
+        value > 1000 ||
+        !Number.isInteger(value)
+      ) {
+        allNative = false;
+        break outer;
+      }
+      if (value > 1) anyAboveOne = true;
+    }
+  }
+
+  if (!allNative || !anyAboveOne) return;
+
+  for (const box of boxes) {
+    for (const key of BOX_COORD_KEYS) {
+      const value = toFiniteNumber(box[key]);
+      if (value !== null) {
+        // Round to avoid float noise from the division.
+        box[key] = Number((value / 1000).toFixed(6));
+      }
+    }
+  }
+  console.warn(
+    `[normalizeStructuredOCR] Native 0-1000 grounding detected (${boxes.length} box(es)); rescaled to 0-1 fractions.`,
+  );
+}
+
+/**
+ * Normalizes common LLM structural mistakes:
+ * 1. Hoists page-level fields (englishParagraph, sectionLabel, sectionStart,
+ *    sectionEnd, eachMarks) from items inside `data` to root when root lacks them.
+ * 2. Maps the legacy root/item `paragraph` key onto `englishParagraph`.
+ * 3. Normalizes root aliases (e.g. `sectionEnds` -> `sectionEnd`, root `marks` -> `eachMarks`).
+ * 4. Coerces legacy (v1) flat content shapes (string question/options, sibling
+ *    `questionFigures` / `optionFigures` keys) into the v2 nested shape, and
+ *    reconciles singular `figure` vs plural `figures` keys per field.
+ * 5. Native Gemini 0-1000 grounding: page-wide deterministic /1000 rescale,
+ *    then the per-item scale heuristic for stray fallback outputs.
+ */
 function normalizeStructuredOCR(raw: unknown): unknown {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
   const root = { ...(raw as Record<string, unknown>) };
@@ -106,30 +399,38 @@ function normalizeStructuredOCR(raw: unknown): unknown {
     root.eachMarks = root.marks;
     delete root.marks;
   }
-  if (typeof root.paragraph === "string") {
-    root.paragraph = sanitizeLatexString(root.paragraph) as string;
+  // v2 renamed the root `paragraph` key; accept both spellings.
+  if (
+    typeof root.paragraph === "string" &&
+    typeof root.englishParagraph !== "string"
+  ) {
+    root.englishParagraph = sanitizeLatexString(root.paragraph);
   }
+  delete root.paragraph;
 
-  // If items in data array contain page-level fields, lift to root and strip from item
+  // If items in the data array carry page-level fields, hoist to root and strip.
   if (Array.isArray(root.data)) {
     root.data = root.data.map((item) => {
       if (!item || typeof item !== "object" || Array.isArray(item)) return item;
       const cleanItem = { ...(item as Record<string, unknown>) };
 
-      if (typeof cleanItem.paragraph === "string" && !root.paragraph) {
-        root.paragraph = sanitizeLatexString(cleanItem.paragraph) as string;
+      if (
+        typeof cleanItem.paragraph === "string" &&
+        typeof root.englishParagraph !== "string"
+      ) {
+        root.englishParagraph = sanitizeLatexString(cleanItem.paragraph);
       }
       delete cleanItem.paragraph;
 
-      if (typeof cleanItem.sectionLabel === "string" && !root.sectionLabel) {
+      if (
+        typeof cleanItem.sectionLabel === "string" &&
+        root.sectionLabel === undefined
+      ) {
         root.sectionLabel = cleanItem.sectionLabel;
       }
       delete cleanItem.sectionLabel;
 
-      if (
-        cleanItem.sectionStart !== undefined &&
-        root.sectionStart === undefined
-      ) {
+      if (cleanItem.sectionStart !== undefined && root.sectionStart === undefined) {
         root.sectionStart = cleanItem.sectionStart;
       }
       delete cleanItem.sectionStart;
@@ -139,10 +440,7 @@ function normalizeStructuredOCR(raw: unknown): unknown {
       }
       delete cleanItem.sectionEnd;
 
-      if (
-        cleanItem.sectionEnds !== undefined &&
-        root.sectionEnd === undefined
-      ) {
+      if (cleanItem.sectionEnds !== undefined && root.sectionEnd === undefined) {
         root.sectionEnd = cleanItem.sectionEnds;
       }
       delete cleanItem.sectionEnds;
@@ -152,32 +450,39 @@ function normalizeStructuredOCR(raw: unknown): unknown {
       }
       delete cleanItem.eachMarks;
 
-      // Sanitize LaTeX strings in item content
-      if (typeof cleanItem.question === "string") {
-        cleanItem.question = sanitizeLatexString(cleanItem.question);
-      }
-      if (typeof cleanItem.solution === "string") {
-        cleanItem.solution = sanitizeLatexString(cleanItem.solution);
-      }
-      if (typeof cleanItem.hint === "string") {
-        cleanItem.hint = sanitizeLatexString(cleanItem.hint);
-      }
-      if (
-        cleanItem.options &&
-        typeof cleanItem.options === "object" &&
-        !Array.isArray(cleanItem.options)
-      ) {
-        const cleanOptions: Record<string, unknown> = {};
-        for (const [optKey, optVal] of Object.entries(
-          cleanItem.options as Record<string, unknown>,
-        )) {
-          cleanOptions[optKey] = sanitizeLatexString(optVal);
-        }
-        cleanItem.options = cleanOptions;
-      }
+      cleanItem.question = normalizeContentShape(
+        cleanItem.question,
+        cleanItem.questionFigures,
+      );
+      delete cleanItem.questionFigures;
+
+      cleanItem.solution = normalizeContentShape(
+        cleanItem.solution,
+        cleanItem.solutionFigures,
+      );
+      delete cleanItem.solutionFigures;
+
+      cleanItem.options = normalizeOptionsShape(
+        cleanItem.options,
+        cleanItem.optionFigures,
+      );
+      delete cleanItem.optionFigures;
 
       return cleanItem;
     });
+
+    // Native 0-1000 grounding rescale FIRST (page-wide, deterministic); the
+    // per-item heuristic below only handles leftovers it cannot classify.
+    rescaleNativeGroundingBoxes(root);
+
+    // Detect & repair stray non-native scales (percent / 0-1 fallbacks).
+    const items = root.data;
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+        repairFigureCoordinateScales(item as Record<string, unknown>);
+      }
+    }
   }
 
   return root;
@@ -192,10 +497,10 @@ function normalizeStructuredOCR(raw: unknown): unknown {
  * The parsing pipeline is simplified but retains fallback recovery:
  *
  * 1. Direct JSON.parse (primary path for structured output)
- * 2. Fallback: strip `<think>` tags, extract from fences, fix trailing commas
- * 3. Normalization: hoists page-level fields mistakenly placed in items
- * 4. Zod validation as final safety net
- * 5. Null → undefined conversion for downstream compatibility
+ * 2. Fallback: strip thinking tags, extract from fences, fix trailing commas
+ * 3. Coversions: null -> undefined (nullable provider fields to optional Zod fields)
+ * 4. Normalization: hoists page-level fields, reconciles legacy/singular figure shapes
+ * 5. Zod validation as final safety net
  */
 export function parseAndValidateStructuredOCR(
   rawText: string | null,
@@ -213,7 +518,7 @@ export function parseAndValidateStructuredOCR(
   // Primary path: try direct JSON parse (structured output should always work here)
   let parsed = tryParseJson(trimmed);
 
-  // Fallback path: strip <think> tags and extract from fences/braces
+  // Fallback path: strip thinking tags and extract from fences/braces
   if (!parsed.ok) {
     const withoutThinking = trimmed.replace(THINK_TAG, "").trim();
     const jsonPayload = extractJsonPayload(withoutThinking);
