@@ -56,10 +56,12 @@ export const questions = pgTable(
       .default("medium")
       .notNull(),
 
-    questionDiagram: text("question_diagram"),
+    // Comma-separated list of figures associated with the question
+    questionDiagrams: text("question_diagrams"),
+    solutionDiagram: text("solution_diagram"),
+
     hint: text("hint"),
     solution: text("solution"),
-    solutionDiagram: text("solution_diagram"), // Diagrams will be svg or image urls.
 
     createdAt: timestamp("created_at", {
       withTimezone: true,

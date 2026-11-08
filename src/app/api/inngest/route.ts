@@ -9,6 +9,11 @@ import { cleanupStaleUploads } from "@/inngest/functions/v1/cleanup-stale-upload
 import { extractQuestions as extractQuestionsV2 } from "@/inngest/functions/v2/extract-questions";
 import { ocrPage as ocrPageV2 } from "@/inngest/functions/v2/ocr-page";
 import { processDocument as processDocumentV2 } from "@/inngest/functions/v2/process-document";
+import {
+  extractQuestions as extractQuestionsV3,
+} from "@/inngest/functions/v3/extract-questions";
+import { ocrPage as ocrPageV3 } from "@/inngest/functions/v3/ocr-page";
+import { processDocument as processDocumentV3 } from "@/inngest/functions/v3/process-document";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -23,6 +28,11 @@ export const { GET, POST, PUT } = serve({
     // V2 functions
     extractQuestionsV2,
     ocrPageV2,
-    processDocumentV2
+    processDocumentV2,
+
+    // V3 functions (path-based two-stage OCR + stitching + LLM resolver)
+    processDocumentV3,
+    extractQuestionsV3,
+    ocrPageV3,
   ],
 });
