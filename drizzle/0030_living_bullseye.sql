@@ -1,0 +1,2 @@
+CREATE TYPE "public"."failure_reason_enum" AS ENUM('missing question', 'missing option', 'missing solution', 'missing answer key', 'figure_not_found', 'figure_unresolved');--> statement-breakpoint
+ALTER TABLE "questions" ADD COLUMN "failure_reason" "failure_reason_enum"[];

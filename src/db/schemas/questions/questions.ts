@@ -21,6 +21,34 @@ export const questionDifficutlyEnum = pgEnum("question_difficulty_enum", [
   "hard",
 ]);
 
+/**
+ * Single source of truth for every machine-readable failure reason
+ * persisted on the questions table — the `failure_reason` column stores an
+ * array of these values.
+ *
+ * Groups (the pipeline codes in
+ * src/inngest/functions/v3/extract-questions/readiness.ts — sync asserted
+ * by tests):
+ * - readiness gaps:    "missing question" | "missing option" |
+ *                      "missing solution" | "missing answer key"
+ * - figure resolution: "figure_not_found" (stage 2 read the question/option
+ *                      text and found no matching diagram) |
+ *                      "figure_unresolved" (a requested part never got
+ *                      bounding boxes)
+ */
+export const FAILURE_REASONS = [
+  "missing question",
+  "missing option",
+  "missing solution",
+  "missing answer key",
+  "figure_not_found",
+  "figure_unresolved",
+] as const;
+
+export type QuestionFailureReason = (typeof FAILURE_REASONS)[number];
+
+export const failureReasonEnum = pgEnum("failure_reason_enum", FAILURE_REASONS);
+
 export const questions = pgTable(
   "questions",
   {
@@ -68,6 +96,15 @@ export const questions = pgTable(
      * question carried no figures at all.
      */
     figureResolved: boolean("figure_resolved").notNull().default(true),
+
+    /**
+     * All machine-readable failure codes for this row (array of
+     * `failure_reason_enum` values): readiness gaps ("missing question",
+     * "missing option", "missing solution", "missing answer key") plus
+     * figure-resolution codes ("figure_not_found",
+     * "figure_unresolved"). Empty when nothing failed.
+     */
+    failureReason: failureReasonEnum("failure_reason").array(),
 
     /**
      * False while any of the question's constituent parts (question text,
