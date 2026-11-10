@@ -1,0 +1,1 @@
+ALTER TABLE "questions" RENAME COLUMN "question_diagram" TO "question_diagrams";

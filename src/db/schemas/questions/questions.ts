@@ -3,6 +3,7 @@ import {
   text,
   uuid,
   integer,
+  boolean,
   jsonb,
   timestamp,
   pgEnum,
@@ -59,6 +60,28 @@ export const questions = pgTable(
     // Comma-separated list of figures associated with the question
     questionDiagrams: text("question_diagrams"),
     solutionDiagram: text("solution_diagram"),
+
+    /**
+     * False when the source OCR reported a figure for this question (stem,
+     * solution, or an option) that could never be localized/cropped during
+     * extraction. True when every requested figure was resolved — or the
+     * question carried no figures at all.
+     */
+    figureResolved: boolean("figure_resolved").notNull().default(true),
+
+    /**
+     * False while any of the question's constituent parts (question text,
+     * options, solution, answer key) is still absent. The migration
+     * default (false) keeps rows incomplete until a checkout explicitly
+     * marks them ready.
+     */
+    isReady: boolean("is_ready").notNull().default(false),
+
+    /**
+     * Comma-separated reason codes for `is_ready = false`, e.g.
+     * "missing option, missing solution".
+     */
+    notReadyReason: text("not_ready_reason"),
 
     hint: text("hint"),
     solution: text("solution"),
