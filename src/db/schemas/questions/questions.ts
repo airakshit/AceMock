@@ -97,28 +97,8 @@ export const questions = pgTable(
      */
     figureResolved: boolean("figure_resolved").notNull().default(true),
 
-    /**
-     * All machine-readable failure codes for this row (array of
-     * `failure_reason_enum` values): readiness gaps ("missing question",
-     * "missing option", "missing solution", "missing answer key") plus
-     * figure-resolution codes ("figure_not_found",
-     * "figure_unresolved"). Empty when nothing failed.
-     */
-    failureReason: failureReasonEnum("failure_reason").array(),
-
-    /**
-     * False while any of the question's constituent parts (question text,
-     * options, solution, answer key) is still absent. The migration
-     * default (false) keeps rows incomplete until a checkout explicitly
-     * marks them ready.
-     */
     isReady: boolean("is_ready").notNull().default(false),
-
-    /**
-     * Comma-separated reason codes for `is_ready = false`, e.g.
-     * "missing option, missing solution".
-     */
-    notReadyReason: text("not_ready_reason"),
+    notReadyReason: failureReasonEnum("not_ready_reason").array(),
 
     hint: text("hint"),
     solution: text("solution"),
