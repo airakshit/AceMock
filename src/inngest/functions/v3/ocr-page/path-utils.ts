@@ -39,6 +39,16 @@ export function pathKey(path: string[] | null | undefined): string {
 
 export type PathKey = string;
 
+/**
+ * Synthetic one-segment path addressing the page-TOP continuation FRAGMENT
+ * (startState.obj), whose content carries no printed path. Stage 2 boxes
+ * for such a fragment are keyed under this slot; the stitcher re-binds them
+ * to the paired item's real path after the merge. The "@" prefix cannot
+ * collide with a printed label (a printed segment is never "@"-prefixed
+ * after canonicalization).
+ */
+export const START_FRAGMENT_SLOT = "@start";
+
 /** Parses a pathKey back into its canonical segments. */
 export function segmentsFromKey(key: PathKey): string[] {
   try {

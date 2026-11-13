@@ -48,8 +48,6 @@ export interface StructuredLogger {
   child: (context: LogContext) => StructuredLogger;
 }
 
-type LogLevel = "debug" | "info" | "warn" | "error";
-
 const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
@@ -75,7 +73,7 @@ function serializeError(value: unknown): LogRecord["error"] {
     const custom: Record<string, unknown> = {};
     for (const key of Object.keys(value)) {
       if (["name", "message", "stack"].includes(key)) continue;
-      custom[key] = (value as Record<string, unknown>)[key];
+      custom[key] = (value as unknown as Record<string, unknown>)[key];
     }
     return {
       name: value.name,

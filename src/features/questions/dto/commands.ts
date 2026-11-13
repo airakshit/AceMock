@@ -2,6 +2,9 @@
 // Accessed by: services and repositories
 
 import {
+  QuestionFailureReason,
+} from "@/db/schemas/questions/questions";
+import {
   QuestionDifficulty,
   QuestionOption,
   QuestionReportType,
@@ -14,7 +17,8 @@ export interface CreateQuestionItemCommand {
   options: QuestionOption[];
   correctOption: string;
   marks: number;
-  difficulty: QuestionDifficulty;
+  /** Omitted = whatever the questions table default is ("medium"). */
+  difficulty?: QuestionDifficulty;
   chapterId?: string | null;
   fileId?: string | null;
   passageId?: string | null;
@@ -22,6 +26,22 @@ export interface CreateQuestionItemCommand {
   solution?: string | null;
   questionDiagram?: string | null; // Diagrams will either be a url or <svg> text
   solutionDiagram?: string | null;
+  /**
+   * False when a figure the OCR reported for this question (stem/solution/
+   * option) was never localized by the bounding-box stage. Defaults to true.
+   */
+  figureResolved?: boolean;
+  /**
+   * Machine-readable failure codes evaluated for this row (array of
+   * `failure_reason_enum` values), persisted into the `not_ready_reason`
+   * array column. Empty when nothing failed.
+   */
+  failureReasons?: QuestionFailureReason[];
+  /**
+   * False while any of question / options / solution / answer key is still
+   * absent for this row. Defaults to false.
+   */
+  isReady?: boolean;
 }
 
 

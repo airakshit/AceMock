@@ -1,10 +1,8 @@
 /**
  * V3 extract-questions types — PATH-BASED resolved questions.
  */
-import type {
-  QuestionDifficulty,
-  QuestionOption,
-} from "@/features/questions/types";
+import type { QuestionOption } from "@/features/questions/types";
+import type { QuestionFailureReason } from "@/db/schemas/questions/questions";
 import type { BoundingBox, SuperEntity } from "../ocr-page/super-schema";
 
 /**
@@ -23,6 +21,8 @@ export interface ResolvedQuestion {
   label: string;
   /** Canonical join key (also used to key figures and answer rows). */
   pathKey: string;
+  /** Section-scoped record key of the stitching origin (for rewrite jobs & debugging). */
+  recordKey?: string;
   question: string;
   /**
    * True when this question/subquestion can stand alone without the parent
@@ -33,7 +33,6 @@ export interface ResolvedQuestion {
   options: QuestionOption[];
   correctOption: string;
   marks: number;
-  difficulty: QuestionDifficulty;
   subject?: string;
   /** Bounding boxes of each separate diagram in the question stem. */
   questionFigures?: BoundingBox[];
@@ -50,6 +49,24 @@ export interface ResolvedQuestion {
   solution?: string | null;
   /** Standalone printed answer (subjective / value-based questions). */
   answerValue?: string | null;
+  /**
+   * False when stage 1 reported a figure for this question (stem, solution,
+   * or an option) but stage 2 could not localize it. True when every
+   * requested figure was resolved — or nothing was requested.
+   */
+  figureResolved: boolean;
+  /**
+   * True when stage 2 read the question text/options and explicitly found
+   * no diagram matching this entity on the page.
+   */
+  figureNotFound?: boolean;
+  /**
+   * All failure codes accumulated for this row — readiness gaps
+   * ("missing question", "missing option", "missing solution",
+   * "missing answer key") plus figure codes ("figure_not_found",
+   * "figure_unresolved"). Persisted into the `not_ready_reason` array column.
+   */
+  failureReasons?: QuestionFailureReason[];
   diagram_url?: string | null;
   solution_diagram_url?: string | null;
   passageId?: string | null;
@@ -62,6 +79,44 @@ export interface ResolvedQuestion {
   needsReview?: boolean;
   /** Why the question needs review (stable reason codes + details). */
   reviewReasons?: string[];
+  /**
+   * False when any of the question / options / solution / answer key is
+   * absent — see `failureReasons`. Ready questions are complete rows.
+   */
+  isReady: boolean;
+}
+
+/**
+ * A non-standalone (fragment) question whose text needs an LLM polish pass:
+ * the entity's own content plus the parent stem / sibling questions are
+ * gathered so the model can write complete, self-contained question and
+ * solution text.
+ */
+export interface StandaloneRewriteJob {
+  /** Section-scoped record key — matches ResolvedQuestion.recordKey. */
+  id: string;
+  pathKey: string;
+  fileId: string;
+  pageNo: number;
+  /** What the entity itself printed — parent stems NOT joined in. */
+  ownQuestionText: string;
+  ownSolutionText?: string;
+  /** Ancestor directive/stem content (top-down), stems only — no figures. */
+  parentStem?: string;
+  /**
+   * `[[FIG:<path>]]` annotation tokens covering this record's and its
+   * ancestors' figures. Figures themselves are never sent to the LLM.
+   */
+  figureAnnotations: string[];
+  /** Neighboring complete siblings (document order) for context. */
+  surrounding: Array<{
+    label: string;
+    question: string;
+    solution?: string | null;
+  }>;
+  /** Deterministic merged text the stitcher already computed — the fallback. */
+  fallbackQuestion: string;
+  fallbackSolution?: string | null;
 }
 
 /**
@@ -85,6 +140,8 @@ export interface StitchResult {
   questions: ResolvedQuestion[];
   /** Entities that require an LLM resolution call. */
   unresolved: UnresolvedEntity[];
+  /** Non-standalone questions queued for the LLM standalone-rewrite pass. */
+  standaloneRewrites: StandaloneRewriteJob[];
   /** Non-fatal diagnostics from stitching (logged, not thrown). */
   warnings: string[];
 }

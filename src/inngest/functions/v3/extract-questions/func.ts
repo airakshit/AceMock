@@ -19,6 +19,7 @@ import {
 } from "./errors";
 import { ocrPage, OcrPageResult, OcrPageFailedError } from "../ocr-page";
 import type { ExtractedFigure } from "../ocr-page/types";
+import { EMPTY_PAGE_STATE } from "../ocr-page/super-schema";
 import {
   GeminiLLMService,
   GeminiModels,
@@ -26,6 +27,10 @@ import {
 import { env } from "@/config/env/server";
 import { mapExtractedFiguresToQuestions } from "./figures";
 import { resolveUnresolvedEntities } from "./resolver";
+import {
+  applyStandaloneRewrites,
+  rewriteStandaloneEntities,
+} from "./standalone";
 import { createOcrLogger } from "@/lib/logger";
 
 export interface ExtractDocumentQuestionEventData {
@@ -245,8 +250,8 @@ export const extractQuestions = inngest.createFunction(
           | "failed",
         survivedValidation: page.survivedValidation,
         isRelevant: page.isRelevant,
-        isStartOpen: false,
-        isEndOpen: false,
+        startState: EMPTY_PAGE_STATE,
+        endState: EMPTY_PAGE_STATE,
       };
     });
 
@@ -337,9 +342,20 @@ export const extractQuestions = inngest.createFunction(
       });
     });
 
+    // Phase 2 prep — collect the figures extracted by the ocr-page stage.
+    // They are passed INTO the merge so pathless boundary-fragment crops
+    // (keyed under the synthetic "@start"/"@end" slots) can be re-bound to
+    // the real paths of the items their fragments were merged into.
+    const allExtractedFigures: ExtractedFigure[] = [];
+    for (const result of allOcrResults) {
+      if (result.extractedFigures) {
+        allExtractedFigures.push(...result.extractedFigures);
+      }
+    }
+
     const stitchResult = await step.run("merge-ocr-questions", async () => {
       try {
-        const result = mergeOcrResults(allOcrResults);
+        const result = mergeOcrResults(allOcrResults, allExtractedFigures);
         if (result.warnings.length > 0) {
           log.warn("Stitching produced warnings during merge.", {
             warnings: result.warnings,
@@ -436,6 +452,50 @@ export const extractQuestions = inngest.createFunction(
       }
     }
 
+    // -----------------------------------------------------------------------
+    // STANDALONE REWRITE PASS — non-standalone (fragment) questions get an
+    // LLM pass that combines their own text with the parent stem and
+    // sibling context into complete, self-contained question + solution
+    // text. Figure markers ([[FIG:<path>]]) are preserved verbatim. The
+    // stitcher's deterministic stem-joined text remains the fallback.
+    // -----------------------------------------------------------------------
+    if (stitchResult.standaloneRewrites.length > 0) {
+      try {
+        const rewriteService = new GeminiLLMService(
+          env.GEMINI_API_KEY,
+          GeminiModels.GEMINI_3_5_FLASH_LITE,
+        );
+
+        const outcome = await step.run("rewrite-standalone-questions", async () => {
+          return await rewriteStandaloneEntities(
+            rewriteService,
+            stitchResult.standaloneRewrites,
+          );
+        });
+
+        applyStandaloneRewrites(
+          resolvedQuestions,
+          stitchResult.standaloneRewrites,
+          outcome,
+        );
+
+        log.info("Standalone rewrite pass complete.", {
+          documentId,
+          fragments: stitchResult.standaloneRewrites.length,
+          rewritten: outcome.rewrites.length,
+          keptFallback: outcome.skipped.length,
+        });
+      } catch (error) {
+        // Rewrite failure must not kill the extraction: fragments keep
+        // their deterministic stem-joined text.
+        log.error("Standalone rewrite pass failed; keeping stitched text.", {
+          documentId,
+          fragments: stitchResult.standaloneRewrites.length,
+          error: error instanceof Error ? error.message : String(error),
+        }, error);
+      }
+    }
+
     log.info("All pages merged and questions resolved successfully.", {
       documentId,
       totalDocPages: allDocPages.length,
@@ -443,14 +503,8 @@ export const extractQuestions = inngest.createFunction(
     });
 
     // Phase 2 — Map figures extracted by the ocr-page stage onto resolved
-    // questions via the canonical path key.
-    const allExtractedFigures: ExtractedFigure[] = [];
-    for (const result of allOcrResults) {
-      if (result.extractedFigures) {
-        allExtractedFigures.push(...result.extractedFigures);
-      }
-    }
-
+    // questions via the canonical path key (pathless fragment crops were
+    // already re-bound during the merge).
     const figurePaths = mapExtractedFiguresToQuestions(
       resolvedQuestions,
       allExtractedFigures,
@@ -562,12 +616,14 @@ export const extractQuestions = inngest.createFunction(
             options: q.options,
             correctOption: q.correctOption,
             marks: q.marks,
-            difficulty: q.difficulty,
 
             questionDiagram: diagrams?.questionDiagram ?? null,
             hint: q.hint ?? null,
             solution: q.solution ?? null,
             solutionDiagram: diagrams?.solutionDiagram ?? null,
+            figureResolved: q.figureResolved ?? true,
+            failureReasons: q.failureReasons ?? [],
+            isReady: q.isReady ?? false,
           });
         }
 

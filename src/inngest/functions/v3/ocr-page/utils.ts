@@ -1,8 +1,8 @@
-/**
+﻿/**
  * V3 OCR parsing utilities — PATH-BASED two-stage flow.
  *
- * Stage 1 (new-schema pageSchema): text/LaTeX + hasFigure flags per entity.
- * Stage 2 (new-schema stage2RootSchema): bounding boxes keyed by path.
+ * Stage 1 (partial-schemas pageSchema): text/LaTeX + hasFigure flags per entity.
+ * Stage 2 (partial-schemas stage2RootSchema): bounding boxes keyed by path.
  * mergeStage1AndStage2 produces the ./super-schema shape (0-1 fraction
  * boxes), which is exactly what downstream stitching consumes.
  */
@@ -13,16 +13,20 @@ import {
   Stage2Item,
   pageSchema,
   stage2RootSchema,
-} from "./new-schema";
+} from "./partial-schemas";
 import { OcrMergeError } from "./errors";
 import {
   BoundingBox,
   OptionContent,
   StructuredPageParseResult,
   SuperEntity,
+  SuperStartState,
   superPageSchema,
 } from "./super-schema";
-import { pathKey } from "./path-utils";
+import {
+  START_FRAGMENT_SLOT,
+  pathKey,
+} from "./path-utils";
 
 type PartialOCRParseResult = {
   cleanedText: string | null;
@@ -46,7 +50,7 @@ const TRAILING_COMMA = /,\s*([\]}])/g;
 
 /**
  * Extracts the entity array index from a Zod issue path like
- * ["entities", "45", "question", "text"] → 45. Returns undefined when no
+ * ["entities", "45", "question", "text"] â†’ 45. Returns undefined when no
  * entity-level issue is found.
  */
 function extractEntityIndex(
@@ -134,6 +138,18 @@ export function sanitizeLatexString(val: unknown): unknown {
 }
 
 /**
+ * Content fields that make an entity worth keeping. If ALL of these are
+ * null/absent the entity is noise (logged + dropped, never an error).
+ */
+const CONTENT_FIELDS = [
+  "passage",
+  "question",
+  "solution",
+  "options",
+  "answerKey",
+] as const;
+
+/**
  * V3 stage-1 normalization. Deliberately LIGHT — numeric/boolean/path
  * coercions live in the Zod schema (ported from v2's preprocess pipeline);
  * this pass only sanitizes LaTeX-ish `text` values.
@@ -155,8 +171,82 @@ function normalizePartialPage(raw: unknown): unknown {
     });
   }
 
+  // Page-boundary states:
+  //   startState: continuation fragment { refPath: null, obj } OR fresh
+  //               start reference { refPath, obj: null }.
+  //   endState:   pure path reference { refPath } â€” no fragment content lives
+  //               here; the bottom entity's content is in `entities`.
+  // A null/non-object state (model noise) becomes a clean boundary instead of
+  // failing the page.
+  for (const stateField of ["startState", "endState"] as const) {
+    const state = root[stateField];
+    if (!state || typeof state !== "object" || Array.isArray(state)) {
+      root[stateField] =
+        stateField === "startState"
+          ? { refPath: null, obj: null }
+          : { refPath: null };
+      continue;
+    }
+    const clean = { ...(state as Record<string, unknown>) };
+    if (stateField === "startState") {
+      const fragment = clean.obj;
+      if (fragment && typeof fragment === "object" && !Array.isArray(fragment)) {
+        const record = fragment as Record<string, unknown>;
+        const hasUsableContent = CONTENT_FIELDS.some(
+          (field) => record[field] !== undefined && record[field] !== null,
+        );
+        clean.obj = hasUsableContent
+          ? normalizePartialEntity(fragment)
+          : null;
+        // Continuation text at the top carries no printed path of its own.
+        clean.refPath = null;
+      } else {
+        clean.obj = null;
+      }
+    } else {
+      // endState: no fragment content lives here â€” drop anything the model
+      // emitted under obj, keep only the path reference.
+      delete clean.obj;
+    }
+    root[stateField] = clean;
+  }
+
   if (Array.isArray(root.entities)) {
-    root.entities = root.entities.map(normalizePartialEntity);
+    const before = (root.entities as unknown[]).length;
+    const kept: unknown[] = [];
+    const droppedLabels: string[] = [];
+    for (const entity of root.entities as unknown[]) {
+      // Null / non-object entities are model noise, not extraction
+      // failures. So are content-less entities — question/solution/
+      // options/answerKey/passage all null (e.g. a bare printed path the
+      // model could not read). Drop them here instead of letting the
+      // schema fail the whole page (which previously escalated to a
+      // document failure); a page made entirely of these becomes an empty
+      // page and is simply ignored downstream.
+      if (typeof entity !== "object" || entity === null || Array.isArray(entity)) {
+        droppedLabels.push("<non-object>");
+        continue;
+      }
+      const record = entity as Record<string, unknown>;
+      const hasUsableContent = CONTENT_FIELDS.some(
+        (field) => record[field] !== undefined && record[field] !== null,
+      );
+      if (!hasUsableContent) {
+        droppedLabels.push(
+          record.path != null ? JSON.stringify(record.path) : "<no path>",
+        );
+        continue;
+      }
+      kept.push(entity);
+    }
+    if (droppedLabels.length > 0) {
+      console.warn(
+        `[v3-ocr] Page ${
+          root.pageNo == null ? "<unknown>" : String(root.pageNo)
+        }: dropped ${droppedLabels.length}/${before} entity/entities with all-null or missing content (question/solution/options/answerKey/passage); ignoring, not an error${droppedLabels.length ? ` — paths: ${droppedLabels.join(", ")}` : ""}.`,
+      );
+    }
+    root.entities = kept.map(normalizePartialEntity);
   }
 
   return root;
@@ -502,6 +592,83 @@ export interface FigureTarget {
     solution: boolean;
     options: Array<"A" | "B" | "C" | "D">;
   };
+  /** Stage-1 question stem text, when printed — helps stage 2 match diagrams to content. */
+  questionText?: string;
+  /** Stage-1 text of each REQUESTED option, keyed by option letter. */
+  optionTexts?: Partial<Record<"A" | "B" | "C" | "D", string>>;
+}
+
+/**
+ * Figure needs derived from one content holder (entity or fragment):
+ * which of its parts flagged hasFigure=true, plus the transcribed texts
+ * stage 2 needs for context.
+ */
+function figureNeedsOf(holder: {
+  question?: { hasFigure?: boolean; text?: string | null } | null;
+  solution?: { hasFigure?: boolean; text?: string | null } | null;
+  options?: Record<string, { hasFigure?: boolean; text?: string | null }> | null;
+}): {
+  needs: FigureTarget["needs"];
+  questionText: string | undefined;
+  optionTexts: Partial<Record<"A" | "B" | "C" | "D", string>>;
+} {
+  const needs: FigureTarget["needs"] = {
+    question: false,
+    solution: false,
+    options: [],
+  };
+  if (holder.question?.hasFigure) needs.question = true;
+  if (holder.solution?.hasFigure) needs.solution = true;
+  if (holder.options) {
+    for (const key of ["A", "B", "C", "D"] as const) {
+      if (holder.options[key]?.hasFigure) needs.options.push(key);
+    }
+  }
+
+  // Stage-2 context: the model matches diagrams against what the entity
+  // actually says, so thread the transcribed text along (requested parts
+  // only — but options keep their text even when only some are flagged,
+  // since the texts together describe the question).
+  const questionText = holder.question?.text?.trim() || undefined;
+  const optionTexts: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
+  for (const key of needs.options) {
+    const text = holder.options?.[key]?.text?.trim();
+    if (text) optionTexts[key] = text;
+  }
+  return { needs, questionText, optionTexts };
+}
+
+/** Merges one holder's figure needs into an existing target entry. */
+function mergeIntoTarget(
+  existing: FigureTarget,
+  needs: FigureTarget["needs"],
+  questionText: string | undefined,
+  optionTexts: Partial<Record<"A" | "B" | "C" | "D", string>>,
+): void {
+  existing.needs.question ||= needs.question;
+  existing.needs.solution ||= needs.solution;
+  for (const option of needs.options) {
+    if (!existing.needs.options.includes(option)) {
+      existing.needs.options.push(option);
+    }
+  }
+  existing.questionText ??= questionText;
+  existing.optionTexts = { ...optionTexts, ...existing.optionTexts };
+}
+
+function targetFrom(
+  path: string[] | null,
+  needs: FigureTarget["needs"],
+  questionText: string | undefined,
+  optionTexts: Partial<Record<"A" | "B" | "C" | "D", string>>,
+): FigureTarget {
+  return {
+    path,
+    needs,
+    questionText,
+    optionTexts:
+      Object.keys(optionTexts).length > 0 ? optionTexts : undefined,
+  };
 }
 
 /**
@@ -509,6 +676,11 @@ export interface FigureTarget {
  * a stage-1 result. Entities without a printed path all share the one
  * unlabeled slot ("[]") — more than ONE such entity with figures cannot be
  * disambiguated by stage 2, so that situation is a hard OcrMergeError.
+ *
+ * Page-boundary fragments are addressed by their OWN key: the fragment's
+ * refPath when printed, otherwise the synthetic page-top/page-bottom slot
+ * ("@start" / "@end") — at most one fragment per boundary is guaranteed by
+ * the schema, so the slots are unambiguous.
  */
 export function collectFigureTargets(
   stage1: PartialPageParseResult,
@@ -518,21 +690,9 @@ export function collectFigureTargets(
   let unlabeledEntityCount = 0;
 
   for (const entity of stage1.entities) {
-    const needs: FigureTarget["needs"] = {
-      question: false,
-      solution: false,
-      options: [],
-    };
-
-    if (entity.question?.hasFigure) needs.question = true;
-    if (entity.solution?.hasFigure) needs.solution = true;
-    if (entity.options) {
-      for (const key of ["A", "B", "C", "D"] as const) {
-        if (entity.options[key]?.hasFigure) needs.options.push(key);
-      }
-    }
-
-    const anyNeeded = needs.question || needs.solution || needs.options.length > 0;
+    const { needs, questionText, optionTexts } = figureNeedsOf(entity);
+    const anyNeeded =
+      needs.question || needs.solution || needs.options.length > 0;
     if (!anyNeeded) continue;
 
     const key = pathKey(entity.path);
@@ -541,18 +701,12 @@ export function collectFigureTargets(
     const existing = byKey.get(key);
     if (existing) {
       // Content printed together on one entity — merge needs.
-      existing.needs.question ||= needs.question;
-      existing.needs.solution ||= needs.solution;
-      for (const option of needs.options) {
-        if (!existing.needs.options.includes(option)) {
-          existing.needs.options.push(option);
-        }
-      }
+      mergeIntoTarget(existing, needs, questionText, optionTexts);
     } else {
-      byKey.set(key, {
-        path: key === UNLABELED ? null : entity.path ?? null,
-        needs,
-      });
+      byKey.set(
+        key,
+        targetFrom(key === UNLABELED ? null : (entity.path ?? null), needs, questionText, optionTexts),
+      );
     }
   }
 
@@ -563,6 +717,36 @@ export function collectFigureTargets(
     throw new OcrMergeError(
       `Stage-1 reported ${unlabeledEntityCount} unlabeled (continuation) entities with figures; stage 2 cannot disambiguate them.`,
     );
+  }
+
+  // Page-boundary fragment: keyed by refPath when printed, otherwise by the
+  // synthetic "@start" slot. There is no endState fragment - the bottom
+  // entity's figures live under its own path in `entities`.
+  const startFragment = stage1.startState?.obj;
+  if (startFragment) {
+    const state = stage1.startState;
+    const { needs, questionText, optionTexts } = figureNeedsOf(startFragment);
+    const anyNeeded =
+      needs.question || needs.solution || needs.options.length > 0;
+    if (anyNeeded) {
+      const key = state.refPath?.length
+        ? pathKey(state.refPath)
+        : pathKey([START_FRAGMENT_SLOT]);
+      const existing = byKey.get(key);
+      if (existing) {
+        mergeIntoTarget(existing, needs, questionText, optionTexts);
+      } else {
+        byKey.set(
+          key,
+          targetFrom(
+            state.refPath?.length ? state.refPath : [START_FRAGMENT_SLOT],
+            needs,
+            questionText,
+            optionTexts,
+          ),
+        );
+      }
+    }
   }
 
   return [...byKey.values()];
@@ -581,7 +765,9 @@ export function pageHasFigures(stage1: PartialPageParseResult): boolean {
  * The stage-2 parser has already normalized every box to a 0-1 fraction
  * (native page-wide rescale or per-item repair). This is a pure copy.
  */
-function asBoundingBox(box: Stage2Item["questionFigures"][number]): BoundingBox | null {
+function asBoundingBox(
+  box: Stage2Item["questionFigures"][number],
+): BoundingBox | null {
   if (
     !box ||
     typeof box !== "object" ||
@@ -601,7 +787,9 @@ function asBoundingBox(box: Stage2Item["questionFigures"][number]): BoundingBox 
 }
 
 function toBoundingBoxes(
-  boxes: Array<{ xMin: number; yMin: number; xMax: number; yMax: number }> | undefined,
+  boxes:
+    | Array<{ xMin: number; yMin: number; xMax: number; yMax: number }>
+    | undefined,
 ): BoundingBox[] {
   if (!boxes?.length) return [];
   return boxes
@@ -613,15 +801,24 @@ function toBoundingBoxes(
  * Merges stage-1 text extraction with stage-2 bounding box extraction into
  * the super-schema shape.
  *
- * STRICT MERGE RULES (all violations throw OcrMergeError and are treated as
- * non-retriable by the caller):
- *  1. Duplicate path in stage-2 items → OcrMergeError
- *  2. More than one unlabeled (null-path) stage-2 item → OcrMergeError
- *  3. Stage-2 item whose path is not requested by stage 1 → OcrMergeError
- *  4. Stage-1 entity with hasFigure=true but no matching stage-2 figures → OcrMergeError
- *  5. Stage-2 reports figures for a field stage 1 marked hasFigure=false → OcrMergeError
- *  6. Stage-1 entities WITHOUT path (continuation) must map to the single
- *     unlabeled stage-2 item; >1 such stage-1 entity → OcrMergeError
+ * MERGE RULES (stage-2 slip-ups are tolerated with warnings; they must never
+ * fail the page, only degrade figure resolution):
+ *  1. Duplicate path in stage-2 items â†’ OcrMergeError (one item per target is
+ *     the binding contract; duplicates are ambiguous, not lossy)
+ *  2. Stage-2 item whose path was NOT requested by stage 1 (hasFigure=true
+ *     somewhere on that path) â†’ WARN + ignore the whole item; its boxes are
+ *     treated as hallucinations and dropped
+ *  3. Stage-1 hasFigure=true but stage-2 emitted no boxes for that part
+ *     (question/solution/option) → WARN + keep the text-only content
+ *  4. Stage-2 reports figures for a part stage 1 did NOT flag â†’ WARN + ignore
+ *     those figures
+ *  5. Stage-1 entities WITHOUT path (continuation) map to the single
+ *     unlabeled stage-2 item; >1 figure-bearing unlabeled entity is already
+ *     rejected earlier (collectFigureTargets)
+ *
+ * Every requested figure part is tracked per path; when any of them stays
+ * unbox-ed the merged entity is marked `figureResolved: false` so the
+ * question can be flagged downstream in the questions table.
  *
  * Boxes arrive as 0-1 fractions (native rescale already applied in the
  * stage-2 parser) — nothing is rescaled here.
@@ -630,6 +827,80 @@ export function mergeStage1AndStage2(
   stage1: PartialPageParseResult,
   stage2: Stage2BoundingBoxResult,
 ): StructuredPageParseResult {
+  // Aggregate the figure parts each path requests (stage-1 hasFigure flags).
+  // Two entities may share one printed path key (content printed together);
+  // their requests union into one target.
+  const figureNeeds = new Map<
+    string,
+    {
+      question: boolean;
+      solution: boolean;
+      options: Set<"A" | "B" | "C" | "D">;
+    }
+  >();
+  for (const entity of stage1.entities) {
+    const needs = {
+      question: !!entity.question?.hasFigure,
+      solution: !!entity.solution?.hasFigure,
+      options: new Set<"A" | "B" | "C" | "D">(),
+    };
+    if (entity.options) {
+      for (const key of ["A", "B", "C", "D"] as const) {
+        if (entity.options[key]?.hasFigure) needs.options.add(key);
+      }
+    }
+    if (!needs.question && !needs.solution && needs.options.size === 0) {
+      continue;
+    }
+
+    const key = pathKey(entity.path);
+    const existing = figureNeeds.get(key);
+    if (existing) {
+      existing.question ||= needs.question;
+      existing.solution ||= needs.solution;
+      for (const option of needs.options) existing.options.add(option);
+    } else {
+      figureNeeds.set(key, needs);
+    }
+  }
+
+  // Page-boundary fragment requests figures under its OWN key: the
+  // fragment's refPath when printed, otherwise the synthetic "@start" slot.
+  // A key shared with an entity unions its needs (one stage-2 item covers
+  // both). There is no endState fragment - the bottom entity's figures live
+  // under its own path in `entities`.
+  const fragmentKeys = new Map<"startState", string>();
+  const startFragment = stage1.startState?.obj;
+  if (startFragment) {
+    const state = stage1.startState;
+    const key = state.refPath?.length
+      ? pathKey(state.refPath)
+      : pathKey([START_FRAGMENT_SLOT]);
+    const needs = {
+      question: !!startFragment.question?.hasFigure,
+      solution: !!startFragment.solution?.hasFigure,
+      options: new Set<"A" | "B" | "C" | "D">(),
+    };
+    if (startFragment.options) {
+      for (const optionKey of ["A", "B", "C", "D"] as const) {
+        if (startFragment.options[optionKey]?.hasFigure) {
+          needs.options.add(optionKey);
+        }
+      }
+    }
+    if (needs.question || needs.solution || needs.options.size > 0) {
+      const existing = figureNeeds.get(key);
+      if (existing) {
+        existing.question ||= needs.question;
+        existing.solution ||= needs.solution;
+        for (const option of needs.options) existing.options.add(option);
+      } else {
+        figureNeeds.set(key, needs);
+      }
+    }
+    fragmentKeys.set("startState", key);
+  }
+
   const stage2Map = new Map<string, Stage2Item>();
   for (const item of stage2.items ?? []) {
     const key = pathKey(item.path);
@@ -638,33 +909,61 @@ export function mergeStage1AndStage2(
         `Duplicate stage-2 entry for path ${key === "[]" ? "<unlabeled>" : JSON.stringify(item.path ?? [])}.`,
       );
     }
+    // Rule 2: unrequested stage-2 items are hallucinations — ignore the
+    // whole item (all of its boxes), warn, and keep going.
+    if (!figureNeeds.has(key)) {
+      console.warn(
+        `[v3-ocr] Stage-2 reported bounding boxes for ${
+          key === "[]" ? "the unlabeled continuation entity" : `path ${JSON.stringify(item.path ?? [])}`
+        } which stage 1 did not request figures for; ignoring that item.` +
+          ` Stage-2 item: ${JSON.stringify(item)}`,
+      );
+      continue;
+    }
     stage2Map.set(key, item);
+  }
+
+  // Per-path figure resolution: true only when every requested part got at
+  // least one bounding box from stage 2.
+  const figureResolvedByKey = new Map<string, boolean>();
+  /** Per-path "stage 2 read the text and found no matching diagram". */
+  const figureNotFoundByKey = new Map<string, boolean>();
+  for (const [key, needs] of figureNeeds) {
+    const item = stage2Map.get(key);
+    const missingParts: string[] = [];
+    if (needs.question && !item?.questionFigures?.length) {
+      missingParts.push("question");
+    }
+    if (needs.solution && !item?.solutionFigures?.length) {
+      missingParts.push("solution");
+    }
+    for (const optionKey of needs.options) {
+      if (!item?.optionFigures?.[optionKey]) {
+        missingParts.push(`option ${optionKey}`);
+      }
+    }
+
+    // Stage-2 may explicitly say it READ the entity's question/option text
+    // and could not find any matching diagram — a confident negative, not a
+    // missing box. Track it separately as `figureNotFound` and treat it as
+    // unresolved overall.
+    figureNotFoundByKey.set(key, item?.noMatchingFigure === true);
+
+    figureResolvedByKey.set(
+      key,
+      missingParts.length === 0 && !item?.noMatchingFigure,
+    );
+    if (missingParts.length > 0) {
+      console.warn(
+        `[v3-ocr] Stage-2 resolved no diagram for requested ${missingParts.join(", ")} at ${
+          key === "[]" ? "the unlabeled continuation entity" : `path ${key}`
+        }; marking figureResolved=false there.`,
+      );
+    }
   }
 
   const requestedKeys = new Set(stage2Map.keys());
   let unlabeledStage1Consumed = false;
-
-  const stage1FigureKeys = new Set<string>();
-  for (const entity of stage1.entities) {
-    const hasAnyFigure =
-      !!entity.question?.hasFigure ||
-      !!entity.solution?.hasFigure ||
-      (!!entity.options &&
-        (["A", "B", "C", "D"] as const).some(
-          (k) => entity.options![k]?.hasFigure,
-        ));
-    if (!hasAnyFigure) continue;
-    stage1FigureKeys.add(pathKey(entity.path));
-  }
-
-  // Rule 3: every stage-2 key must correspond to a stage-1 figure target.
-  for (const key of requestedKeys) {
-    if (!stage1FigureKeys.has(key)) {
-      throw new OcrMergeError(
-        `Stage-2 reported bounding boxes for ${key === "[]" ? "<unlabeled>" : `path ${key}`} but stage 1 requested no figures there.`,
-      );
-    }
-  }
 
   const takeStage2 = (entity: PartialEntity): Stage2Item | undefined => {
     const key = pathKey(entity.path);
@@ -680,20 +979,29 @@ export function mergeStage1AndStage2(
   };
 
   const mergeContent = (
-    content: PartialEntity["question"],
+    // questionSchema is assignable to PartialSolution (answerValue is the only
+    // extra optional key), so one param type serves both fields.
+    content: PartialEntity["solution"],
     stage2Item: Stage2Item | undefined,
     field: "question" | "solution",
     entityPath: string[] | undefined,
+    describe?: string,
   ): SuperEntity["question"] | undefined => {
     if (!content) {
+      // Stage 1 has no question/solution block at all. Stage 2 may still
+      // report figures for it (model hallucination) — ignore them rather
+      // than failing the whole page. Only warn so it's visible in logs.
       if (stage2Item) {
         const stage2Figures =
           field === "question"
             ? stage2Item.questionFigures
             : stage2Item.solutionFigures;
         if (stage2Figures?.length) {
-          throw new OcrMergeError(
-            `${field} figures reported for ${describeEntityPath(entityPath)} but stage 1 has no ${field}.`,
+          console.warn(
+            `[v3-ocr] Stage-2 reported ${field} figures for ${describe ?? describeEntityPath(
+              entityPath,
+            )} but stage 1 has no ${field} block; ignoring those figures.` +
+              ` Stage-2 figures: ${JSON.stringify(stage2Figures)}`,
           );
         }
       }
@@ -706,28 +1014,45 @@ export function mergeStage1AndStage2(
           ? stage2Item?.questionFigures
           : stage2Item?.solutionFigures;
       if (!stage2Figures?.length) {
-        throw new OcrMergeError(
-          `${field}.hasFigure=true for ${describeEntityPath(entityPath)} but no ${field}Figures in stage-2 output.`,
+        // Stage-2 failed to localize a figure stage 1 confirmed — degrade
+        // gracefully (text-only content); the entity carries
+        // figureResolved=false instead of failing the page.
+        console.warn(
+          `[v3-ocr] ${field}.hasFigure=true for ${describe ?? describeEntityPath(
+            entityPath,
+          )} but stage 2 emitted no ${field}Figures; keeping text-only content.`,
         );
+        return {
+          text: content.text,
+          figures: [],
+          marks: content.marks,
+          subject: content.subject,
+          isStandalone: content.isStandalone,
+          answerValue: content.answerValue,
+        };
       }
       return {
         text: content.text,
         figures: toBoundingBoxes(stage2Figures),
         marks: content.marks,
-        difficulty: content.difficulty,
         subject: content.subject,
         isStandalone: content.isStandalone,
         answerValue: content.answerValue,
       };
     }
 
+    // content.hasFigure === false but stage-2 reports figures â†’ model
+    // hallucination; ignore the figures, keep text-only content.
     const stage2Figures =
       field === "question"
         ? stage2Item?.questionFigures
         : stage2Item?.solutionFigures;
     if (stage2Figures?.length) {
-      throw new OcrMergeError(
-        `${field}.hasFigure=false for ${describeEntityPath(entityPath)} but stage-2 reports figures.`,
+      console.warn(
+        `[v3-ocr] Stage-2 reported ${field} figures for ${describe ?? describeEntityPath(
+          entityPath,
+        )} but stage 1 marked ${field}.hasFigure=false; ignoring those figures.` +
+          ` Stage-2 figures: ${JSON.stringify(stage2Figures)}`,
       );
     }
 
@@ -735,7 +1060,6 @@ export function mergeStage1AndStage2(
       text: content.text,
       figures: [],
       marks: content.marks,
-      difficulty: content.difficulty,
       subject: content.subject,
       isStandalone: content.isStandalone,
       answerValue: content.answerValue,
@@ -745,15 +1069,26 @@ export function mergeStage1AndStage2(
   const mergeOptions = (
     options: PartialEntity["options"],
     stage2Item: Stage2Item | undefined,
+    entityPath: string[] | undefined,
+    describe?: string,
   ): StructuredPageParseResult["entities"][number]["options"] => {
     if (!options) {
-      const hasOrphanFigure = stage2Item?.optionFigures
-        ? Object.values(stage2Item.optionFigures).some(Boolean)
-        : false;
-      if (hasOrphanFigure) {
-        throw new OcrMergeError(
-          "Stage-2 reported option figures but stage 1 has no options on this entity.",
+      // Stage 1 has no options block. Stage 2 may still report option
+      // figures (model hallucination) — ignore them rather than failing.
+      if (stage2Item?.optionFigures) {
+        const orphanKeys = Object.entries(stage2Item.optionFigures).filter(
+          ([, fig]) => Boolean(fig),
         );
+        if (orphanKeys.length > 0) {
+          console.warn(
+            `[v3-ocr] Stage-2 reported option figures for keys ${orphanKeys
+              .map(([k]) => k)
+              .join(
+                ", ",
+              )} but stage 1 has no options on this entity; ignoring those figures.` +
+              ` Stage-2 optionFigures: ${JSON.stringify(stage2Item.optionFigures)}`,
+          );
+        }
       }
       return undefined;
     }
@@ -762,10 +1097,12 @@ export function mergeStage1AndStage2(
     for (const key of ["A", "B", "C", "D"] as const) {
       const option = options[key];
       if (!option) {
-        // Option exists nowhere in stage 1 — stage 2 must not report one.
+        // Option exists nowhere in stage 1 — stage 2 may still report one
+        // (model hallucination); ignore it.
         if (stage2Item?.optionFigures?.[key]) {
-          throw new OcrMergeError(
-            `Option ${key} figure reported in stage 2 but stage 1 has no such option.`,
+          console.warn(
+            `[v3-ocr] Stage-2 reported option ${key} figure but stage 1 has no such option; ignoring.` +
+              ` Stage-2 optionFigures: ${JSON.stringify(stage2Item.optionFigures)}`,
           );
         }
         continue;
@@ -773,18 +1110,26 @@ export function mergeStage1AndStage2(
       if (option.hasFigure) {
         const stage2Figure = stage2Item?.optionFigures?.[key];
         if (!stage2Figure) {
-          throw new OcrMergeError(
-            `Option ${key}.hasFigure=true but no figure in stage-2 optionFigures.`,
+          // Stage-2 failed to localize a figure stage 1 confirmed — degrade
+          // gracefully (text-only option); the entity carries
+          // figureResolved=false instead of failing the page.
+          console.warn(
+            `[v3-ocr] Option ${key}.hasFigure=true for ${describe ?? describeEntityPath(entityPath)} but stage 2 emitted no optionFigures.${key}; keeping text-only option.`,
           );
+          mergedOptions[key] = { text: option.text };
+          continue;
         }
         const figure = asBoundingBox(stage2Figure);
         mergedOptions[key] = figure
           ? { text: option.text, figure }
           : { text: option.text };
       } else {
+        // option.hasFigure === false but stage-2 reports a figure â†’ model
+        // hallucination; ignore the figure, keep text-only option.
         if (stage2Item?.optionFigures?.[key]) {
-          throw new OcrMergeError(
-            `Option ${key}.hasFigure=false but stage-2 reports a figure.`,
+          console.warn(
+            `[v3-ocr] Stage-2 reported option ${key} figure but stage 1 marked option ${key}.hasFigure=false; ignoring.` +
+              ` Stage-2 optionFigures: ${JSON.stringify(stage2Item.optionFigures)}`,
           );
         }
         mergedOptions[key] = { text: option.text };
@@ -808,7 +1153,7 @@ export function mergeStage1AndStage2(
       "solution",
       entity.path,
     );
-    const options = mergeOptions(entity.options, stage2Item);
+    const options = mergeOptions(entity.options, stage2Item, entity.path);
 
     return {
       path: entity.path,
@@ -817,14 +1162,68 @@ export function mergeStage1AndStage2(
       solution,
       options,
       answerKey: entity.answerKey,
+      figureResolved: figureResolvedByKey.get(pathKey(entity.path)) ?? true,
+      figureNotFound: figureNotFoundByKey.get(pathKey(entity.path)) ?? undefined,
     };
   });
+
+  /**
+   * Merges the page-TOP state: the continuation fragment's content is filled
+   * with stage-2 boxes exactly like an entity's, keyed by the fragment's own
+   * key (refPath, or the synthetic "@start" slot).
+   */
+  const mergeStartState = (): SuperStartState => {
+    const state = stage1.startState;
+    const refPath = state.refPath?.length ? state.refPath : null;
+    const fragment = state.obj;
+    if (!fragment) {
+      return { refPath, obj: null };
+    }
+    const key =
+      fragmentKeys.get("startState") ??
+      (refPath ? pathKey(refPath) : pathKey([START_FRAGMENT_SLOT]));
+    const stage2Item = stage2Map.get(key);
+    const describe = refPath
+      ? `page-boundary fragment of ${describeEntityPath(refPath)}`
+      : "the page-top continuation fragment";
+
+    const question = mergeContent(
+      fragment.question,
+      stage2Item,
+      "question",
+      refPath ?? undefined,
+      describe,
+    );
+    const solution = mergeContent(
+      fragment.solution,
+      stage2Item,
+      "solution",
+      refPath ?? undefined,
+      describe,
+    );
+    const options = mergeOptions(fragment.options, stage2Item, refPath ?? undefined, describe);
+
+    return {
+      refPath,
+      obj: {
+        passage: fragment.passage,
+        question,
+        solution,
+        options,
+        answerKey: fragment.answerKey,
+        figureResolved: figureResolvedByKey.get(key) ?? true,
+        figureNotFound: figureNotFoundByKey.get(key),
+      },
+    };
+  };
 
   return {
     pageNo: stage1.pageNo,
     isRelevant: stage1.isRelevant,
-    isStartOpen: stage1.isStartOpen,
-    isEndOpen: stage1.isEndOpen,
+    startState: mergeStartState(),
+    endState: {
+      refPath: stage1.endState.refPath?.length ? stage1.endState.refPath : null,
+    },
     sections: stage1.sections,
     entities: mergedEntities,
   };

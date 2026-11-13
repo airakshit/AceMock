@@ -23,7 +23,7 @@ export const questionDifficutlyEnum = pgEnum("question_difficulty_enum", [
 
 /**
  * Single source of truth for every machine-readable failure reason
- * persisted on the questions table — the `failure_reason` column stores an
+ * persisted on the questions table — the `not_ready_reason` column stores an
  * array of these values.
  *
  * Groups (the pipeline codes in

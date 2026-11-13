@@ -22,9 +22,11 @@ import {
 import {
   partialOCRJsonSchema,
   stage2BoundingBoxRootJsonSchema,
-} from "./new-schema";
+} from "./partial-schemas";
 import type { StructuredPageParseResult } from "./super-schema";
-import type { PartialPageParseResult } from "./new-schema";
+import { EMPTY_PAGE_STATE } from "./super-schema";
+import type { LoosePageState } from "./types";
+import type { PartialPageParseResult } from "./partial-schemas";
 import { env } from "@/config/env/server";
 import { RateLimitError } from "@/services/llm/errors";
 import { NonRetriableError, RetryAfterError } from "inngest";
@@ -119,8 +121,8 @@ export const ocrPage = inngest.createFunction(
         rawText: string | null;
         survivedValidation: boolean;
         isRelevant: boolean;
-        isStartOpen: boolean;
-        isEndOpen: boolean;
+        startState: LoosePageState;
+        endState: LoosePageState;
         data?: PartialPageParseResult;
       }> => {
         let rawText: string | null = null;
@@ -138,12 +140,16 @@ export const ocrPage = inngest.createFunction(
           });
         } catch (error) {
           if (error instanceof RateLimitError) {
-            log.error("Rate limit error in stage 1", {
-              message: error.message,
-              model: error.model,
-              provider: error.llmProvider,
-              retryAfterMs: error.retryAfterMs,
-            }, error);
+            log.error(
+              "Rate limit error in stage 1",
+              {
+                message: error.message,
+                model: error.model,
+                provider: error.llmProvider,
+                retryAfterMs: error.retryAfterMs,
+              },
+              error,
+            );
             throw new RetryAfterError(error.message, error.retryAfterMs);
           }
           log.error("Unexpected LLM error in stage 1", {}, error);
@@ -173,22 +179,26 @@ export const ocrPage = inngest.createFunction(
         if (!survivedValidation) {
           // Log the FULL context: validation errors, raw output, page, attempt,
           // and the offending entity index (e.g. "entities.45").
-          log.error("Stage-1 structured OCR validation failed", {
-            validationErrors,
-            entityIndex,
-            rawOutput: rawText?.slice(0, 2000),
-            attempt,
-          }, new OcrValidationError(
-            `Stage-1 structured OCR validation failed for page ${pageNo}: ${validationErrors?.join("; ") || "Schema validation failed"}`,
+          log.error(
+            "Stage-1 structured OCR validation failed",
             {
               validationErrors,
-              pageNo,
-              attempt,
-              stage: "stage-1",
-              rawOutput: rawText ?? undefined,
               entityIndex,
+              rawOutput: rawText?.slice(0, 2000),
+              attempt,
             },
-          ));
+            new OcrValidationError(
+              `Stage-1 structured OCR validation failed for page ${pageNo}: ${validationErrors?.join("; ") || "Schema validation failed"}`,
+              {
+                validationErrors,
+                pageNo,
+                attempt,
+                stage: "stage-1",
+                rawOutput: rawText ?? undefined,
+                entityIndex,
+              },
+            ),
+          );
 
           if (attempt < TOTAL_RETRIES) {
             throw new OcrValidationError(
@@ -204,10 +214,13 @@ export const ocrPage = inngest.createFunction(
             );
           }
           // Final attempt: proceed with best-effort text (non-blocking).
-          log.warn("Stage-1 validation failed on final attempt; proceeding with best-effort text", {
-            validationErrors,
-            rawOutput: rawText?.slice(0, 500),
-          });
+          log.warn(
+            "Stage-1 validation failed on final attempt; proceeding with best-effort text",
+            {
+              validationErrors,
+              rawOutput: rawText?.slice(0, 500),
+            },
+          );
         }
 
         const parsed = parsedStructuredData;
@@ -215,8 +228,8 @@ export const ocrPage = inngest.createFunction(
           rawText: cleanedText,
           survivedValidation,
           isRelevant: parsed?.isRelevant ?? true,
-          isStartOpen: parsed?.isStartOpen ?? false,
-          isEndOpen: parsed?.isEndOpen ?? false,
+          startState: parsed?.startState ?? EMPTY_PAGE_STATE,
+          endState: parsed?.endState ?? EMPTY_PAGE_STATE,
           data: parsed,
         };
       },
@@ -236,9 +249,13 @@ export const ocrPage = inngest.createFunction(
         figureTargets = collectFigureTargets(stage1Data);
       } catch (error) {
         // Unlabeled-target ambiguity etc. — cannot run stage 2 at all.
-        log.error("Failed to derive stage-2 figure targets", {
-          message: error instanceof Error ? error.message : String(error),
-        }, error);
+        log.error(
+          "Failed to derive stage-2 figure targets",
+          {
+            message: error instanceof Error ? error.message : String(error),
+          },
+          error,
+        );
         throw new NonRetriableError(
           error instanceof Error ? error.message : String(error),
         );
@@ -270,12 +287,16 @@ export const ocrPage = inngest.createFunction(
             );
           } catch (error) {
             if (error instanceof RateLimitError) {
-              log.error("Rate limit error in stage 2", {
-                message: error.message,
-                model: error.model,
-                provider: error.llmProvider,
-                retryAfterMs: error.retryAfterMs,
-              }, error);
+              log.error(
+                "Rate limit error in stage 2",
+                {
+                  message: error.message,
+                  model: error.model,
+                  provider: error.llmProvider,
+                  retryAfterMs: error.retryAfterMs,
+                },
+                error,
+              );
               throw new RetryAfterError(error.message, error.retryAfterMs);
             }
             log.error("Unexpected LLM error in stage 2", {}, error);
@@ -295,22 +316,26 @@ export const ocrPage = inngest.createFunction(
           const detail =
             stage2Parsed.validationErrors?.join("; ") ||
             "Stage-2 bounding box schema validation failed";
-          log.error("Stage-2 structured OCR validation failed", {
-            validationErrors: stage2Parsed.validationErrors,
-            entityIndex: stage2Parsed.entityIndex,
-            rawOutput: stage2Raw?.slice(0, 2000),
-            attempt,
-          }, new OcrValidationError(
-            `Stage-2 bounding box extraction failed for page ${pageNo}: ${detail}`,
+          log.error(
+            "Stage-2 structured OCR validation failed",
             {
               validationErrors: stage2Parsed.validationErrors,
-              pageNo,
-              attempt,
-              stage: "stage-2",
-              rawOutput: stage2Raw ?? undefined,
               entityIndex: stage2Parsed.entityIndex,
+              rawOutput: stage2Raw?.slice(0, 2000),
+              attempt,
             },
-          ));
+            new OcrValidationError(
+              `Stage-2 bounding box extraction failed for page ${pageNo}: ${detail}`,
+              {
+                validationErrors: stage2Parsed.validationErrors,
+                pageNo,
+                attempt,
+                stage: "stage-2",
+                rawOutput: stage2Raw ?? undefined,
+                entityIndex: stage2Parsed.entityIndex,
+              },
+            ),
+          );
 
           if (attempt < TOTAL_RETRIES) {
             throw new OcrValidationError(
@@ -339,10 +364,14 @@ export const ocrPage = inngest.createFunction(
           );
         } catch (error) {
           if (error instanceof OcrMergeError) {
-            log.error("Stage-1 / stage-2 merge failed", {
-              message: error.message,
-              stage: "merge",
-            }, error);
+            log.error(
+              "Stage-1 / stage-2 merge failed",
+              {
+                message: error.message,
+                stage: "merge",
+              },
+              error,
+            );
             throw new NonRetriableError(error.message);
           }
           log.error("Unexpected merge error", {}, error);
@@ -358,8 +387,8 @@ export const ocrPage = inngest.createFunction(
         | "failed",
       survivedValidation: stage1.survivedValidation && !!mergedData,
       isRelevant: stage1.isRelevant,
-      isStartOpen: mergedData?.isStartOpen ?? stage1.isStartOpen,
-      isEndOpen: mergedData?.isEndOpen ?? stage1.isEndOpen,
+      startState: mergedData?.startState ?? stage1.startState,
+      endState: mergedData?.endState ?? stage1.endState,
       parsedData: mergedData,
     };
 
@@ -417,8 +446,8 @@ export const ocrPage = inngest.createFunction(
       survivedValidation: extraction.survivedValidation,
       status: extraction.ocrStatus,
       isRelevant: extraction.isRelevant,
-      isStartOpen: extraction.isStartOpen,
-      isEndOpen: extraction.isEndOpen,
+      startState: extraction.startState,
+      endState: extraction.endState,
       parsedData: extraction.parsedData,
       extractedFigures,
     };

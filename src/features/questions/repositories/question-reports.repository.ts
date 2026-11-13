@@ -168,7 +168,7 @@ export class QuestionReportsRepository {
         correctOption: questions.correctOption,
         marks: questions.marks,
         difficulty: questions.difficulty,
-        questionDiagram: questions.questionDiagram,
+        questionDiagram: questions.questionDiagrams,
         // Cheap availability flag — always selected so the UI badge works
         // even when there is no solution to reveal.
         hasSolution: sql<boolean>`${questions.solution} IS NOT NULL`,

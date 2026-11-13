@@ -5,7 +5,11 @@ import {
 } from "@/lib/supabase/storage-paths";
 import type { BoundingBox, StructuredPageParseResult } from "./super-schema";
 import { computeCropRegion } from "./crop-region";
-import { pathKey, segmentsForFilename } from "./path-utils";
+import {
+  START_FRAGMENT_SLOT,
+  pathKey,
+  segmentsForFilename,
+} from "./path-utils";
 import sharp from "sharp";
 
 /**
@@ -28,6 +32,8 @@ export interface ExtractedFigure {
   bbox: BoundingBox;
   /** Page number the figure was extracted from. */
   pageNo: number;
+  /** Document file the figure was cropped from (page numbers restart per file). */
+  fileId: string;
 }
 
 /**
@@ -158,20 +164,27 @@ export async function extractFiguresFromPage(
   documentId: string,
   fileName: string,
 ): Promise<ExtractedFigure[]> {
-  if (!parsedData?.entities?.length) {
+  if (!parsedData) {
     return [];
   }
 
   const retriever = getStorageRetriever(fileName);
   const extractedFigures: ExtractedFigure[] = [];
 
-  for (const entity of parsedData.entities) {
-    const path = entity.path;
-
+  /**
+   * Crops one content holder's figures (question / solution / options),
+   * shared by entities and page-boundary fragments. A fragment's identity
+   * is its refPath when printed, otherwise the synthetic slot the stitcher
+   * re-binds to the paired item's real path after merging.
+   */
+  const extractHolderFigures = async (
+    holder: StructuredPageParseResult["entities"][number],
+    path: string[] | undefined,
+  ): Promise<void> => {
     // Question stem figures
-    if (entity.question?.figures?.length) {
-      for (let i = 0; i < entity.question.figures.length; i++) {
-        const bbox = entity.question.figures[i];
+    if (holder.question?.figures?.length) {
+      for (let i = 0; i < holder.question.figures.length; i++) {
+        const bbox = holder.question.figures[i];
         const figName = generateFigureName({
           path,
           figureType: "question",
@@ -195,9 +208,9 @@ export async function extractFiguresFromPage(
     }
 
     // Solution figures
-    if (entity.solution?.figures?.length) {
-      for (let i = 0; i < entity.solution.figures.length; i++) {
-        const bbox = entity.solution.figures[i];
+    if (holder.solution?.figures?.length) {
+      for (let i = 0; i < holder.solution.figures.length; i++) {
+        const bbox = holder.solution.figures[i];
         const figName = generateFigureName({
           path,
           figureType: "solution",
@@ -221,9 +234,9 @@ export async function extractFiguresFromPage(
     }
 
     // Option figures
-    if (entity.options) {
+    if (holder.options) {
       for (const optionKey of ["A", "B", "C", "D"] as const) {
-        const bbox = entity.options[optionKey]?.figure;
+        const bbox = holder.options[optionKey]?.figure;
         if (!bbox) continue;
 
         const figName = generateFigureName({
@@ -249,6 +262,22 @@ export async function extractFiguresFromPage(
         );
       }
     }
+  };
+
+  for (const entity of parsedData.entities ?? []) {
+    await extractHolderFigures(entity, entity.path);
+  }
+
+  // Page-boundary fragments: only the page-TOP fragment can carry figures -
+  // the bottom state is a pure path reference with no content. A pathless
+  // fragment's boxes were keyed under the synthetic "@start" slot; the
+  // stitcher re-binds them to the paired item's real path after the merge.
+  const startFragment = parsedData.startState?.obj;
+  if (startFragment) {
+    const path = parsedData.startState.refPath?.length
+      ? parsedData.startState.refPath
+      : [START_FRAGMENT_SLOT];
+    await extractHolderFigures(startFragment, path);
   }
 
   return extractedFigures;
@@ -287,5 +316,6 @@ async function cropEntityFigure(
     storagePath,
     bbox,
     pageNo,
+    fileId,
   };
 }

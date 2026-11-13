@@ -18,9 +18,12 @@ export interface QuestionDiagramPaths {
  * stage) onto resolved questions via the canonical PATH KEY.
  *
  * Matching priority per question:
- *   1. pathKey + a page the figure was extracted from that this question
- *      actually spans (handles section-scoped path reprints),
- *   2. pathKey alone (cross-page entities).
+ *   1. pathKey + the question's own file + a page the figure was extracted
+ *      from that this question actually spans (handles section-scoped path
+ *      reprints),
+ *   2. pathKey alone, preferring the question's file (cross-page entities,
+ *      with a cross-file fallback for questions that continue across the
+ *      file boundary).
  * Figures of unmatched pathKeys are ignored (logged upstream).
  */
 export function mapExtractedFiguresToQuestions(
@@ -39,11 +42,16 @@ export function mapExtractedFiguresToQuestions(
 
   const consumed = new Set<ExtractedFigure>();
 
-  // Pass 1: strict match — pathKey AND page overlap.
+  // Pass 1: strict match — pathKey, SAME file, AND page overlap. Page
+  // numbers restart per file, so a fileId check is what prevents figures
+  // from one file bleeding onto same-numbered questions of another file.
   for (const q of resolvedQuestions) {
     if (q.pathKey.startsWith("resolved:")) continue;
     const candidates = (figuresByKey.get(q.pathKey) ?? []).filter(
-      (fig) => !consumed.has(fig) && q.pageNos.includes(fig.pageNo),
+      (fig) =>
+        !consumed.has(fig) &&
+        fig.fileId === q.fileId &&
+        q.pageNos.includes(fig.pageNo),
     );
     if (candidates.length > 0) {
       result.set(q.pathKey, takeFigures(q, candidates, consumed));
@@ -51,11 +59,18 @@ export function mapExtractedFiguresToQuestions(
   }
 
   // Pass 2: pathKey-only (figures from adjacent pages of a split entity).
+  // Prefer figures from the question's own file; only fall back to another
+  // file's figures when the question genuinely continues across the file
+  // boundary and nothing same-file is left.
   for (const q of resolvedQuestions) {
     if (result.has(q.pathKey)) continue;
-    const candidates = (figuresByKey.get(q.pathKey) ?? []).filter(
+    const pool = (figuresByKey.get(q.pathKey) ?? []).filter(
       (fig) => !consumed.has(fig),
     );
+    const candidates =
+      pool.filter((fig) => fig.fileId === q.fileId).length > 0
+        ? pool.filter((fig) => fig.fileId === q.fileId)
+        : pool;
     if (candidates.length > 0) {
       result.set(q.pathKey, takeFigures(q, candidates, consumed));
     }

@@ -91,10 +91,13 @@ export class QuestionsRepository {
         difficulty: data.difficulty,
         passageId: data.passageId ?? null,
         fileId: data.fileId ?? null,
-        questionDiagram: data.questionDiagram ?? null,
+        questionDiagrams: data.questionDiagram ?? null,
         hint: data.hint ?? null,
         solution: data.solution ?? null,
         solutionDiagram: data.solutionDiagram ?? null,
+        figureResolved: data.figureResolved ?? true,
+        notReadyReason: data.failureReasons ?? [],
+        isReady: data.isReady ?? false,
       })
       .returning();
 
@@ -119,10 +122,13 @@ export class QuestionsRepository {
       difficulty: item.difficulty,
       passageId: item.passageId ?? null,
       fileId: item.fileId ?? null,
-      questionDiagram: item.questionDiagram ?? null,
+      questionDiagrams: item.questionDiagram ?? null,
       hint: item.hint ?? null,
       solution: item.solution ?? null,
       solutionDiagram: item.solutionDiagram ?? null,
+      figureResolved: item.figureResolved ?? true,
+      notReadyReason: item.failureReasons ?? [],
+      isReady: item.isReady ?? false,
     }));
 
     return db.insert(questions).values(valuesToInsert).returning();
@@ -217,7 +223,7 @@ export class QuestionsRepository {
         correctOption: questions.correctOption,
         marks: questions.marks,
         difficulty: questions.difficulty,
-        questionDiagram: questions.questionDiagram,
+        questionDiagram: questions.questionDiagrams,
         hint: questions.hint,
         solution: questions.solution,
         solutionDiagram: questions.solutionDiagram,
@@ -330,6 +336,25 @@ export class QuestionsRepository {
       .returning();
 
     return updated;
+  }
+
+  /**
+   * Marks (or re-marks) a question's figure resolution state — false when a
+   * figure the OCR reported for the question stem/solution/options could
+   * never be localized during extraction.
+   */
+  async updateFigureResolved(
+    db: DbExecutor,
+    questionId: string,
+    figureResolved: boolean,
+  ) {
+    const [updated] = await db
+      .update(questions)
+      .set({ figureResolved, updatedAt: new Date() })
+      .where(eq(questions.id, questionId))
+      .returning();
+
+    return updated ?? null;
   }
 
   async updateManyChapterIds(

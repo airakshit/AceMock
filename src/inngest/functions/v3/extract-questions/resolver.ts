@@ -18,6 +18,11 @@ import {
 } from "../ocr-page/utils";
 import type { UnresolvedEntity } from "./types";
 import type { ResolvedQuestion } from "./types";
+import {
+  buildFailureReasons,
+  deriveFigureFailureReason,
+  deriveReadiness,
+} from "./readiness";
 import { formatPathDisplay } from "../ocr-page/path-utils";
 
 // ---------------------------------------------------------------------------
@@ -51,19 +56,12 @@ export const resolverEntityResultSchema = z.object({
     .refine(
       (value) =>
         value === null ||
-        ["math", "physics", "chemistry", "grammar", "comprehension"].includes(
+        ["maths", "physics", "chemistry", "grammar", "comprehension"].includes(
           value,
         ),
       { message: "unknown subject" },
     ),
   marks: z.number().int().positive().nullable(),
-  difficulty: z
-    .string()
-    .nullable()
-    .refine(
-      (value) => value === null || ["easy", "medium", "hard"].includes(value),
-      { message: "difficulty must be easy, medium, hard or null" },
-    ),
   notes: z.string().nullable(),
 });
 
@@ -121,13 +119,9 @@ const resolverRawJsonSchema = {
           answerValue: { type: ["string", "number", "null"] },
           subject: {
             type: ["string", "null"],
-            enum: ["math", "physics", "chemistry", "grammar", "comprehension", "null"],
+            enum: ["maths", "physics", "chemistry", "grammar", "comprehension", "null"],
           },
           marks: { type: ["integer", "null"], minimum: 1 },
-          difficulty: {
-            type: ["string", "null"],
-            enum: ["easy", "medium", "hard", "null"],
-          },
           notes: { type: ["string", "null"] },
         },
         required: [
@@ -140,7 +134,6 @@ const resolverRawJsonSchema = {
           "answerValue",
           "subject",
           "marks",
-          "difficulty",
           "notes",
         ],
         additionalProperties: false,
@@ -225,7 +218,7 @@ export function buildResolutionPrompt(context: ResolutionContext): string {
 Your job: decide for EACH entity whether it contains a real question worth keeping, and if so output the COMPLETE question content (merging split fragments across the supplied context). Precision over coverage:
 - If the material is a headline, instruction, continuation tail without any actual question, duplicated junk, or unreadable, choose "discard".
 - If it is a real question (even partially incomplete), choose "resolve" and transcribe the question IN FULL, inferring any numbering continuation from the neighboring questions listed for context. Fix obvious split-sentence continuations by joining the fragment to its parent question text where context makes the join unambiguous.
-- Do NOT invent options, answers, solutions, marks or difficulty that are not visible or inferable from context — leave those keys null.
+- Do NOT invent options, answers, solutions, marks or subject that are not visible or inferable from context — leave those keys null.
 - Keep math in KaTeX ($...$ / $$...$$, \\\\ce{} for chemistry), every backslash doubled in JSON. Transcribe verbatim otherwise.
 - Match the numbering style of neighboring questions for text like "(ii)".
 
@@ -233,7 +226,7 @@ Your job: decide for EACH entity whether it contains a real question worth keepi
 ${items}
 
 ## Output
-One JSON object: { "results": [ { "id": <echo one id per entity>, "action": "resolve"|"discard", "questionText": string|null, "options": { "A": {"text": string|null}, ... }|null, "correctOption": "A"|"B"|"C"|"D"|null, "solutionText": string|null, "answerValue": string|number|null, "subject": "math"|"physics"|"chemistry"|"grammar"|"comprehension"|null, "marks": integer|null, "difficulty": "easy"|"medium"|"hard"|null, "notes": string|null } ] }
+One JSON object: { "results": [ { "id": <echo one id per entity>, "action": "resolve"|"discard", "questionText": string|null, "options": { "A": {"text": string|null}, ... }|null, "correctOption": "A"|"B"|"C"|"D"|null, "solutionText": string|null, "answerValue": string|number|null, "subject": "maths"|"physics"|"chemistry"|"grammar"|"comprehension"|null, "marks": integer|null, "notes": string|null } ] }
 - Output ONE result object per input entity, echoing its id exactly.
 - "options" null when the question is not multiple-choice.`;
 }
@@ -319,6 +312,17 @@ export async function resolveUnresolvedEntities(
       ? options.find((opt) => opt.text.trim() === finalValue)?.key
       : undefined;
 
+    const { isReady, reasons } = deriveReadiness({
+      question: questionText,
+      questionFigureCount: 0,
+      hasOptions: options.length > 0,
+      optionCount: options.length,
+      solution: result.solutionText,
+      answerKey: result.correctOption ?? null,
+      answerValue:
+        result.answerValue !== null ? String(result.answerValue) : null,
+    });
+
     resolved.push({
       fileId: entry.fileId,
       pageNos: [entry.pageNo],
@@ -330,17 +334,28 @@ export async function resolveUnresolvedEntities(
       options,
       correctOption: result.correctOption ?? crossCheckOption ?? options[0]?.key ?? "A",
       marks: result.marks ?? 1,
-      difficulty:
-        (result.difficulty as ResolvedQuestion["difficulty"] | null) ?? "medium",
       subject: result.subject ?? undefined,
       hint: null,
       solution: result.solutionText,
       answerValue: result.answerValue !== null ? String(result.answerValue) : null,
+      // Resolver-recovered questions carry no figure-resolution data; a
+      // resolver can never confirm a figure, so mark it unresolved until a
+      // human confirms otherwise.
+      figureResolved: entry.entity.figureResolved !== false,
+      figureNotFound: entry.entity.figureNotFound === true,
+      failureReasons: buildFailureReasons(
+        reasons,
+        deriveFigureFailureReason({
+          figureResolved: entry.entity.figureResolved !== false,
+          figureNotFound: entry.entity.figureNotFound,
+        }),
+      ),
       needsReview: true,
       reviewReasons: [
         ...(entry.reasons.length ? entry.reasons : ["resolver-recovered"]),
         result.notes ? `resolver-notes:${result.notes}` : "",
       ].filter(Boolean),
+      isReady,
     });
   }
 

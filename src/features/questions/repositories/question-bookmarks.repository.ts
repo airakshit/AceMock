@@ -83,7 +83,7 @@ export class QuestionBookmarksRepository {
         options: questions.options,
         marks: questions.marks,
         difficulty: questions.difficulty,
-        questionDiagram: questions.questionDiagram,
+        questionDiagram: questions.questionDiagrams,
         // Cheap availability flag — always selected so the UI badge works
         // even when the answer columns themselves are not requested.
         hasSolution: sql<boolean>`${questions.solution} IS NOT NULL`,
