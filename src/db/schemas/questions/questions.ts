@@ -31,8 +31,10 @@ export const questionDifficutlyEnum = pgEnum("question_difficulty_enum", [
  * by tests):
  * - readiness gaps:    "missing question" | "missing option" |
  *                      "missing solution" | "missing answer key"
- * - figure resolution: "figure_not_found" (stage 2 read the question/option
- *                      text and found no matching diagram) |
+ * - figure resolution: "figure_not_found" (stage 2 read the question/
+ *                      solution/option texts and found no matching diagram) |
+ *                      "figure_do_not_match" (diagrams exist on the page but
+ *                      none matches the entity's supplied texts) |
  *                      "figure_unresolved" (a requested part never got
  *                      bounding boxes)
  */
@@ -42,6 +44,7 @@ export const FAILURE_REASONS = [
   "missing solution",
   "missing answer key",
   "figure_not_found",
+  "figure_do_not_match",
   "figure_unresolved",
 ] as const;
 
@@ -53,7 +56,6 @@ export const questions = pgTable(
   "questions",
   {
     id: uuid("id").primaryKey(),
-    question: text("question").notNull(),
 
     chapterId: uuid("chapter_id").references(() => chapters.id, {
       onDelete: "set null",
@@ -66,21 +68,21 @@ export const questions = pgTable(
       onDelete: "set null",
     }),
 
-    options: jsonb("options")
-      .$type<
-        {
-          key: string;
-          text: string;
-        }[]
-      >()
-      .notNull(),
+    question: text("question"),
+    options: jsonb("options").$type<
+      {
+        key: string;
+        text: string | null;
+        diagram: string | null;
+      }[]
+    >(),
 
     correctOption: char("correct_option", {
       length: 1,
-    }).notNull(),
-
+    }),
+    hint: text("hint"),
+    solution: text("solution"),
     marks: integer("marks").notNull().default(1),
-
     difficulty: questionDifficutlyEnum("difficulty")
       .default("medium")
       .notNull(),
@@ -100,8 +102,6 @@ export const questions = pgTable(
     isReady: boolean("is_ready").notNull().default(false),
     notReadyReason: failureReasonEnum("not_ready_reason").array(),
 
-    hint: text("hint"),
-    solution: text("solution"),
 
     createdAt: timestamp("created_at", {
       withTimezone: true,

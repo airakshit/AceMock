@@ -225,6 +225,20 @@
       "when": 1794330952598,
       "tag": "0031_pink_archangel",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794645787786,
+      "tag": "0032_tan_ulik",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794651460629,
+      "tag": "0033_eager_snowbird",
+      "breakpoints": true
     }
   ]
 }

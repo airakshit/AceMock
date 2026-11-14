@@ -1,0 +1,1 @@
+ALTER TYPE "public"."failure_reason_enum" ADD VALUE 'figure_do_not_match' BEFORE 'figure_unresolved';
